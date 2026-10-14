@@ -14,18 +14,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - name: Install Android SDK 36
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
       - name: Accept licenses and install required packages
         run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
       - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
       - name: Offline manifest and source assertions
