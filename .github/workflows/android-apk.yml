@@ -1,0 +1,63 @@
+name: Build PulsePlayer APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'scripts/**'
+      - '.github/workflows/android-apk.yml'
+      - 'PulsePlayer-v3-Compact-MiniPlayer-Source.zip'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Expand source ZIP when supplied
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f PulsePlayer-v3-Compact-MiniPlayer-Source.zip ]]; then
+            mkdir -p "$RUNNER_TEMP/pulseplayer-import"
+            unzip -q PulsePlayer-v3-Compact-MiniPlayer-Source.zip -d "$RUNNER_TEMP/pulseplayer-import"
+            test -f "$RUNNER_TEMP/pulseplayer-import/PulsePlayer-v3/settings.gradle.kts"
+            cp -a "$RUNNER_TEMP/pulseplayer-import/PulsePlayer-v3/." .
+          fi
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Verify project sources
+        run: python3 scripts/verify_source.py
+      - name: Run unit tests and build debug APK
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulseplayer-v3-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
