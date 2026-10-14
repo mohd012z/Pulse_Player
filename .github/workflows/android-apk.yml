@@ -20,10 +20,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK 36
-        uses: android-actions/setup-android@v3
-      - name: Accept licenses and install required packages
-        run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+      - name: Install Android SDK 36 on GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          test -x "$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$sdk_root" \
+            --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
       - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
