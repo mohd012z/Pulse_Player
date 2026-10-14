@@ -403,11 +403,11 @@ class MainActivity : Activity() {
     }
 
     private fun addRadioDialog() {
-        val nameEdit = EditText(this).apply { hint = "Station name"; singleLine = true }
+        val nameEdit = EditText(this).apply { hint = "Station name"; setSingleLine(true) }
         val urlEdit = EditText(this).apply {
             hint = "https://station.example/live.mp3"
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            singleLine = true
+            setSingleLine(true)
         }
         val fields = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -875,7 +875,7 @@ class MainActivity : Activity() {
             setHintTextColor(0xFF8296A7L.toInt())
             setTextColor(Color.WHITE)
             textSize = 14f
-            singleLine = true
+            setSingleLine(true)
             setPadding(dp(12), dp(7), dp(12), dp(7))
             background = panelBackground()
             addTextChangedListener(object : TextWatcher {
