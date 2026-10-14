@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "ce1ea0bfe20ac58e3b1afc59b84c886548a61bcf89295fe2d6a992e45bad94d3  PulsePlayer-v6-MP3-Downloads-Quality-Source.zip" | sha256sum --check -
+          echo "91526d039077b9234add4d7cb8287fb3050684723c4263e91eadee45690f079d  PulsePlayer-v6-MP3-Downloads-Quality-Source.zip" | sha256sum --check -
           unzip -t PulsePlayer-v6-MP3-Downloads-Quality-Source.zip
           mkdir -p "$RUNNER_TEMP/pulse-source"
           unzip -q PulsePlayer-v6-MP3-Downloads-Quality-Source.zip -d "$RUNNER_TEMP/pulse-source"
