@@ -33,23 +33,6 @@ class RadioRepository(context: Context) {
         Station("MY · BFM 89.9", "https://playerservices.streamtheworld.com/api/livestream-redirect/BFMAAC_SC")
     )
 
-    fun discovered(): List<Station> = runCatching {
-        val arr = JSONArray(prefs.getString("discovered_my", "[]"))
-        (0 until arr.length()).mapNotNull { i ->
-            val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-            val name = obj.optString("name").trim()
-            val url = obj.optString("url").trim()
-            if (!name.startsWith("MY ·") || !isValidUrl(url)) null else Station(name.take(90), url)
-        }
-    }.getOrDefault(emptyList())
-
-    fun replaceDiscovery(found: List<Station>): Boolean {
-        val arr = JSONArray()
-        found.asSequence().filter { it.name.startsWith("MY ·") && isValidUrl(it.url) }
-            .distinctBy { it.url }.take(70).forEach { arr.put(JSONObject().put("name", it.name).put("url", it.url)) }
-        return prefs.edit().putString("discovered_my", arr.toString()).commit()
-    }
-
     fun stations(): List<Station> {
         val saved = runCatching {
             val array = JSONArray(prefs.getString("stations", "[]"))
@@ -60,29 +43,20 @@ class RadioRepository(context: Context) {
                 if (name.isEmpty() || !isValidUrl(url)) null else Station(name, url)
             }
         }.getOrDefault(emptyList())
-        return (saved + discovered() + examples).distinctBy { it.url }
+        return (examples + saved).distinctBy { it.url }
     }
-
-    fun favorites(): List<Station> = runCatching {
-        val arr = JSONArray(prefs.getString("stations", "[]"))
-        (0 until arr.length()).mapNotNull { i ->
-            val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-            val name = obj.optString("name").trim()
-            val url = obj.optString("url").trim()
-            if (name.isEmpty() || !isValidUrl(url)) null else Station(name, url)
-        }
-    }.getOrDefault(emptyList())
 
     fun add(name: String, url: String): Boolean {
         val cleanName = name.trim().take(90)
         val cleanUrl = url.trim()
-        if (cleanName.isEmpty() || !isValidUrl(cleanUrl) || favorites().any { it.url == cleanUrl }) return false
+        if (cleanName.isEmpty() || !isValidUrl(cleanUrl) || stations().any { it.url == cleanUrl }) return false
         val arr = JSONArray(prefs.getString("stations", "[]"))
         arr.put(JSONObject().put("name", cleanName).put("url", cleanUrl))
         return prefs.edit().putString("stations", arr.toString()).commit()
     }
 
     fun remove(url: String): Boolean {
+        if (examples.any { it.url == url }) return false
         val saved = runCatching { JSONArray(prefs.getString("stations", "[]")) }.getOrNull() ?: return false
         val keep = JSONArray()
         var deleted = false

@@ -17,20 +17,6 @@ class AudioEffectsManager {
     var bass: Int = 0
         private set
 
-    var customBassDb = 0
-        private set
-    var customMidDb = 0
-        private set
-    var customTrebleDb = 0
-        private set
-
-    fun setCustom(bassDb: Int, midDb: Int, trebleDb: Int): Boolean {
-        customBassDb = bassDb.coerceIn(-6, 6)
-        customMidDb = midDb.coerceIn(-6, 6)
-        customTrebleDb = trebleDb.coerceIn(-6, 6)
-        return setPreset("Custom")
-    }
-
     val hasEqualizer: Boolean get() = equalizer != null
     val hasBassBoost: Boolean get() = bassBoost != null
 
@@ -60,7 +46,7 @@ class AudioEffectsManager {
                 val range = effect.bandLevelRange
                 for (index in 0 until effect.numberOfBands.toInt()) {
                     val centerHz = effect.getCenterFreq(index.toShort()) / 1000.0
-                    val gain = (SoundPresets.gainDb(name, centerHz, customBassDb, customMidDb, customTrebleDb) * 100.0)
+                    val gain = (SoundPresets.gainDb(name, centerHz) * 100.0)
                         .roundToInt()
                         .coerceIn(range[0].toInt(), range[1].toInt())
                     effect.setBandLevel(index.toShort(), gain.toShort())

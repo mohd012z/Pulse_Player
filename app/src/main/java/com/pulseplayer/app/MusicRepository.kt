@@ -35,11 +35,12 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION
         )
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        // Scan all user-visible audio, including MP3s not classified as IS_MUSIC.
+        // Storage access is still governed by Android's audio permission.
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection,
-            selection,
+            null,
             null,
             "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC"
         )?.use { cursor ->

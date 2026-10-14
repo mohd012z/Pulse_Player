@@ -15,24 +15,13 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-      - name: Extract verified v6 source archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "91526d039077b9234add4d7cb8287fb3050684723c4263e91eadee45690f079d  PulsePlayer-v6-MP3-Downloads-Quality-Source.zip" | sha256sum --check -
-          unzip -t PulsePlayer-v6-MP3-Downloads-Quality-Source.zip
-          mkdir -p "$RUNNER_TEMP/pulse-source"
-          unzip -q PulsePlayer-v6-MP3-Downloads-Quality-Source.zip -d "$RUNNER_TEMP/pulse-source"
-          test -f "$RUNNER_TEMP/pulse-source/PulsePlayer-v6/settings.gradle.kts"
-          cp -a "$RUNNER_TEMP/pulse-source/PulsePlayer-v6/." "$GITHUB_WORKSPACE/"
-          test -f app/src/main/java/com/pulseplayer/app/AuthorizedMp3Downloader.kt
       - name: Install Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - name: Install Android SDK 36
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
       - name: Accept licenses and install required packages
         run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
       - name: Set up Gradle 8.13
