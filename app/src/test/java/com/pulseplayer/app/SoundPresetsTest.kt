@@ -29,6 +29,13 @@ class SoundPresetsTest {
         assertTrue(SoundPresets.gainDb("NovaStream TV", 2300.0) > SoundPresets.gainDb("NovaStream TV", 550.0))
     }
 
+    @Test fun customAndNoisePresetsAreBounded() {
+        assertTrue(SoundPresets.names.contains("Custom"))
+        assertTrue(SoundPresets.names.contains("Noise Softening"))
+        assertEquals(6.0, SoundPresets.gainDb("Custom", 100.0, 12, 0, 0), 0.0)
+        assertTrue(SoundPresets.gainDb("Noise Softening", 10000.0) < 0.0)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun unknownPresetFailsClosed() {
         SoundPresets.gainDb("HiddenMode", 1000.0)

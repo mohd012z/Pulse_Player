@@ -31,7 +31,8 @@ assert "androidx.media3.session.MediaSessionService" in intents
 
 source = ROOT / "app/src/main/java/com/pulseplayer/app"
 expected = {"MainActivity", "PlaybackService", "AudioEffectsManager", "MusicRepository", "SoundPresets",
-            "FolderAudioRepository", "RadioRepository", "PlaybackInputs", "MiniPlayerGestures", "LyricsRepository", "SpectrumView"}
+            "FolderAudioRepository", "RadioRepository", "PlaybackInputs", "MiniPlayerGestures",
+            "TimedLyrics", "SpectrumView", "MalaysiaRadioDirectory"}
 actual = {file.stem for file in source.glob("*.kt")}
 assert expected <= actual, f"Missing Kotlin modules: {expected - actual}"
 service_text = (source / "PlaybackService.kt").read_text()
@@ -60,19 +61,21 @@ for profile in ("Immersive", "NovaStream TV"):
     assert profile in presets
 assert "SYSTEM_ALERT_WINDOW" not in permissions
 assert "android.permission.RECORD_AUDIO" in permissions
-assert "scanMalaysiaRadio" in activity_text and "LyricsRepository.at" in activity_text
-assert "CMD_SET_CUSTOM" in constants and "PlaybackService.CMD_SET_CUSTOM" in activity_text
-assert "SpectrumView" in activity_text and "showCustomEq" in activity_text
-assert "scanMalaysia" in (source / "RadioRepository.kt").read_text()
-for profile in ("R&B", "Rock", "Classical", "Subwoofer", "Noise Softener", "Custom"):
-    assert profile in presets
+for feature in ("REQUEST_LYRICS", "TimedLyrics.activeIndex", "discoverMalaysiaRadio", "showCustomEqualizer", "requestSpectrum", "Spotify", "Lyrics / subtitles"):
+    assert feature in activity_text, f"Missing v4 feature: {feature}"
+assert "bycountrycodeexact/MY" in (source / "MalaysiaRadioDirectory.kt").read_text()
+assert "onFftDataCapture" in (source / "SpectrumView.kt").read_text()
+assert "CMD_SET_CUSTOM" in service_text
+assert "PlaybackService.CMD_SET_CUSTOM" in activity_text
+assert (ROOT / "app/src/test/java/com/pulseplayer/app/TimedLyricsTest.kt").is_file()
 
 assert "onConnectAsync" in service_text
 assert "controller.packageName == packageName" in service_text
 build = (ROOT / "app/build.gradle.kts").read_text()
 assert 'val media3Version = "1.11.1"' in build
 assert "targetSdk = 36" in build
+assert "versionCode = 4" in build
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text()
 assert ":app:testDebugUnitTest :app:assembleDebug" in workflow
-print("PASS: XML/resources, permissions, service registration, modules, commands, workflow")
+print("PASS: v4 XML/resources, permissions, service registration, modules, commands, workflow")
 print("NOTE: Android compilation, instrumentation, playback and APK generation are NOT tested here")
