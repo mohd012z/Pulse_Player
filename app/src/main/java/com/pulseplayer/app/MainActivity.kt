@@ -875,6 +875,8 @@ class MainActivity : Activity() {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
             "YouTube Music" -> "https://music.youtube.com/"
+            "YouTube Shorts" -> "https://www.youtube.com/shorts"
+            "Short Drama" -> "https://www.youtube.com/results?search_query=short+drama"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
@@ -884,7 +886,7 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music")) {
+            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music", "YouTube Shorts", "Short Drama")) {
                 startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
                     putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, destination)
                 })
@@ -942,7 +944,7 @@ class MainActivity : Activity() {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
@@ -1072,7 +1074,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER  ·  CLOUD v9", 16f, COLOR_ACCENT, true)
+        val brand = label("♫  PULSE PLAYER  ·  CLOUD v10", 16f, COLOR_ACCENT, true)
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
