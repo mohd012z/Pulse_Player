@@ -445,7 +445,7 @@ class MainActivity : Activity() {
     }
 
     private fun selectMixPreset() {
-        val options = SoundPresets.names.toTypedArray()
+        val options = SoundPresets.featuredNames.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Sound mixer · EQ profile")
             .setSingleChoiceItems(options, -1) { dialog, which ->
