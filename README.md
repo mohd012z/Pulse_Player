@@ -105,3 +105,16 @@ Observed: XML/source check **PASS**, preset test **15 PASS**, input validation *
 - Radio remains a saved manual stream list. Automatic Malaysian station discovery and stream validation are not yet implemented.
 - HQ restoration, machine-learning noise reduction, and a synchronized music spectrum visualizer are not yet implemented. Lossy MP3 detail cannot be perfectly recreated.
 - YouTube, YouTube Music and JOOX should use their official experiences. Spotify App Remote integration requires registered OAuth client ID and app permissions; do not decode or extract its stream.
+
+## v7 — In-app YouTube / Spotify / JOOX portal
+
+PulsePlayer provides a **single app screen** for selecting YouTube, YouTube Music, Spotify and JOOX through provider-owned experiences, under More → Online music services. It is not a universal music stream extractor.
+
+- YouTube: paste an official YouTube video or playlist URL. PulsePlayer validates its ID and embeds the YouTube player using its IFrame format, keeping video and player controls visible. Playback depends on the video's embeddability and Google's policy/device checks. YouTube Music home runs in the provider's web page; not all music playback is available in WebView.
+- Spotify: paste a public Spotify track, album, playlist, artist, episode, or show share link. PulsePlayer creates an official `open.spotify.com/embed/...` experience. Playback length, features, region, account and browser support are controlled by Spotify. Full native Spotify playback would require licensed Spotify integration; Spotify App Remote controls the installed Spotify app rather than streaming Spotify into ExoPlayer.
+- JOOX: official `https://www.joox.com/` website is available in the in-app provider panel. This is not the proprietary JOOX native SDK; JOOX playback/login in Android WebView is not guaranteed. Authorized JOOX SDK playback requires partner app ID and authorization.
+- "Official app" button is the fallback if web playback fails. No DRM bypass, audio ripping, background YouTube-only audio, extraction or mp3 conversion from the three services.
+
+WebView: HTTPS host restrictions for main-frame navigation; JavaScript and DOM storage for official embeds; no file/content access, mixed-content blocked, safe browsing, no autoplay before user action, limited third-party cookies. The Music Hub screen is non-exported. The local ExoPlayer session pauses when entering the hub to avoid overlapping audio.
+
+After building, test with a physical Android device and valid official provider links. This source is not proof all providers permit embedded playback for all accounts or regions.

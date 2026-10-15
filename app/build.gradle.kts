@@ -11,8 +11,8 @@ android {
         applicationId = "com.pulseplayer.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "5.0.0"
+        versionCode = 7
+        versionName = "7.0.0"
     }
 
     buildTypes {

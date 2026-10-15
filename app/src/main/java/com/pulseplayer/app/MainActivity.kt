@@ -711,6 +711,16 @@ class MainActivity : Activity() {
                 station.name.contains(query, ignoreCase = true)
         }
 
+    private fun openInAppProvider(provider: ProviderMediaUrls.Provider) {
+        // Do not overlap our ExoPlayer audio with an independent authorized provider.
+        controller?.pause()
+        runCatching {
+            startActivity(Intent(this, InAppMusicHubActivity::class.java).apply {
+                putExtra(InAppMusicHubActivity.EXTRA_PROVIDER, provider.name)
+            })
+        }.onFailure { status("In-app provider unavailable: ${it.message}") }
+    }
+
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
@@ -762,7 +772,7 @@ class MainActivity : Activity() {
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio presets / bass",
         "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Synchronized lyrics (.lrc)",
-        "World music catalog (Jamendo)"
+        "World music catalog (Jamendo)", "In-app YouTube / Spotify / JOOX"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Pick one or multiple audio files", "Import folder recursively", "View selected files", "Remove imported folders", "Clear picked file list", "Rescan device music")) {
@@ -775,13 +785,13 @@ class MainActivity : Activity() {
                     5 -> scanLibrary()
                 }
             }
-            1 -> showPicker("Online music · authorized sources", arrayOf("World music (Jamendo)", "Spotify official app", "JOOX official app", "YouTube Music official app", "YouTube official app")) {
+            1 -> showPicker("Online music · authorized sources", arrayOf("World music (Jamendo)", "Spotify in-app embed", "JOOX in-app website", "YouTube Music in-app", "YouTube in-app")) {
                 when (it) {
                     0 -> showWorldMenu()
-                    1 -> openProvider("Spotify")
-                    2 -> openProvider("JOOX")
-                    3 -> openProvider("YouTube Music")
-                    4 -> openProvider("YouTube")
+                    1 -> openInAppProvider(ProviderMediaUrls.Provider.SPOTIFY)
+                    2 -> openInAppProvider(ProviderMediaUrls.Provider.JOOX)
+                    3 -> openInAppProvider(ProviderMediaUrls.Provider.YOUTUBE_MUSIC)
+                    4 -> openInAppProvider(ProviderMediaUrls.Provider.YOUTUBE)
                 }
             }
             2 -> showPicker("Malaysia radio", arrayOf(
@@ -811,6 +821,15 @@ class MainActivity : Activity() {
             6 -> shareCurrentTrack()
             7 -> showLyricsDialog()
             8 -> showWorldMenu()
+            9 -> showPicker("Choose in-app provider", arrayOf("YouTube", "YouTube Music", "Spotify Embed", "JOOX Website")) { which ->
+                val provider = listOf(
+                    ProviderMediaUrls.Provider.YOUTUBE,
+                    ProviderMediaUrls.Provider.YOUTUBE_MUSIC,
+                    ProviderMediaUrls.Provider.SPOTIFY,
+                    ProviderMediaUrls.Provider.JOOX
+                )[which]
+                openInAppProvider(provider)
+            }
         }
     }
 

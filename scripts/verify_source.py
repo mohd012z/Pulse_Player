@@ -88,3 +88,17 @@ assert 'resolveMp3Download' in world_repo and 'mp31' in (source / 'Mp3DownloadIn
 assert 'showSelectedMp3Download' in activity_text and '↓ MP3' in activity_text
 assert 'DownloadManager.Request' in (source / 'AuthorizedMp3Downloader.kt').read_text()
 print("PASS: artist-authorized MP3, 96kbps/VBR selection, Android DownloadManager")
+
+# v7 in-app official embed hubs — not protected-audio extraction or unlicensed playback.
+hub = (source / "InAppMusicHubActivity.kt").read_text()
+urls = (source / "ProviderMediaUrls.kt").read_text()
+assert "InAppMusicHubActivity" in activity_text
+assert "controller?.pause()" in activity_text
+assert "javaScriptEnabled = true" in hub
+for feature in ("allowFileAccess = false", "allowContentAccess = false", "MIXED_CONTENT_NEVER_ALLOW", "mediaPlaybackRequiresUserGesture = true", "onPause()", "onDestroy()"):
+    assert feature in hub, f"Missing safe WebView integration: {feature}"
+for allowed in ("youtube.com/embed/", "open.spotify.com/embed/", "www.joox.com"):
+    assert allowed in urls
+assert "android:exported=\"false\"" in (ROOT / "app/src/main/AndroidManifest.xml").read_text()
+assert (ROOT / "app/src/test/java/com/pulseplayer/app/ProviderMediaUrlsTest.kt").exists()
+print("PASS: embedded YouTube/Spotify and JOOX first-party website integration declarations")
