@@ -30,7 +30,9 @@ class ProviderBrowserActivity : Activity() {
             "Spotify" to "https://open.spotify.com/",
             "JOOX" to "https://www.joox.com/",
             "YouTube" to "https://www.youtube.com/",
-            "YouTube Music" to "https://music.youtube.com/"
+            "YouTube Music" to "https://music.youtube.com/",
+            "YouTube Shorts" to "https://www.youtube.com/shorts",
+            "Short Drama" to "https://www.youtube.com/results?search_query=short+drama"
         )
     }
 
@@ -137,6 +139,11 @@ class ProviderBrowserActivity : Activity() {
         button("Forward") { if (browser.canGoForward()) browser.goForward() }
         button("Home") { browser.loadUrl(home) }
         button("Reload") { browser.reload() }
+        if (provider in setOf("YouTube", "YouTube Shorts", "Short Drama")) {
+            button("Shorts") { browser.loadUrl("https://www.youtube.com/shorts") }
+            button("Drama") { browser.loadUrl("https://www.youtube.com/results?search_query=short+drama") }
+        }
+        button("CC") { status.text = "Use the video player's CC control for available subtitles." }
         button("External", 1.3f) { openExternal(Uri.parse(browser.url ?: home)) }
         controlsContainer = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -150,8 +157,13 @@ class ProviderBrowserActivity : Activity() {
             scheduleAutoHide()
         }
         setContentView(root)
-        browser.loadUrl(home)
+        if (savedInstanceState == null || browser.restoreState(savedInstanceState) == null) browser.loadUrl(home)
         scheduleAutoHide()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (::browser.isInitialized) browser.saveState(outState)
+        super.onSaveInstanceState(outState)
     }
 
     private fun openExternal(uri: Uri) {
