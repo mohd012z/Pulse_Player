@@ -17,7 +17,8 @@
         android:theme="@style/Theme.PulsePlayer"
         android:supportsRtl="true">
 
-        <activity android:name=".ProviderBrowserActivity" android:exported="false" />
+        <activity android:name=".ProviderBrowserActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize" />
 
         <activity
             android:name=".MainActivity"
