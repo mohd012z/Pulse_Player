@@ -250,10 +250,10 @@ class MainActivity : Activity() {
     private fun filterLibrary() {
         val query = filterView.text?.toString()?.trim().orEmpty()
         visibleSongs.clear()
-        visibleSongs.addAll(if (query.isEmpty()) songs else songs.filter {
+        visibleSongs.addAll((if (query.isEmpty()) songs else songs.filter {
             it.title.contains(query, ignoreCase = true) ||
                 it.artist.contains(query, ignoreCase = true)
-        })
+        }).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }) )
         val lines: List<String> = when (source) {
             "FOLDERS" -> folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }
                 .map { "${it.name}\n${it.folder}" }
@@ -1069,6 +1069,10 @@ class MainActivity : Activity() {
         tabs.addView(button("♫ FX") { selectMixPreset() },
             LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
         root.addView(tabs)
+        val radioTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        radioTools.addView(button("Scan MY stations") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        radioTools.addView(button("All radio") { switchPlaylist("RADIO") }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        root.addView(radioTools)
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
