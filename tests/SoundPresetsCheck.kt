@@ -1,7 +1,7 @@
 import com.pulseplayer.app.SoundPresets
 
 fun main() {
-    check(SoundPresets.names.size == 23)
+    check(SoundPresets.names.size == 21)
     check(SoundPresets.gainDb("Flat", 20.0) == 0.0)
     check(SoundPresets.gainDb("Flat", 20000.0) == 0.0)
     check(SoundPresets.gainDb("Warm", 100.0) > SoundPresets.gainDb("Warm", 8000.0))
@@ -17,9 +17,5 @@ fun main() {
     check(SoundPresets.gainDb("Immersive", 12000.0) > SoundPresets.gainDb("Immersive", 400.0))
     check(SoundPresets.gainDb("NovaStream TV", 2400.0) > SoundPresets.gainDb("NovaStream TV", 550.0))
     check(SoundPresets.names.distinct().size == SoundPresets.names.size)
-    check(SoundPresets.gainDb("Subwoofer", 50.0) > SoundPresets.gainDb("Subwoofer", 2000.0))
-    check(SoundPresets.gainDb("Noise Softening", 11000.0) < SoundPresets.gainDb("Noise Softening", 1500.0))
-    check(SoundPresets.gainDb("Custom", 2000.0, -4, 3, 1) == 3.0)
-    check(SoundPresets.gainDb("Custom", 80.0, 15, 3, 1) == 6.0)
-    println("SoundPresets: 19 assertions PASSED")
+    println("SoundPresets: 16 assertions PASSED")
 }

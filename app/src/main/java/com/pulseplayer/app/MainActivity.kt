@@ -33,9 +33,9 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
-import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.view.inputmethod.EditorInfo
 import android.text.Editable
 import android.text.TextWatcher
 import androidx.media3.common.C
@@ -57,8 +57,7 @@ class MainActivity : Activity() {
         private const val REQUEST_AUDIO_PERMISSION = 101
         private const val REQUEST_OPEN_AUDIO = 102
         private const val REQUEST_OPEN_FOLDER = 103
-        private const val REQUEST_LYRICS = 104
-        private const val REQUEST_SPECTRUM_PERMISSION = 105
+        private const val REQUEST_OPEN_LRC = 104
         private const val EXTRA_SHORTCUT = "shortcut"
         private const val COLOR_BG = 0xFF10141FL.toInt()
         private const val COLOR_PANEL = 0xFF1B2331L.toInt()
@@ -74,14 +73,15 @@ class MainActivity : Activity() {
     private val visibleSongs = ArrayList<MusicRepository.Song>()
     private val folderTracks = ArrayList<FolderAudioRepository.Track>()
     private val radioRepo by lazy { RadioRepository(this) }
-    private val lyricsPrefs by lazy { getSharedPreferences("song_lyrics", MODE_PRIVATE) }
-    private var lyricsTrackId: String? = null
-    private var lyricLines: List<TimedLyrics.Line> = emptyList()
-    private var lyricGeneration = 0
-    private var spectrumView: SpectrumView? = null
-    private var customLow = 0
-    private var customMid = 0
-    private var customHigh = 0
+    private val pickedRepo by lazy { ImportedAudioRepository(this) }
+    private val worldRepo by lazy { JamendoCatalogRepository() }
+    private val worldPrefs by lazy { getSharedPreferences("world_music_catalog", MODE_PRIVATE) }
+    private val worldTracks = ArrayList<JamendoCatalogRepository.Track>()
+    private var worldQuery = ""
+    private var worldOffset = 0
+    private var worldSearchGeneration = 0
+    private var selectedWorldTrackId: String? = null
+    private lateinit var worldDownloadButton: Button
     private val folderPrefs by lazy { getSharedPreferences("selected_folders", MODE_PRIVATE) }
     private var source = "DEVICE"
     private var folderScanGeneration = 0
@@ -92,8 +92,8 @@ class MainActivity : Activity() {
     private var pendingPickedUri: Uri? = null
     private var seeking = false
     private var bassStrength = 0
+    private var importedLyrics: List<LrcLyrics.Line> = emptyList()
 
-    private lateinit var lyricView: TextView
     private lateinit var titleView: TextView
     private lateinit var artistView: TextView
     private lateinit var progressView: TextView
@@ -141,7 +141,6 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
-        spectrumView?.stop()
         clock.removeCallbacks(ticker)
         controller?.removeListener(playerListener)
         controller = null
@@ -151,10 +150,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        lyricGeneration++
-        spectrumView?.stop()
         scanGeneration++
         folderScanGeneration++
+        worldSearchGeneration++
         super.onDestroy()
     }
 
@@ -207,13 +205,6 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                showSpectrum()
-            } else {
-                status("FFT visualization requires optional audio capture permission")
-            }
-        }
         if (requestCode == REQUEST_AUDIO_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
                 scanLibrary()
@@ -259,6 +250,11 @@ class MainActivity : Activity() {
                 .map { "${it.name}\n${it.folder}" }
             "RADIO", "MY RADIO" -> filteredStations(query)
                 .map { "${it.name}\nLIVE STREAM" }
+            "PICKED" -> pickedRepo.all().filter { it.name.contains(query, true) }
+                .map { "${it.name}\nSelected local file" }
+            "ALL LOCAL" -> allLocalItems().filter { it.second.contains(query, true) }
+                .map { "${it.second}\nOn your device" }
+            "WORLD" -> worldTracks.map { "${it.title}\n${it.artist} · ${if (it.downloadAllowed) "↓ MP3 available" else "stream only"}" }
             else -> visibleSongs.map { "${it.title}\n${it.artist}" }
         }
         currentDisplaySize = lines.size
@@ -268,7 +264,16 @@ class MainActivity : Activity() {
         libraryView.text = "${source}  ·  $currentDisplaySize tracks / stations"
         if (::sourceView.isInitialized) sourceView.text = "${source.replace('_', ' ')} · ${currentDisplaySize} items"
         if (::sourceButton.isInitialized) sourceButton.text = "${source} ▾"
+        if (::worldDownloadButton.isInitialized) worldDownloadButton.visibility =
+            if (source == "WORLD") View.VISIBLE else View.GONE
     }
+
+    private fun allLocalItems(): List<Pair<MediaItem, String>> = (
+        songs.map { it.toMediaItem() to it.title } +
+            folderTracks.map { it.toMediaItem() to it.name } +
+            pickedRepo.all().map { it.toMediaItem() to it.name }
+        ).distinctBy { (item, _) -> item.mediaId }
+            .sortedBy { (_, title) -> title.lowercase(Locale.ROOT) }
 
     private fun playSelection(index: Int) {
         val c = controller ?: run { status("Connecting to player…"); return }
@@ -282,9 +287,19 @@ class MainActivity : Activity() {
                 val stations = filteredStations(query)
                 stations.map { it.toMediaItem() } to stations.getOrNull(index)?.name
             }
+            "PICKED" -> {
+                val picked = pickedRepo.all().filter { it.name.contains(query, true) }
+                picked.map { it.toMediaItem() } to picked.getOrNull(index)?.name
+            }
+            "ALL LOCAL" -> {
+                val local = allLocalItems().filter { it.second.contains(query, true) }
+                local.map { it.first } to local.getOrNull(index)?.second
+            }
+            "WORLD" -> worldTracks.map { it.toMediaItem() } to worldTracks.getOrNull(index)?.title
             else -> visibleSongs.map { it.toMediaItem() } to visibleSongs.getOrNull(index)?.title
         }
         if (index !in queue.indices) return
+        if (source == "WORLD") selectedWorldTrackId = worldTracks.getOrNull(index)?.id
         c.setMediaItems(queue, index, 0L)
         c.prepare()
         c.play()
@@ -301,7 +316,7 @@ class MainActivity : Activity() {
     }
 
     private fun rotatePlaylist() {
-        val choices = listOf("DEVICE", "FOLDERS", "MY RADIO", "RADIO")
+        val choices = listOf("ALL LOCAL", "DEVICE", "FOLDERS", "PICKED", "WORLD", "MY RADIO", "RADIO")
         switchPlaylist(choices[(choices.indexOf(source) + 1) % choices.size], true)
     }
 
@@ -383,21 +398,34 @@ class MainActivity : Activity() {
                 val station = filteredStations(query).getOrNull(index) ?: return
                 AlertDialog.Builder(this)
                     .setTitle(station.name)
-                    .setItems(arrayOf("Play station", "Save as favorite", "Remove from favorites")) { _, selected ->
-                        when (selected) {
-                            0 -> playSelection(index)
-                            1 -> status(if (radioRepo.add(station.name, station.url))
-                                "Added to radio favorites" else "Station already bookmarked")
-                            2 -> status(if (radioRepo.remove(station.url))
-                                "Removed from favorites" else "No removable favorite found")
-                        }
-                        filterLibrary()
+                    .setItems(arrayOf("Play station", "Remove saved station")) { _, selected ->
+                        if (selected == 0) playSelection(index)
+                        else if (radioRepo.remove(station.url)) {
+                            filterLibrary()
+                            status("Removed saved radio station")
+                        } else status("Built-in sample stations cannot be removed")
                     }.show()
             }
             "FOLDERS" -> {
                 val track = folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }.getOrNull(index)
                 track?.let { shareLocalUri(it.uri) }
             }
+            "PICKED" -> pickedRepo.all().filter { it.name.contains(query, true) }
+                .getOrNull(index)?.let { shareLocalUri(it.uri) }
+            "WORLD" -> {
+                val track = worldTracks.getOrNull(index) ?: return
+                AlertDialog.Builder(this)
+                    .setTitle(track.title)
+                    .setMessage("${track.artist}\n\n${if (track.downloadAllowed) "Artist permits MP3 download." else "Stream only — artist does not permit downloads."}\nLicense: ${track.licenseUrl}")
+                    .setPositiveButton("Play") { _, _ -> playSelection(index) }
+                    .setNeutralButton(if (track.downloadAllowed) "↓ Download MP3" else "No download") { _, _ ->
+                        if (track.downloadAllowed) showMp3QualityPicker(track)
+                        else status("Artist has disabled downloads for this song")
+                    }
+                    .setNegativeButton("Close", null).show()
+            }
+            "ALL LOCAL" -> allLocalItems().filter { it.second.contains(query, true) }
+                .getOrNull(index)?.first?.localConfiguration?.uri?.let { shareLocalUri(it) }
             else -> visibleSongs.getOrNull(index)?.let { shareLocalUri(it.uri) }
         }
     }
@@ -458,203 +486,6 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancel", null).show()
     }
 
-    private fun discoverMalaysiaRadio() {
-        status("Searching public Malaysia internet-radio directory…")
-        thread(name = "PulseMalaysiaRadioScan", isDaemon = true) {
-            val result = runCatching { MalaysiaRadioDirectory().scan() }
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                result.onSuccess { found ->
-                    if (found.isNotEmpty() && radioRepo.replaceDiscovery(found)) {
-                        switchPlaylist("MY RADIO")
-                        status("Saved ${found.size} Malaysia radio directory entries. Long-press to favorite.")
-                    } else {
-                        status("No confirmed HTTPS Malaysian stations found. Saved stations were kept.")
-                    }
-                }.onFailure { error ->
-                    status("Radio scan unavailable: ${error.message}. Saved radio stations remain available.")
-                }
-            }
-        }
-    }
-
-    private fun lyricKey(id: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-            .digest(id.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun lyricsForCurrent() {
-        val item = controller?.currentMediaItem ?: run { status("Play a local song first"); return }
-        val uri = item.localConfiguration?.uri ?: return
-        if (uri.scheme != "content") {
-            status("Lyrics import is available for local music, not internet radio")
-            return
-        }
-        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        }
-        runCatching { startActivityForResult(picker, REQUEST_LYRICS) }
-            .onFailure { status("Cannot open LRC subtitle picker: ${it.message}") }
-    }
-
-    private fun refreshLyricsIfNeeded() {
-        val item = controller?.currentMediaItem
-        val id = item?.mediaId?.takeIf { it.isNotBlank() }
-            ?: item?.localConfiguration?.uri?.toString()
-        if (lyricsTrackId == id) return
-        lyricsTrackId = id
-        lyricLines = emptyList()
-        if (!::lyricView.isInitialized) return
-        lyricView.text = "♫ Lyrics: choose More → Lyrics → Import .lrc"
-        if (id == null) return
-        val saved = lyricsPrefs.getString(lyricKey(id), null) ?: return
-        parseLyricsAsync(id, Uri.parse(saved))
-    }
-
-    private fun parseLyricsAsync(songId: String, lyricUri: Uri) {
-        val generation = ++lyricGeneration
-        thread(name = "PulseLrcReader", isDaemon = true) {
-            val result = runCatching {
-                val buffer = java.io.ByteArrayOutputStream()
-                contentResolver.openInputStream(lyricUri)?.use { input ->
-                    val part = ByteArray(4096)
-                    while (true) {
-                        val n = input.read(part)
-                        if (n < 0) break
-                        check(buffer.size() + n <= 1_000_000) { "LRC file exceeds 1 MB" }
-                        buffer.write(part, 0, n)
-                    }
-                } ?: error("Cannot read selected LRC file")
-                TimedLyrics.parse(buffer.toString(Charsets.UTF_8.name()).removePrefix("\uFEFF"))
-            }
-            runOnUiThread {
-                if (generation != lyricGeneration || lyricsTrackId != songId || isFinishing || isDestroyed) return@runOnUiThread
-                result.onSuccess {
-                    lyricLines = it
-                    status(if (it.isEmpty()) "LRC has no valid timed lines" else "Loaded ${it.size} synchronized LRC subtitles")
-                }.onFailure { error ->
-                    lyricLines = emptyList()
-                    status("Cannot load lyrics: ${error.message}")
-                }
-            }
-        }
-    }
-
-    private fun showLyricDialog() {
-        if (lyricLines.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle("Synchronized song lyrics")
-                .setMessage("Import a local .lrc file for the current song first. No copyrighted lyrics are fetched automatically.")
-                .setPositiveButton("Import .lrc") { _, _ -> lyricsForCurrent() }
-                .setNegativeButton("Close", null).show()
-            return
-        }
-        val text = TextView(this).apply {
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(dp(16), dp(18), dp(16), dp(18))
-            text = lyricLines.take(600).joinToString("\n\n") { it.text }
-        }
-        val scroll = ScrollView(this).apply { addView(text) }
-        AlertDialog.Builder(this)
-            .setTitle("Lyrics · synchronized line shown in mini-player")
-            .setView(scroll)
-            .setPositiveButton("Import another .lrc") { _, _ -> lyricsForCurrent() }
-            .setNegativeButton("Close", null).show()
-    }
-
-    private fun showCustomEqualizer() {
-        val values = intArrayOf(customLow, customMid, customHigh)
-        val labels = arrayOf("Bass (under 250 Hz)", "Midrange (250–4000 Hz)", "Treble (over 4000 Hz)")
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(10), dp(18), dp(8))
-        }
-        labels.forEachIndexed { index, name ->
-            val text = label("$name · ${values[index]} dB", 13f, COLOR_MUTED)
-            layout.addView(text)
-            val slider = SeekBar(this).apply {
-                max = 12
-                progress = values[index] + 6
-                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onStartTrackingTouch(bar: SeekBar) = Unit
-                    override fun onStopTrackingTouch(bar: SeekBar) = Unit
-                    override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
-                        values[index] = progress - 6
-                        text.text = "$name · ${values[index]} dB"
-                    }
-                })
-            }
-            layout.addView(slider)
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Custom EQ · ±6 dB per region")
-            .setMessage("Adjust conservatively to avoid distortion. Uses device EQ, not a full parametric processor.")
-            .setView(layout)
-            .setPositiveButton("Apply") { _, _ ->
-                customCommand(PlaybackService.CMD_SET_CUSTOM, Bundle().apply {
-                    putInt(PlaybackService.ARG_CUSTOM_BASS, values[0])
-                    putInt(PlaybackService.ARG_CUSTOM_MID, values[1])
-                    putInt(PlaybackService.ARG_CUSTOM_TREBLE, values[2])
-                }) { _, ok ->
-                    if (ok) {
-                        customLow = values[0]
-                        customMid = values[1]
-                        customHigh = values[2]
-                    }
-                    status(if (ok) "Custom EQ applied" else "Device equalizer unavailable; settings saved for compatible output")
-                }
-            }
-            .setNegativeButton("Cancel", null).show()
-    }
-
-    private fun requestSpectrum() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            AlertDialog.Builder(this)
-                .setTitle("Optional live audio visualizer")
-                .setMessage("Android requires audio-capture permission for FFT visualization. PulsePlayer uses this only to display the current song spectrum, does not record sound to disk, and stops capture when closed.")
-                .setPositiveButton("Allow") { _, _ ->
-                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_SPECTRUM_PERMISSION)
-                }
-                .setNegativeButton("Cancel", null).show()
-        } else showSpectrum()
-    }
-
-    private fun showSpectrum() {
-        customCommand(PlaybackService.CMD_STATUS) { extras, success ->
-            if (!success || isFinishing || isDestroyed) return@customCommand
-            val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
-            if (sessionId <= 0) {
-                status("Start playback before opening the audio spectrum")
-                return@customCommand
-            }
-            spectrumView?.stop()
-            val view = SpectrumView(this).apply {
-                setBackgroundColor(COLOR_BG)
-                minimumHeight = dp(240)
-            }
-            if (!view.start(sessionId)) {
-                status("Audio spectrum unsupported on this playback route")
-                return@customCommand
-            }
-            spectrumView = view
-            AlertDialog.Builder(this)
-                .setTitle("Live music spectrum · FFT")
-                .setView(view)
-                .setPositiveButton("Close", null)
-                .create().also { dialog ->
-                    dialog.setOnDismissListener {
-                        view.stop()
-                        if (spectrumView === view) spectrumView = null
-                    }
-                    dialog.show()
-                }
-        }
-    }
-
     private fun playDocument(uri: Uri) {
         val c = controller ?: run { pendingPickedUri = uri; return }
         var name = "Selected audio file"
@@ -680,6 +511,7 @@ class MainActivity : Activity() {
         val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "audio/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         startActivityForResult(picker, REQUEST_OPEN_AUDIO)
@@ -709,27 +541,47 @@ class MainActivity : Activity() {
             switchPlaylist("FOLDERS")
             scanFolders()
         }
-        if (requestCode == REQUEST_LYRICS && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            val id = controller?.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
-                ?: controller?.currentMediaItem?.localConfiguration?.uri?.toString()
-            if (id == null) {
-                status("Play a local track before attaching LRC lyrics")
-                return
-            }
-            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            lyricsPrefs.edit().putString(lyricKey(id), uri.toString()).apply()
-            lyricsTrackId = id
-            parseLyricsAsync(id, uri)
+        if (requestCode == REQUEST_OPEN_LRC && resultCode == RESULT_OK) {
+            val lyricUri = data?.data ?: return
+            val parsed = runCatching {
+                contentResolver.openInputStream(lyricUri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+                    LrcLyrics.parse(reader.readText())
+                } ?: emptyList()
+            }.getOrElse { status("Could not open LRC file: ${it.message}"); return }
+            importedLyrics = parsed
+            status("Loaded ${parsed.size} synchronized lyric lines")
         }
         if (requestCode == REQUEST_OPEN_AUDIO && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            runCatching {
-                contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }.onFailure { status("File opened for this session; persistable access unavailable") }
-            playDocument(uri)
+            val chosen = LinkedHashSet<Uri>()
+            data?.clipData?.let { clips ->
+                for (index in 0 until clips.itemCount.coerceAtMost(500)) {
+                    chosen.add(clips.getItemAt(index).uri)
+                }
+            }
+            data?.data?.let { chosen.add(it) }
+            if (chosen.isEmpty()) return
+            val persisted = chosen.filter { uri ->
+                runCatching {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    true
+                }.getOrDefault(false)
+            }
+            if (persisted.isNotEmpty()) {
+                val total = runCatching { pickedRepo.add(persisted) }.getOrElse { error ->
+                    status("Unable to index selected audio: ${error.message}")
+                    0
+                }
+                status("Saved $total selected files. You may reopen them in Picked Files.")
+            }
+            val selected = chosen.first()
+            if (persisted.isEmpty()) {
+                playDocument(selected)
+                status("Playing one selected file. Its provider did not allow persistent access.")
+            } else if (chosen.size == 1) playDocument(selected)
+            else {
+                switchPlaylist("PICKED")
+                status("Selected ${chosen.size} audio files. Tap a track to play")
+            }
         }
     }
 
@@ -802,11 +654,6 @@ class MainActivity : Activity() {
         val duration = c?.duration ?: C.TIME_UNSET
         val current = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
         progressView.text = "${formatTime(current)}  /  ${formatTime(duration)}"
-        refreshLyricsIfNeeded()
-        val lyricIndex = TimedLyrics.activeIndex(lyricLines, current)
-        lyricView.text = if (lyricIndex >= 0) "♫ ${lyricLines[lyricIndex].text}"
-            else if (lyricLines.isNotEmpty()) "♫ Lyrics begin soon…"
-            else "♫ Lyrics: More → Lyrics → Import .lrc"
         if (!seeking) {
             if (duration > 0L && duration != C.TIME_UNSET && c?.isCurrentMediaItemLive != true) {
                 seekBar.max = duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -854,9 +701,6 @@ class MainActivity : Activity() {
             val preset = result.getString(PlaybackService.ARG_PRESET, "Flat")
             val strength = result.getInt(PlaybackService.ARG_BASS, 0)
             bassStrength = strength
-            customLow = result.getInt(PlaybackService.ARG_CUSTOM_BASS, 0)
-            customMid = result.getInt(PlaybackService.ARG_CUSTOM_MID, 0)
-            customHigh = result.getInt(PlaybackService.ARG_CUSTOM_TREBLE, 0)
             status("Audio effects: EQ ${if (eq) "available" else "unsupported"}, Bass ${if (bass) "available" else "unsupported"} • $preset")
         }
     }
@@ -867,12 +711,22 @@ class MainActivity : Activity() {
                 station.name.contains(query, ignoreCase = true)
         }
 
+    private fun openInAppProvider(provider: ProviderMediaUrls.Provider) {
+        // Do not overlap our ExoPlayer audio with an independent authorized provider.
+        controller?.pause()
+        runCatching {
+            startActivity(Intent(this, InAppMusicHubActivity::class.java).apply {
+                putExtra(InAppMusicHubActivity.EXTRA_PROVIDER, provider.name)
+            })
+        }.onFailure { status("In-app provider unavailable: ${it.message}") }
+    }
+
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
             "YouTube Music" -> "https://music.youtube.com/"
             "JOOX" -> "https://www.joox.com/"
-            "Spotify" -> "https://open.spotify.com/"
+            "Spotify" -> "https://open.spotify.com/search/" + Uri.encode(filterView.text?.toString()?.trim().orEmpty())
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
             "BFM 89.9" -> "https://www.bfm.my/"
             "ERA Malaysia" -> "https://era.je/"
@@ -901,72 +755,256 @@ class MainActivity : Activity() {
 
     private fun showPlaylistDialog() = showPicker(
         "Choose playlist / source",
-        arrayOf("Device MP3 library", "Imported folders", "Malaysia radio", "All radio stations", "Next playlist and play")
+        arrayOf("All local audio", "Device MP3 library", "Imported folders", "Picked audio files", "World independent music", "Malaysia radio", "All radio stations", "Next playlist and play")
     ) { index ->
         when (index) {
-            0 -> switchPlaylist("DEVICE")
-            1 -> switchPlaylist("FOLDERS")
-            2 -> switchPlaylist("MY RADIO")
-            3 -> switchPlaylist("RADIO")
-            4 -> rotatePlaylist()
+            0 -> switchPlaylist("ALL LOCAL")
+            1 -> switchPlaylist("DEVICE")
+            2 -> switchPlaylist("FOLDERS")
+            3 -> switchPlaylist("PICKED")
+            4 -> showWorldMenu()
+            5 -> switchPlaylist("MY RADIO")
+            6 -> switchPlaylist("RADIO")
+            7 -> rotatePlaylist()
         }
     }
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
-        "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song"
+        "Import / file manager", "Online music services", "Malaysian radio", "Audio presets / bass",
+        "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Synchronized lyrics (.lrc)",
+        "World music catalog (Jamendo)", "In-app YouTube / Spotify / JOOX"
     )) { index ->
         when (index) {
-            0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
-                when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
+            0 -> showPicker("Import music", arrayOf("Pick one or multiple audio files", "Import folder recursively", "View selected files", "Remove imported folders", "Clear picked file list", "Rescan device music")) {
+                when (it) {
+                    0 -> openFilePicker()
+                    1 -> openFolderPicker()
+                    2 -> switchPlaylist("PICKED")
+                    3 -> clearFolders()
+                    4 -> clearPickedFiles()
+                    5 -> scanLibrary()
+                }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
+            1 -> showPicker("Online music · authorized sources", arrayOf("World music (Jamendo)", "Spotify in-app embed", "JOOX in-app website", "YouTube Music in-app", "YouTube in-app")) {
+                when (it) {
+                    0 -> showWorldMenu()
+                    1 -> openInAppProvider(ProviderMediaUrls.Provider.SPOTIFY)
+                    2 -> openInAppProvider(ProviderMediaUrls.Provider.JOOX)
+                    3 -> openInAppProvider(ProviderMediaUrls.Provider.YOUTUBE_MUSIC)
+                    4 -> openInAppProvider(ProviderMediaUrls.Provider.YOUTUBE)
+                }
             }
             2 -> showPicker("Malaysia radio", arrayOf(
-                "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
+                "Play Malaysia radio list", "All saved radio", "Add HTTPS stream",
                 "RTM official radio (stations)", "BFM 89.9 official player",
                 "ERA official player", "MY FM official player"
             )) {
                 when (it) {
                     0 -> switchPlaylist("MY RADIO")
-                    1 -> discoverMalaysiaRadio()
-                    2 -> switchPlaylist("RADIO")
-                    3 -> addRadioDialog()
-                    4 -> openProvider("RTM Radio Malaysia")
-                    5 -> openProvider("BFM 89.9")
-                    6 -> openProvider("ERA Malaysia")
-                    7 -> openProvider("MY FM")
+                    1 -> switchPlaylist("RADIO")
+                    2 -> addRadioDialog()
+                    3 -> openProvider("RTM Radio Malaysia")
+                    4 -> openProvider("BFM 89.9")
+                    5 -> openProvider("ERA Malaysia")
+                    6 -> openProvider("MY FM")
                 }
             }
             3 -> showAudioMenu()
-            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
-                when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog() }
-            }
-            5 -> requestSpectrum()
-            6 -> showPlaybackMenu()
-            7 -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
+            4 -> showPlaybackMenu()
+            5 -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
                 when (it) {
                     0 -> openSystemSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
                     1 -> chooseAudioOutput()
                     2 -> openSystemSettings(Settings.ACTION_WIFI_SETTINGS)
                 }
             }
-            8 -> shareCurrentTrack()
+            6 -> shareCurrentTrack()
+            7 -> showLyricsDialog()
+            8 -> showWorldMenu()
+            9 -> showPicker("Choose in-app provider", arrayOf("YouTube", "YouTube Music", "Spotify Embed", "JOOX Website")) { which ->
+                val provider = listOf(
+                    ProviderMediaUrls.Provider.YOUTUBE,
+                    ProviderMediaUrls.Provider.YOUTUBE_MUSIC,
+                    ProviderMediaUrls.Provider.SPOTIFY,
+                    ProviderMediaUrls.Provider.JOOX
+                )[which]
+                openInAppProvider(provider)
+            }
         }
     }
 
+    private fun clearPickedFiles() {
+        AlertDialog.Builder(this)
+            .setTitle("Remove picked audio list?")
+            .setMessage("This removes the saved list and releases its file permissions. Original music is not deleted.")
+            .setPositiveButton("Remove") { _, _ ->
+                pickedRepo.all().forEach { track ->
+                    runCatching { contentResolver.releasePersistableUriPermission(track.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                }
+                pickedRepo.removeAll()
+                filterLibrary()
+                status("Picked audio list cleared")
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showWorldMenu() = showPicker("World music · independent artists", arrayOf(
+        "Browse world music", "Search current text", "Load next 50 tracks", "Set Jamendo client ID", "Spotify search in official app", "JOOX official app"
+    )) { option ->
+        when (option) {
+            0 -> {
+                switchPlaylist("WORLD")
+                if (worldTracks.isEmpty()) searchWorld(false, browse = true)
+            }
+            1 -> searchWorld(false)
+            2 -> searchWorld(true)
+            3 -> setJamendoClientId()
+            4 -> openProvider("Spotify")
+            5 -> openProvider("JOOX")
+        }
+    }
+
+    private fun setJamendoClientId() {
+        val field = EditText(this).apply {
+            hint = "Your Jamendo developer client ID"
+            setSingleLine(true)
+            setText(worldPrefs.getString("jamendo_client_id", ""))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Jamendo catalog access")
+            .setMessage("Register your own Jamendo API application at developer.jamendo.com. The app will search independently published music, not Spotify/JOOX's licensed catalogs.")
+            .setView(field)
+            .setPositiveButton("Save") { _, _ ->
+                val id = field.text.toString().trim()
+                if (!WorldMusicInputs.validClientId(id)) {
+                    status("Invalid Jamendo API client ID")
+                } else {
+                    worldPrefs.edit().putString("jamendo_client_id", id).apply()
+                    switchPlaylist("WORLD")
+                    status("Jamendo client ID saved. Loading independent world music…")
+                    searchWorld(false, browse = true)
+                }
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun searchWorld(loadMore: Boolean, browse: Boolean = false) {
+        val key = worldPrefs.getString("jamendo_client_id", "").orEmpty()
+        if (!WorldMusicInputs.validClientId(key)) {
+            status("World catalog needs a Jamendo client ID: More → World music → Set ID")
+            return
+        }
+        val query = if (loadMore) worldQuery else if (browse) "" else filterView.text?.toString()?.trim().orEmpty()
+        if (query.isNotBlank() && !WorldMusicInputs.validSearch(query)) {
+            status("Enter at least two characters for world music search")
+            return
+        }
+        if (!loadMore && !browse && query.isBlank()) {
+            status("Enter at least two characters or choose Browse world music")
+            return
+        }
+        if (loadMore && worldTracks.isEmpty()) {
+            status("Search the catalog first")
+            return
+        }
+        val offset = if (loadMore) worldOffset else 0
+        val generation = ++worldSearchGeneration
+        source = "WORLD"
+        status(if (query.isBlank()) "Discovering independent world music…" else "Searching independent world music…")
+        thread(name = "JamendoCatalogSearch", isDaemon = true) {
+            val result = runCatching { worldRepo.search(key, query, offset = offset) }
+            runOnUiThread {
+                if (isFinishing || isDestroyed || generation != worldSearchGeneration) return@runOnUiThread
+                result.onSuccess { tracks ->
+                    if (!loadMore) {
+                        worldTracks.clear()
+                        selectedWorldTrackId = null
+                    }
+                    val known = worldTracks.mapTo(hashSetOf()) { it.id }
+                    tracks.filter { known.add(it.id) }.forEach(worldTracks::add)
+                    worldQuery = query
+                    worldOffset = offset + tracks.size
+                    filterLibrary()
+                    status("World music: ${worldTracks.size} tracks · Search next page using More menu")
+                }.onFailure { error ->
+                    status("Catalog search failed: ${error.message}. Check your API ID / network.")
+                }
+            }
+        }
+    }
+
+    private fun showSelectedMp3Download() {
+        if (source != "WORLD") { status("Open World music and choose a song to download"); return }
+        val selected = worldTracks.firstOrNull { it.id == selectedWorldTrackId }
+        if (selected == null) {
+            status("Tap a World music track first, then press ↓ MP3")
+            return
+        }
+        showMp3QualityPicker(selected)
+    }
+
+    private fun showMp3QualityPicker(track: JamendoCatalogRepository.Track) {
+        if (!track.downloadAllowed) {
+            status("Artist has not authorized downloads for this track")
+            return
+        }
+        val choices = Mp3DownloadInputs.Quality.entries.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("↓ Download MP3 · ${track.title}")
+            .setMessage("Choose provider quality. High means variable bitrate, not guaranteed 320 kbps. Download only where permitted by the artist's license. Files appear in Downloads/PulsePlayer on Android 10+.")
+            .setItems(choices.map { it.label }.toTypedArray()) { _, position ->
+                val quality = choices[position]
+                val key = worldPrefs.getString("jamendo_client_id", "").orEmpty()
+                if (!WorldMusicInputs.validClientId(key)) {
+                    status("Set a valid Jamendo client ID before downloading")
+                } else {
+                    status("Checking artist download permission…")
+                    thread(name = "AuthorizedMp3Download", isDaemon = true) {
+                        val resolved = runCatching { worldRepo.resolveMp3Download(key, track.id, quality) }
+                        runOnUiThread {
+                            if (isFinishing || isDestroyed) return@runOnUiThread
+                            resolved.onSuccess { url ->
+                                runCatching { AuthorizedMp3Downloader(this).queue(track, url, quality) }
+                                    .onSuccess { id ->
+                                        status("MP3 queued (#$id). Check Android Downloads for completion.")
+                                    }.onFailure { error -> status("Cannot queue MP3: ${error.message}") }
+                            }.onFailure { error ->
+                                status("MP3 download unavailable: ${error.message}")
+                            }
+                        }
+                    }
+                }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun importLyrics() {
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/octet-stream"))
+        }
+        runCatching { startActivityForResult(picker, REQUEST_OPEN_LRC) }
+            .onFailure { status("No compatible lyrics file picker") }
+    }
+
+    private fun showLyricsDialog() {
+        val c = controller
+        val current = LrcLyrics.at(importedLyrics, c?.currentPosition ?: 0L)
+        AlertDialog.Builder(this)
+            .setTitle("Local LRC lyrics")
+            .setMessage(current ?: "No lyric line at this timestamp. Import a synchronized .lrc text file first.")
+            .setPositiveButton("Import LRC") { _, _ -> importLyrics() }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
+        "Choose EQ preset", "Bass strength", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
-            1 -> showCustomEqualizer()
-            2 -> showBassDialog()
-            3 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
-                putString(PlaybackService.ARG_PRESET, "Noise Softening")
-            }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
-            4 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            1 -> showBassDialog()
+            2 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
     }
 
@@ -997,7 +1035,8 @@ class MainActivity : Activity() {
     )) {
         val c = controller
         when (it) {
-            0 -> c?.let { player ->                player.shuffleModeEnabled = !player.shuffleModeEnabled
+            0 -> c?.let { player ->
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
                 status(if (player.shuffleModeEnabled) "Shuffle ON" else "Shuffle OFF")
             }
             1 -> c?.let { player ->
@@ -1058,7 +1097,7 @@ class MainActivity : Activity() {
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
         tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
-        tabs.addView(button("MY Radio") { switchPlaylist("MY RADIO") },
+        tabs.addView(button("World ♫") { showWorldMenu() },
             LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
         tabs.addView(button("♫ FX") { selectMixPreset() },
             LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
@@ -1067,11 +1106,18 @@ class MainActivity : Activity() {
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         filterView = EditText(this).apply {
-            hint = "Search MP3 / artist / folder / station"
+            hint = "Search device songs / artist / independent world music"
             setHintTextColor(0xFF8296A7L.toInt())
             setTextColor(Color.WHITE)
             textSize = 14f
             setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_SEARCH && source == "WORLD") {
+                    searchWorld(false)
+                    true
+                } else false
+            }
             setPadding(dp(12), dp(7), dp(12), dp(7))
             background = panelBackground()
             addTextChangedListener(object : TextWatcher {
@@ -1082,7 +1128,17 @@ class MainActivity : Activity() {
         }
         root.addView(filterView, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(7) })
         libraryView = label("Music library", 12f, COLOR_MUTED)
-        root.addView(libraryView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
+        val libraryHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        libraryHeader.addView(libraryView, LinearLayout.LayoutParams(0, -2, 1f))
+        worldDownloadButton = button("↓ MP3") { showSelectedMp3Download() }.apply {
+            contentDescription = "Download selected authorized world music as MP3; choose quality"
+            visibility = View.GONE
+        }
+        libraryHeader.addView(worldDownloadButton, LinearLayout.LayoutParams(dp(84), dp(38)))
+        root.addView(libraryHeader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
         trackAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, arrayListOf<String>()) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent) as TextView
@@ -1111,12 +1167,6 @@ class MainActivity : Activity() {
         statusView = label("Connecting…", 11f, COLOR_MUTED)
         statusView.maxLines = 2
         root.addView(statusView, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
-        lyricView = label("♫ Lyrics: More → Lyrics → Import .lrc", 12f, COLOR_ACCENT)
-        lyricView.isSingleLine = true
-        lyricView.ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-        lyricView.isSelected = true
-        lyricView.setOnClickListener { showLyricDialog() }
-        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))

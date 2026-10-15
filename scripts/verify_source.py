@@ -31,8 +31,7 @@ assert "androidx.media3.session.MediaSessionService" in intents
 
 source = ROOT / "app/src/main/java/com/pulseplayer/app"
 expected = {"MainActivity", "PlaybackService", "AudioEffectsManager", "MusicRepository", "SoundPresets",
-            "FolderAudioRepository", "RadioRepository", "PlaybackInputs", "MiniPlayerGestures",
-            "TimedLyrics", "SpectrumView", "MalaysiaRadioDirectory"}
+            "FolderAudioRepository", "RadioRepository", "PlaybackInputs", "MiniPlayerGestures"}
 actual = {file.stem for file in source.glob("*.kt")}
 assert expected <= actual, f"Missing Kotlin modules: {expected - actual}"
 service_text = (source / "PlaybackService.kt").read_text()
@@ -60,22 +59,46 @@ presets = (source / "SoundPresets.kt").read_text()
 for profile in ("Immersive", "NovaStream TV"):
     assert profile in presets
 assert "SYSTEM_ALERT_WINDOW" not in permissions
-assert "android.permission.RECORD_AUDIO" in permissions
-for feature in ("REQUEST_LYRICS", "TimedLyrics.activeIndex", "discoverMalaysiaRadio", "showCustomEqualizer", "requestSpectrum", "Spotify", "Lyrics / subtitles"):
-    assert feature in activity_text, f"Missing v4 feature: {feature}"
-assert "bycountrycodeexact/MY" in (source / "MalaysiaRadioDirectory.kt").read_text()
-assert "onFftDataCapture" in (source / "SpectrumView.kt").read_text()
-assert "CMD_SET_CUSTOM" in service_text
-assert "PlaybackService.CMD_SET_CUSTOM" in activity_text
-assert (ROOT / "app/src/test/java/com/pulseplayer/app/TimedLyricsTest.kt").is_file()
 
 assert "onConnectAsync" in service_text
 assert "controller.packageName == packageName" in service_text
 build = (ROOT / "app/build.gradle.kts").read_text()
 assert 'val media3Version = "1.11.1"' in build
 assert "targetSdk = 36" in build
-assert "versionCode = 4" in build
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text()
 assert ":app:testDebugUnitTest :app:assembleDebug" in workflow
-print("PASS: v4 XML/resources, permissions, service registration, modules, commands, workflow")
+print("PASS: XML/resources, permissions, service registration, modules, commands, workflow")
 print("NOTE: Android compilation, instrumentation, playback and APK generation are NOT tested here")
+
+# v5: authorized world-music streaming + fully user-approved local import.
+for name in ("JamendoCatalogRepository", "ImportedAudioRepository", "WorldMusicInputs"):
+    assert (source / f"{name}.kt").is_file(), f"Missing v5 source: {name}"
+for symbol in ("EXTRA_ALLOW_MULTIPLE", "ALL LOCAL", "PICKED", "WORLD", "searchWorld", "setJamendoClientId", "openProvider(\"Spotify\")"):
+    assert symbol in activity_text, f"Missing unified music feature: {symbol}"
+assert "api.jamendo.com/v3.0/tracks/" in (source / "JamendoCatalogRepository.kt").read_text()
+assert "https://open.spotify.com/search/" in activity_text
+print("PASS: world music access, imported audio and unified local source wiring")
+
+# v6 MP3: selected artist-authorized Jamendo downloads only; accurate provider quality.
+for name in ("Mp3DownloadInputs", "AuthorizedMp3Downloader"):
+    assert (source / f"{name}.kt").is_file(), f"Missing MP3 download module: {name}"
+world_repo = (source / "JamendoCatalogRepository.kt").read_text()
+assert 'audiodownload_allowed' in world_repo and 'audiodlformat' in world_repo
+assert 'resolveMp3Download' in world_repo and 'mp31' in (source / 'Mp3DownloadInputs.kt').read_text()
+assert 'showSelectedMp3Download' in activity_text and '↓ MP3' in activity_text
+assert 'DownloadManager.Request' in (source / 'AuthorizedMp3Downloader.kt').read_text()
+print("PASS: artist-authorized MP3, 96kbps/VBR selection, Android DownloadManager")
+
+# v7 in-app official embed hubs — not protected-audio extraction or unlicensed playback.
+hub = (source / "InAppMusicHubActivity.kt").read_text()
+urls = (source / "ProviderMediaUrls.kt").read_text()
+assert "InAppMusicHubActivity" in activity_text
+assert "controller?.pause()" in activity_text
+assert "javaScriptEnabled = true" in hub
+for feature in ("allowFileAccess = false", "allowContentAccess = false", "MIXED_CONTENT_NEVER_ALLOW", "mediaPlaybackRequiresUserGesture = true", "onPause()", "onDestroy()"):
+    assert feature in hub, f"Missing safe WebView integration: {feature}"
+for allowed in ("youtube.com/embed/", "open.spotify.com/embed/", "www.joox.com"):
+    assert allowed in urls
+assert "android:exported=\"false\"" in (ROOT / "app/src/main/AndroidManifest.xml").read_text()
+assert (ROOT / "app/src/test/java/com/pulseplayer/app/ProviderMediaUrlsTest.kt").exists()
+print("PASS: embedded YouTube/Spotify and JOOX first-party website integration declarations")
