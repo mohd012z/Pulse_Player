@@ -167,13 +167,12 @@ class ProviderBrowserActivity : Activity() {
 
     override fun onPause() {
         hideHandler.removeCallbacks(hideControls)
-        if (::browser.isInitialized) browser.onPause()
+        // Preserve the page and playback state; providers control whether background audio is allowed.
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::browser.isInitialized) browser.onResume()
         if (::controlsContainer.isInitialized) scheduleAutoHide()
     }
 
