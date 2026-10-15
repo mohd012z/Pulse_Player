@@ -628,22 +628,29 @@ class MainActivity : Activity() {
             if (!success || isFinishing || isDestroyed) return@customCommand
             val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
             if (sessionId <= 0) {
-                status("Start playback before opening the audio spectrum")
+                status("Start local playback before opening the pixel-cloud waveform")
                 return@customCommand
             }
             spectrumView?.stop()
             val view = SpectrumView(this).apply {
                 setBackgroundColor(COLOR_BG)
-                minimumHeight = dp(240)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(154))
             }
             if (!view.start(sessionId)) {
-                status("Audio spectrum unsupported on this playback route")
+                status("Audio waveform unsupported on this playback route")
                 return@customCommand
             }
             spectrumView = view
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(8), dp(12), dp(4))
+                addView(view, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(154)))
+            }
             AlertDialog.Builder(this)
-                .setTitle("Live music spectrum · FFT")
-                .setView(view)
+                .setTitle("Pixel cloud · Live waveform")
+                .setView(content)
                 .setPositiveButton("Close", null)
                 .create().also { dialog ->
                     dialog.setOnDismissListener {
@@ -1058,21 +1065,22 @@ class MainActivity : Activity() {
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⚙ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
+        toolbar.addView(button("⚙ Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(40)))
         root.addView(toolbar)
 
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
+        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(40), 1.25f))
         tabs.addView(button("📻 Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("🎚 FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(6) })
+        tabs.addView(button("🎚 FX") { showAudioMenu() },
+            LinearLayout.LayoutParams(0, dp(40), 0.8f).apply { leftMargin = dp(6) })
         root.addView(tabs)
         val radioTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         radioTools.addView(button("📡 Scan MY") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
         radioTools.addView(button("📻 All radio") { switchPlaylist("RADIO") }, LinearLayout.LayoutParams(0, dp(40), 1f))
-        root.addView(radioTools)
+        // Keep secondary radio discovery controls in the Radio menu, not permanently above the library.
+        // root.addView(radioTools)
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
