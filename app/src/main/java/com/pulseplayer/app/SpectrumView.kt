@@ -2,6 +2,7 @@ package com.pulseplayer.app
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Color
 import android.media.audiofx.Visualizer
@@ -74,17 +75,31 @@ class SpectrumView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
         val center = height / 2f
-        canvas.drawLine(0f, center, width.toFloat(), center, baseline)
-        val amplitude = height * 0.43f
         val pixel = pixelSize.coerceAtLeast(1f)
-        val columns = (width / pixel).toInt().coerceAtLeast(1)
+        val spacing = pixel * 1.9f
+        val columns = (width / spacing).toInt().coerceAtLeast(1)
+        val amplitude = height * 0.39f
         line.style = Paint.Style.FILL
+        // A soft cloud of independent fine pixels around the captured waveform.
+        // Deterministic variation avoids random flicker between frames.
         for (column in 0 until columns) {
             val sampleIndex = (column.toLong() * wave.size / columns).toInt().coerceIn(0, wave.lastIndex)
-            val x = column * pixel
-            val y = center - wave[sampleIndex].coerceIn(-1f, 1f) * amplitude
-            val snappedY = (y / pixel).toInt() * pixel
-            canvas.drawRect(x, snappedY, (x + pixel * 0.68f).coerceAtMost(width.toFloat()), snappedY + pixel * 0.8f, line)
+            val sample = wave[sampleIndex].coerceIn(-1f, 1f)
+            val x = column * spacing
+            val waveY = center - sample * amplitude
+            val spread = (height * (0.035f + 0.14f * kotlin.math.abs(sample))).coerceAtLeast(pixel * 2f)
+            for (layer in -4..4) {
+                val distance = kotlin.math.abs(layer) / 4f
+                val offset = layer * spread / 4f
+                val jitter = kotlin.math.sin(column * 1.71f + layer * 2.37f) * pixel * 0.55f
+                val y = waveY + offset + jitter
+                if (y < 0f || y >= height) continue
+                val brightness = (1f - distance * 0.68f).coerceIn(0f, 1f)
+                val hue = (178f + 140f * column / columns + layer * 2f) % 360f
+                line.color = Color.HSVToColor((brightness * 255).toInt(), floatArrayOf(hue, 0.72f, 0.98f))
+                val size = pixel * (0.45f + brightness * 0.25f)
+                canvas.drawRect(x, y, x + size, y + size, line)
+            }
         }
     }
 }
