@@ -95,6 +95,16 @@ class ProviderBrowserActivity : Activity() {
             setPadding(12, 4, 12, 6)
         }
         root.addView(status)
+        if (provider == "Spotify") {
+            status.text = "Spotify playback may require the official app or a supported browser."
+            root.addView(Button(this).apply {
+                text = "Open in Spotify app / supported browser"
+                setOnClickListener {
+                    val current = Uri.parse(browser.url ?: home)
+                    openSpotify(current)
+                }
+            })
+        }
         browser = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -164,6 +174,15 @@ class ProviderBrowserActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         if (::browser.isInitialized) browser.saveState(outState)
         super.onSaveInstanceState(outState)
+    }
+
+    private fun openSpotify(uri: Uri) {
+        val safe = if (uri.scheme == "https" && uri.host?.endsWith("spotify.com") == true) uri else Uri.parse(home)
+        val app = Intent(Intent.ACTION_VIEW, safe).apply {
+            setPackage("com.spotify.music")
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        runCatching { startActivity(app) }.onFailure { openExternal(safe) }
     }
 
     private fun openExternal(uri: Uri) {
