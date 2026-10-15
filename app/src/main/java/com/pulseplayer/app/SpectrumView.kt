@@ -74,30 +74,35 @@ class SpectrumView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
         val center = height / 2f
-        val pixel = pixelSize.coerceAtLeast(1f)
-        val spacing = pixel * 1.9f
+        val pixel = (resources.displayMetrics.density * 1.15f).coerceAtLeast(1f)
+        val spacing = pixel * 1.85f
         val columns = (width / spacing).toInt().coerceAtLeast(1)
-        val amplitude = height * 0.39f
+        val amplitude = height * 0.31f
         line.style = Paint.Style.FILL
-        // A soft cloud of independent fine pixels around the captured waveform.
-        // Deterministic variation avoids random flicker between frames.
+        // A layered sine-wave cloud. Actual waveform energy controls its shape and thickness.
+        // Multiple phase-shifted ribbons make quiet music visible without fake FFT bars.
         for (column in 0 until columns) {
+            val t = column.toFloat() / columns
             val sampleIndex = (column.toLong() * wave.size / columns).toInt().coerceIn(0, wave.lastIndex)
-            val sample = wave[sampleIndex].coerceIn(-1f, 1f)
-            val x = column * spacing
-            val waveY = center - sample * amplitude
-            val spread = (height * (0.035f + 0.14f * kotlin.math.abs(sample))).coerceAtLeast(pixel * 2f)
-            for (layer in -4..4) {
-                val distance = kotlin.math.abs(layer) / 4f
-                val offset = layer * spread / 4f
-                val jitter = kotlin.math.sin(column * 1.71f + layer * 2.37f) * pixel * 0.55f
-                val y = waveY + offset + jitter
-                if (y < 0f || y >= height) continue
-                val brightness = (1f - distance * 0.68f).coerceIn(0f, 1f)
-                val hue = (178f + 140f * column / columns + layer * 2f) % 360f
-                line.color = Color.HSVToColor((brightness * 255).toInt(), floatArrayOf(hue, 0.72f, 0.98f))
-                val size = pixel * (0.45f + brightness * 0.25f)
-                canvas.drawRect(x, y, x + size, y + size, line)
+            val signal = wave[sampleIndex].coerceIn(-1f, 1f)
+            val energy = kotlin.math.abs(signal)
+            val envelope = 0.35f + 0.65f * kotlin.math.sin(Math.PI.toFloat() * t).let { it * it }
+            val swing = (0.24f + energy * 0.76f) * envelope
+            val phase = t * 19f
+            val mainY = center - amplitude * (signal * 0.45f + kotlin.math.sin(phase) * swing * 0.75f)
+            val spread = height * (0.09f + energy * 0.17f) * envelope
+            for (layer in -10..10) {
+                val distance = kotlin.math.abs(layer) / 10f
+                val ripple = kotlin.math.sin(phase * 1.35f + layer * 0.41f) * amplitude * 0.13f * swing
+                val jitter = kotlin.math.sin(column * 1.71f + layer * 2.37f) * pixel * 0.8f
+                val y = mainY + layer * spread / 10f + ripple + jitter
+                if (y < pixel || y > height - pixel) continue
+                val opacity = (0.93f - distance * 0.75f).coerceIn(0.1f, 1f)
+                val hue = (172f + t * 155f + layer * 1.5f) % 360f
+                line.color = Color.HSVToColor((opacity * 255f).toInt(),
+                    floatArrayOf(hue, 0.74f, 0.98f))
+                val size = pixel * (0.55f + opacity * 0.25f)
+                canvas.drawRect(column * spacing, y, column * spacing + size, y + size, line)
             }
         }
     }
