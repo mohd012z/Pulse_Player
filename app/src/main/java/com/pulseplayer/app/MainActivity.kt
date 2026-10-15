@@ -880,9 +880,15 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-            })
+            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music")) {
+                startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
+                    putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, destination)
+                })
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                })
+            }
         }.onFailure {
             status("Cannot open $destination: ${it.message}")
         }
