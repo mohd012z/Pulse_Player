@@ -922,6 +922,18 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showMalaysiaRadioQuickMenu() = showPicker("Malaysia radio · stations", arrayOf(
+        "Browse Malaysia radio stations", "Discover more Malaysia stations (online)",
+        "All saved radio stations", "Add a radio stream"
+    )) { selected ->
+        when (selected) {
+            0 -> switchPlaylist("MY RADIO")
+            1 -> discoverMalaysiaRadio()
+            2 -> switchPlaylist("RADIO")
+            3 -> addRadioDialog()
+        }
+    }
+
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
         "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song"
@@ -1058,7 +1070,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER  ·  CLOUD v6", 16f, COLOR_ACCENT, true)
+        val brand = label("♫  PULSE PLAYER  ·  CLOUD v7", 16f, COLOR_ACCENT, true)
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
@@ -1068,7 +1080,7 @@ class MainActivity : Activity() {
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
         tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(40), 1.25f))
-        tabs.addView(button("📻 Radio") { switchPlaylist("MY RADIO") },
+        tabs.addView(button("📻 Radio") { showMalaysiaRadioQuickMenu() },
             LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(6) })
         tabs.addView(button("🎚 FX") { showAudioMenu() },
             LinearLayout.LayoutParams(0, dp(40), 0.8f).apply { leftMargin = dp(6) })
