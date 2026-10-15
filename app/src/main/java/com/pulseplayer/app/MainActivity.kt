@@ -1058,20 +1058,20 @@ class MainActivity : Activity() {
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
+        toolbar.addView(button("⚙ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
         root.addView(toolbar)
 
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
         tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
-        tabs.addView(button("MY Radio") { switchPlaylist("MY RADIO") },
+        tabs.addView(button("📻 Radio") { switchPlaylist("MY RADIO") },
             LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("♫ FX") { selectMixPreset() },
+        tabs.addView(button("🎚 FX") { selectMixPreset() },
             LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
         root.addView(tabs)
         val radioTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        radioTools.addView(button("Scan MY stations") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
-        radioTools.addView(button("All radio") { switchPlaylist("RADIO") }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        radioTools.addView(button("📡 Scan MY") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        radioTools.addView(button("📻 All radio") { switchPlaylist("RADIO") }, LinearLayout.LayoutParams(0, dp(40), 1f))
         root.addView(radioTools)
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
@@ -1239,17 +1239,27 @@ class MainActivity : Activity() {
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
         this.text = text
         setAllCaps(false)
-        textSize = 11f
+        textSize = 12f
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setTextColor(Color.WHITE)
-        background = GradientDrawable().apply {
-            setColor(0xFF2A3849L.toInt())
-            cornerRadius = dp(9).toFloat()
+        val accent = when {
+            text.contains("Radio", true) || text.contains("Scan", true) -> 0xFF087F83L.toInt()
+            text.contains("FX", true) || text.contains("Sound", true) -> 0xFF6845AAL.toInt()
+            text.contains("Play", true) || text.contains("Pause", true) -> 0xFF146B65L.toInt()
+            text.contains("Web", true) || text.contains("YouTube", true) -> 0xFF345CA0L.toInt()
+            else -> 0xFF27384BL.toInt()
+        }
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            intArrayOf(accent, 0xFF1A2638L.toInt())).apply {
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(1), 0xFF496177L.toInt())
         }
         minHeight = 0
         minimumHeight = 0
         minWidth = 0
         minimumWidth = 0
-        setPadding(dp(2), 0, dp(2), 0)
+        setPadding(dp(5), 0, dp(5), 0)
+        contentDescription = text
         setOnClickListener { onClick() }
     }
 
