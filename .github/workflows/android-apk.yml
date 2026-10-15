@@ -21,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install Android SDK 36
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
       - name: Accept licenses and install required packages
         run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
       - name: Set up Gradle 8.13
