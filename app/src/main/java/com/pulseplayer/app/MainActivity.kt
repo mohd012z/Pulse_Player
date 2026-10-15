@@ -1058,7 +1058,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER", 18f, COLOR_ACCENT, true)
+        val brand = label("♫  PULSE PLAYER  ·  CLOUD v6", 16f, COLOR_ACCENT, true)
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
@@ -1205,6 +1205,15 @@ class MainActivity : Activity() {
             if (c.hasNextMediaItem()) c.seekToNextMediaItem()
         } }, LinearLayout.LayoutParams(dp(48), dp(44)))
         dock.addView(mini)
+        val visualizerAction = button("Waveform") { requestSpectrum() }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable("wave", dp(18)), null, null, null)
+            compoundDrawablePadding = dp(6)
+            contentDescription = "Show or hide live pixel cloud waveform"
+        }
+        dock.addView(visualizerAction, LinearLayout.LayoutParams(-1, dp(36)).apply {
+            topMargin = dp(3)
+            bottomMargin = dp(2)
+        })
 
         seekBar = SeekBar(this).apply {
             isEnabled = false
@@ -1253,7 +1262,7 @@ class MainActivity : Activity() {
             text.contains("Scan", true) -> "scan"
             text.contains("Radio", true) -> "radio"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
-            text.contains("More", true) || text.contains("Setting", true) -> "settings"
+            text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
             text.contains("DEVICE", true) -> "device"
             else -> null
         }
