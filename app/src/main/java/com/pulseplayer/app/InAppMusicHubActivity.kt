@@ -102,8 +102,8 @@ class InAppMusicHubActivity : Activity() {
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                    progress.progress = newProgress
-                    progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                    this@InAppMusicHubActivity.progress.progress = newProgress
+                    this@InAppMusicHubActivity.progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
                 }
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                     if (view == null || callback == null || fullscreen != null) return
@@ -134,7 +134,7 @@ class InAppMusicHubActivity : Activity() {
                     if (request?.isForMainFrame == true) info.text = "Provider web playback unavailable here. Choose Official app."
                 }
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                    progress.visibility = View.VISIBLE
+                    this@InAppMusicHubActivity.progress.visibility = View.VISIBLE
                 }
             }
         }
