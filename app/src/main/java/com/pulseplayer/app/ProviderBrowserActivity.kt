@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.CookieManager
@@ -43,6 +44,12 @@ class ProviderBrowserActivity : Activity() {
     private lateinit var toggle: Button
     private var controlsVisible = true
     private var home = ""
+    private val trackerHosts = setOf("google-analytics.com", "analytics.google.com",
+        "stats.g.doubleclick.net", "connect.facebook.net", "bat.bing.com",
+        "static.hotjar.com", "script.hotjar.com", "cdn.segment.com")
+    private fun isTracker(host: String): Boolean =
+        trackerHosts.any { host == it || host.endsWith(".$it") }
+
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable {
         controlsContainer.visibility = View.GONE
@@ -117,6 +124,14 @@ class ProviderBrowserActivity : Activity() {
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                    if (!request.isForMainFrame && isTracker(request.url.host.orEmpty().lowercase())) {
+                        return WebResourceResponse("text/plain", "UTF-8",
+                            java.io.ByteArrayInputStream(ByteArray(0)))
+                    }
+                    return super.shouldInterceptRequest(view, request)
+                }
+
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val uri = request.url
                     if (uri.scheme != "https") {
