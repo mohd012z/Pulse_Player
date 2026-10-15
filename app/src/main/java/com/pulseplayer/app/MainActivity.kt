@@ -79,6 +79,7 @@ class MainActivity : Activity() {
     private var lyricLines: List<TimedLyrics.Line> = emptyList()
     private var lyricGeneration = 0
     private var spectrumView: SpectrumView? = null
+    private var waveformDock: LinearLayout? = null
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -615,7 +616,7 @@ class MainActivity : Activity() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
                 .setTitle("Optional live audio visualizer")
-                .setMessage("Android requires audio-capture permission for FFT visualization. PulsePlayer uses this only to display the current song spectrum, does not record sound to disk, and stops capture when closed.")
+                .setMessage("Android requires audio-capture permission for the live pixel-cloud waveform. PulsePlayer displays the current audio session only, does not save captured sound, and stops capture when the visualizer is closed.")
                 .setPositiveButton("Allow") { _, _ ->
                     requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_SPECTRUM_PERMISSION)
                 }
@@ -624,6 +625,14 @@ class MainActivity : Activity() {
     }
 
     private fun showSpectrum() {
+        val row = waveformDock ?: return
+        if (row.visibility == android.view.View.VISIBLE) {
+            spectrumView?.stop()
+            spectrumView = null
+            row.removeAllViews()
+            row.visibility = android.view.View.GONE
+            return
+        }
         customCommand(PlaybackService.CMD_STATUS) { extras, success ->
             if (!success || isFinishing || isDestroyed) return@customCommand
             val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
@@ -632,33 +641,21 @@ class MainActivity : Activity() {
                 return@customCommand
             }
             spectrumView?.stop()
-            val view = SpectrumView(this).apply {
-                setBackgroundColor(COLOR_BG)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, dp(154))
-            }
+            row.removeAllViews()
+            val view = SpectrumView(this).apply { setBackgroundColor(COLOR_PANEL) }
             if (!view.start(sessionId)) {
                 status("Audio waveform unsupported on this playback route")
                 return@customCommand
             }
             spectrumView = view
-            val content = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), dp(8), dp(12), dp(4))
-                addView(view, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, dp(154)))
-            }
-            AlertDialog.Builder(this)
-                .setTitle("Pixel cloud · Live waveform")
-                .setView(content)
-                .setPositiveButton("Close", null)
-                .create().also { dialog ->
-                    dialog.setOnDismissListener {
-                        view.stop()
-                        if (spectrumView === view) spectrumView = null
-                    }
-                    dialog.show()
-                }
+            row.addView(view, LinearLayout.LayoutParams(0, dp(78), 1f))
+            row.addView(button("✕") {
+                view.stop()
+                if (spectrumView === view) spectrumView = null
+                row.removeAllViews()
+                row.visibility = android.view.View.GONE
+            }, LinearLayout.LayoutParams(dp(36), dp(40)))
+            row.visibility = android.view.View.VISIBLE
         }
     }
 
@@ -1141,6 +1138,13 @@ class MainActivity : Activity() {
             background = panelBackground()
         }
         root.addView(dock)
+        val waveformRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            visibility = android.view.View.GONE
+        }
+        waveformDock = waveformRow
+        dock.addView(waveformRow, LinearLayout.LayoutParams(-1, dp(82)))
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
