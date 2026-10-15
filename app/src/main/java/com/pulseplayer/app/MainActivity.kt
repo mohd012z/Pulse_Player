@@ -936,7 +936,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -975,6 +975,7 @@ class MainActivity : Activity() {
                 }
             }
             8 -> shareCurrentTrack()
+            9 -> startActivity(Intent(this, MediaExportActivity::class.java))
         }
     }
 
@@ -1070,7 +1071,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER  ·  CLOUD v7", 16f, COLOR_ACCENT, true)
+        val brand = label("♫  PULSE PLAYER  ·  CLOUD v8", 16f, COLOR_ACCENT, true)
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
