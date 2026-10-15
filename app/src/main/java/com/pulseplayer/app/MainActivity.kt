@@ -1237,7 +1237,19 @@ class MainActivity : Activity() {
     }
 
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
-        this.text = text
+        val iconKind = when {
+            text.contains("Scan", true) -> "scan"
+            text.contains("Radio", true) -> "radio"
+            text.contains("FX", true) || text.contains("Sound", true) -> "fx"
+            text.contains("More", true) || text.contains("Setting", true) -> "settings"
+            text.contains("DEVICE", true) -> "device"
+            else -> null
+        }
+        this.text = text.trimStart { !it.isLetterOrDigit() }.trim()
+        if (iconKind != null) {
+            setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable(iconKind, dp(18)), null, null, null)
+            compoundDrawablePadding = dp(5)
+        }
         setAllCaps(false)
         textSize = 12f
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
