@@ -2,7 +2,8 @@ package com.pulseplayer.app
 
 /** EQ curves in dB. Hardware equalizer implementation determines actual band count. */
 object SoundPresets {
-    val names = listOf("Flat", "Warm", "Vocal", "Bright", "Studio Punch", "Cinema", "Night", "Airy", "Immersive", "NovaStream TV", "R&B", "Rock", "Classical", "Subwoofer", "Loudness EQ", "Stereo Clarity", "3D Bass EQ", "Cinema Spatial EQ", "Studio Beats EQ", "Balanced Speaker", "Live Concert", "Noise Softening", "Custom")
+    val names = listOf("Flat", "Balanced Speaker", "Vocal", "Rock", "Subwoofer", "Cinema", "Custom")
+    // Legacy EQ curves remain readable for previously saved user preferences.
 
     fun gainDb(name: String, frequencyHz: Double, customBass: Int = 0, customMid: Int = 0, customTreble: Int = 0): Double {
         require(frequencyHz >= 0.0 && frequencyHz.isFinite()) {
