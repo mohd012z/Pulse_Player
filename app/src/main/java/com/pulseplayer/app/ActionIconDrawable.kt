@@ -52,6 +52,13 @@ class ActionIconDrawable(private val kind: String, private val sizePx: Int) : Dr
                     canvas.drawLine(12f + 8f * dx, 12f + 8f * dy, 12f + 10f * dx, 12f + 10f * dy, pen)
                 }
             }
+            "wave" -> {
+                for (i in 0..20) {
+                    val x = 2f + i
+                    val y = 12f - kotlin.math.sin(i * 0.65f) * 4f
+                    canvas.drawCircle(x, y, 0.8f, pen)
+                }
+            }
             "device" -> {
                 canvas.drawRoundRect(5f, 3f, 19f, 21f, 2f, 2f, pen)
                 canvas.drawLine(10f, 17f, 14f, 17f, pen)
