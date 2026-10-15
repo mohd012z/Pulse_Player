@@ -3,7 +3,6 @@ package com.pulseplayer.app
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
 import android.media.audiofx.Visualizer
 import android.util.Log
 import android.view.View
@@ -21,7 +20,7 @@ class SpectrumView(context: Context) : View(context) {
         color = 0x4475E2C0
         strokeWidth = resources.displayMetrics.density
     }
-    private val path = Path()
+    private val pixelSize = resources.displayMetrics.density * 3f
     private var effect: Visualizer? = null
 
     fun start(sessionId: Int): Boolean {
@@ -76,12 +75,15 @@ class SpectrumView(context: Context) : View(context) {
         val center = height / 2f
         canvas.drawLine(0f, center, width.toFloat(), center, baseline)
         val amplitude = height * 0.43f
-        path.reset()
-        wave.forEachIndexed { index, sample ->
-            val x = index * (width - 1f) / (wave.size - 1)
-            val y = center - sample.coerceIn(-1f, 1f) * amplitude
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        val pixel = pixelSize.coerceAtLeast(2f)
+        val columns = (width / pixel).toInt().coerceAtLeast(1)
+        line.style = Paint.Style.FILL
+        for (column in 0 until columns) {
+            val sampleIndex = (column.toLong() * wave.size / columns).toInt().coerceIn(0, wave.lastIndex)
+            val x = column * pixel
+            val y = center - wave[sampleIndex].coerceIn(-1f, 1f) * amplitude
+            val snappedY = (y / pixel).toInt() * pixel
+            canvas.drawRect(x, snappedY, (x + pixel * 0.8f).coerceAtMost(width.toFloat()), snappedY + pixel * 0.8f, line)
         }
-        canvas.drawPath(path, line)
     }
 }
