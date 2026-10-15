@@ -15,6 +15,8 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.CookieManager
+import android.webkit.WebSettings
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -34,11 +36,12 @@ class ProviderBrowserActivity : Activity() {
 
     private lateinit var browser: WebView
     private lateinit var controls: LinearLayout
+    private lateinit var controlsContainer: HorizontalScrollView
     private lateinit var status: TextView
     private var controlsVisible = true
     private var home = ""
     private val hideHandler = Handler(Looper.getMainLooper())
-    private val hideControls = Runnable { controls.visibility = View.GONE; controlsVisible = false }
+    private val hideControls = Runnable { controlsContainer.visibility = View.GONE; controlsVisible = false }
     private fun scheduleAutoHide() {
         hideHandler.removeCallbacks(hideControls)
         if (controlsVisible) hideHandler.postDelayed(hideControls, 5000L)
@@ -91,11 +94,15 @@ class ProviderBrowserActivity : Activity() {
             settings.mediaPlaybackRequiresUserGesture = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            settings.javaScriptCanOpenWindowsAutomatically = false
+            settings.setSupportMultipleWindows(false)
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val uri = request.url
-                    if (uri.scheme != "https" && uri.scheme != "http") {
+                    if (uri.scheme != "https") {
                         openExternal(uri)
                         return true
                     }
@@ -125,14 +132,14 @@ class ProviderBrowserActivity : Activity() {
         button("Home") { browser.loadUrl(home) }
         button("Reload") { browser.reload() }
         button("Open externally", 1.5f) { openExternal(Uri.parse(browser.url ?: home)) }
-        val scrollControls = HorizontalScrollView(this).apply {
+        controlsContainer = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(controls)
         }
-        root.addView(scrollControls)
+        root.addView(controlsContainer)
         toggle.setOnClickListener {
             controlsVisible = !controlsVisible
-            controls.visibility = if (controlsVisible) View.VISIBLE else View.GONE
+            controlsContainer.visibility = if (controlsVisible) View.VISIBLE else View.GONE
             toggle.text = if (controlsVisible) "Hide tools" else "Show tools"
             scheduleAutoHide()
         }
