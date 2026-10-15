@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -16,6 +18,7 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.HorizontalScrollView
 
 /** First-party navigation shell. Providers may require an external browser for sign-in/playback. */
 class ProviderBrowserActivity : Activity() {
@@ -34,6 +37,12 @@ class ProviderBrowserActivity : Activity() {
     private lateinit var status: TextView
     private var controlsVisible = true
     private var home = ""
+    private val hideHandler = Handler(Looper.getMainLooper())
+    private val hideControls = Runnable { controls.visibility = View.GONE; controlsVisible = false }
+    private fun scheduleAutoHide() {
+        hideHandler.removeCallbacks(hideControls)
+        if (controlsVisible) hideHandler.postDelayed(hideControls, 5000L)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,14 +125,20 @@ class ProviderBrowserActivity : Activity() {
         button("Home") { browser.loadUrl(home) }
         button("Reload") { browser.reload() }
         button("Open externally", 1.5f) { openExternal(Uri.parse(browser.url ?: home)) }
-        root.addView(controls)
+        val scrollControls = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(controls)
+        }
+        root.addView(scrollControls)
         toggle.setOnClickListener {
             controlsVisible = !controlsVisible
             controls.visibility = if (controlsVisible) View.VISIBLE else View.GONE
             toggle.text = if (controlsVisible) "Hide tools" else "Show tools"
+            scheduleAutoHide()
         }
         setContentView(root)
         browser.loadUrl(home)
+        scheduleAutoHide()
     }
 
     private fun openExternal(uri: Uri) {
@@ -148,6 +163,7 @@ class ProviderBrowserActivity : Activity() {
     }
 
     override fun onDestroy() {
+        hideHandler.removeCallbacks(hideControls)
         if (::browser.isInitialized) {
             (browser.parent as? ViewGroup)?.removeView(browser)
             browser.stopLoading()
