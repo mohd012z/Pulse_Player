@@ -20,7 +20,7 @@ class SpectrumView(context: Context) : View(context) {
         color = 0x4475E2C0
         strokeWidth = resources.displayMetrics.density
     }
-    private val pixelSize = resources.displayMetrics.density * 3f
+    private val pixelSize = resources.displayMetrics.density * 1.25f
     private var effect: Visualizer? = null
 
     fun start(sessionId: Int): Boolean {
@@ -75,7 +75,7 @@ class SpectrumView(context: Context) : View(context) {
         val center = height / 2f
         canvas.drawLine(0f, center, width.toFloat(), center, baseline)
         val amplitude = height * 0.43f
-        val pixel = pixelSize.coerceAtLeast(2f)
+        val pixel = pixelSize.coerceAtLeast(1f)
         val columns = (width / pixel).toInt().coerceAtLeast(1)
         line.style = Paint.Style.FILL
         for (column in 0 until columns) {
@@ -83,7 +83,7 @@ class SpectrumView(context: Context) : View(context) {
             val x = column * pixel
             val y = center - wave[sampleIndex].coerceIn(-1f, 1f) * amplitude
             val snappedY = (y / pixel).toInt() * pixel
-            canvas.drawRect(x, snappedY, (x + pixel * 0.8f).coerceAtMost(width.toFloat()), snappedY + pixel * 0.8f, line)
+            canvas.drawRect(x, snappedY, (x + pixel * 0.68f).coerceAtMost(width.toFloat()), snappedY + pixel * 0.8f, line)
         }
     }
 }
