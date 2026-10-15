@@ -38,10 +38,15 @@ class ProviderBrowserActivity : Activity() {
     private lateinit var controls: LinearLayout
     private lateinit var controlsContainer: HorizontalScrollView
     private lateinit var status: TextView
+    private lateinit var toggle: Button
     private var controlsVisible = true
     private var home = ""
     private val hideHandler = Handler(Looper.getMainLooper())
-    private val hideControls = Runnable { controlsContainer.visibility = View.GONE; controlsVisible = false }
+    private val hideControls = Runnable {
+        controlsContainer.visibility = View.GONE
+        controlsVisible = false
+        toggle.text = "Show tools"
+    }
     private fun scheduleAutoHide() {
         hideHandler.removeCallbacks(hideControls)
         if (controlsVisible) hideHandler.postDelayed(hideControls, 5000L)
@@ -77,7 +82,7 @@ class ProviderBrowserActivity : Activity() {
             setPadding(16, 10, 8, 10)
         }
         header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val toggle = Button(this).apply { text = "Hide tools" }
+        toggle = Button(this).apply { text = "Hide tools" }
         header.addView(toggle)
         root.addView(header)
 
@@ -129,9 +134,10 @@ class ProviderBrowserActivity : Activity() {
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight))
         }
         button("Back") { if (browser.canGoBack()) browser.goBack() else finish() }
+        button("Forward") { if (browser.canGoForward()) browser.goForward() }
         button("Home") { browser.loadUrl(home) }
         button("Reload") { browser.reload() }
-        button("Open externally", 1.5f) { openExternal(Uri.parse(browser.url ?: home)) }
+        button("External", 1.3f) { openExternal(Uri.parse(browser.url ?: home)) }
         controlsContainer = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(controls)
@@ -160,6 +166,7 @@ class ProviderBrowserActivity : Activity() {
     }
 
     override fun onPause() {
+        hideHandler.removeCallbacks(hideControls)
         if (::browser.isInitialized) browser.onPause()
         super.onPause()
     }
@@ -167,6 +174,7 @@ class ProviderBrowserActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::browser.isInitialized) browser.onResume()
+        if (::controlsContainer.isInitialized) scheduleAutoHide()
     }
 
     override fun onDestroy() {
