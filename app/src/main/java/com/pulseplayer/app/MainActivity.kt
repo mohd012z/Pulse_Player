@@ -978,15 +978,58 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showRadioTuner() {
+        val stations = radioRepo.stations().filter { it.name.startsWith("MY ·") }
+        if (stations.isEmpty()) {
+            status("Discover Malaysia radio stations first")
+            return
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+        }
+        val current = label(stations.first().name, 16f, Color.WHITE, true)
+        val detail = label("Internet station selector · not FM MHz tuning", 12f, COLOR_MUTED)
+        val slider = SeekBar(this).apply { max = stations.lastIndex; progress = 0 }
+        container.addView(current)
+        container.addView(detail)
+        container.addView(slider)
+        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                current.text = stations[progress].name
+                detail.text = "Station ${progress + 1} / ${stations.size} · internet stream"
+            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) {}
+        })
+        AlertDialog.Builder(this)
+            .setTitle("Malaysia Radio · manual tuning")
+            .setView(container)
+            .setPositiveButton("Play selected") { _, _ ->
+                val station = stations[slider.progress]
+                val c = controller
+                if (c == null) status("Playback service not connected")
+                else {
+                    c.setMediaItem(station.toMediaItem())
+                    c.prepare()
+                    c.play()
+                    status("Playing ${station.name}")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showMalaysiaRadioQuickMenu() = showPicker("Malaysia radio · stations", arrayOf(
         "Browse Malaysia radio stations", "Discover more Malaysia stations (online)",
-        "All saved radio stations", "Add a radio stream"
+        "All saved radio stations", "Add a radio stream", "Manual station tuning slider"
     )) { selected ->
         when (selected) {
             0 -> switchPlaylist("MY RADIO")
             1 -> discoverMalaysiaRadio()
             2 -> switchPlaylist("RADIO")
             3 -> addRadioDialog()
+            4 -> showRadioTuner()
         }
     }
 
