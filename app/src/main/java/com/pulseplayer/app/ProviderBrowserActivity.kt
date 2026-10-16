@@ -42,6 +42,7 @@ class ProviderBrowserActivity : Activity() {
     private lateinit var browser: WebView
     private lateinit var rootLayout: LinearLayout
     private lateinit var videoHost: FrameLayout
+    private lateinit var exitCinemaButton: Button
     private lateinit var headerView: View
     private lateinit var statusView: View
     private var fullscreenView: View? = null
@@ -144,7 +145,7 @@ class ProviderBrowserActivity : Activity() {
                     }
                     fullscreenView = view
                     fullscreenCallback = callback
-                    videoHost.addView(view, FrameLayout.LayoutParams(-1, -1))
+                    videoHost.addView(view, videoHost.indexOfChild(exitCinemaButton), FrameLayout.LayoutParams(-1, -1))
                     browser.visibility = View.GONE
                     enterPortraitCinema()
                 }
@@ -175,6 +176,15 @@ class ProviderBrowserActivity : Activity() {
         }
         videoHost = FrameLayout(this)
         videoHost.addView(browser, FrameLayout.LayoutParams(-1, -1))
+        exitCinemaButton = Button(this).apply {
+            text = "✕"
+            contentDescription = "Exit portrait fullscreen"
+            visibility = View.GONE
+            setOnClickListener { leavePortraitCinema() }
+        }
+        videoHost.addView(exitCinemaButton, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.END))
         root.addView(videoHost, LinearLayout.LayoutParams(-1, 0, 1f))
         controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -232,6 +242,8 @@ class ProviderBrowserActivity : Activity() {
         statusView.visibility = View.GONE
         controlsContainer.visibility = View.GONE
         if (drama) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        exitCinemaButton.visibility = View.VISIBLE
+        exitCinemaButton.bringToFront()
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
@@ -255,6 +267,7 @@ class ProviderBrowserActivity : Activity() {
     private fun leavePortraitCinema() {
         if (fullscreenView != null) { leaveFullscreenVideo(); return }
         portraitCinema = false
+        exitCinemaButton.visibility = View.GONE
         headerView.visibility = View.VISIBLE
         statusView.visibility = View.VISIBLE
         controlsContainer.visibility = if (controlsVisible) View.VISIBLE else View.GONE
@@ -302,7 +315,7 @@ class ProviderBrowserActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::controlsContainer.isInitialized) scheduleAutoHide()
+        if (::controlsContainer.isInitialized && !portraitCinema) scheduleAutoHide()
     }
 
     override fun onDestroy() {
