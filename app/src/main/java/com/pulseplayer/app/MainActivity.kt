@@ -1074,20 +1074,20 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER  ·  CLOUD v10", 16f, COLOR_ACCENT, true)
+        val brand = label("PULSE PLAYER  ·  STUDIO", 16f, COLOR_ACCENT, true)
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⚙ Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(40)))
+        toolbar.addView(button("Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(44)))
         root.addView(toolbar)
 
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(40), 1.25f))
-        tabs.addView(button("📻 Radio") { showMalaysiaRadioQuickMenu() },
-            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("🎚 FX") { showAudioMenu() },
-            LinearLayout.LayoutParams(0, dp(40), 0.8f).apply { leftMargin = dp(6) })
+        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1.25f))
+        tabs.addView(button("Radio") { showMalaysiaRadioQuickMenu() },
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
+        tabs.addView(button("FX") { showAudioMenu() },
+            LinearLayout.LayoutParams(0, dp(48), 0.8f).apply { leftMargin = dp(6) })
         root.addView(tabs)
         val radioTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         radioTools.addView(button("📡 Scan MY") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
@@ -1279,7 +1279,7 @@ class MainActivity : Activity() {
             text.contains("Radio", true) -> "radio"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
             text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
-            text.contains("DEVICE", true) -> "device"
+            text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"
             else -> null
         }
         this.text = text.trimStart { !it.isLetterOrDigit() }.trim()
@@ -1293,8 +1293,8 @@ class MainActivity : Activity() {
         setTextColor(Color.WHITE)
         val accent = when {
             text.contains("Radio", true) || text.contains("Scan", true) -> 0xFF087F83L.toInt()
-            text.contains("FX", true) || text.contains("Sound", true) -> 0xFF6845AAL.toInt()
-            text.contains("Play", true) || text.contains("Pause", true) -> 0xFF146B65L.toInt()
+            text.contains("FX", true) || text.contains("Sound", true) -> 0xFF6742A6L.toInt()
+            text.contains("Play", true) || text.contains("Pause", true) -> 0xFF13765CL.toInt()
             text.contains("Web", true) || text.contains("YouTube", true) -> 0xFF345CA0L.toInt()
             else -> 0xFF27384BL.toInt()
         }
@@ -1307,8 +1307,9 @@ class MainActivity : Activity() {
         minimumHeight = 0
         minWidth = 0
         minimumWidth = 0
-        setPadding(dp(5), 0, dp(5), 0)
-        contentDescription = text
+        setPadding(dp(8), 0, dp(8), 0)
+        elevation = dp(2).toFloat()
+        contentDescription = this.text.toString()
         setOnClickListener { onClick() }
     }
 
