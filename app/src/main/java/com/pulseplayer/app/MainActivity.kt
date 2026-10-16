@@ -1274,7 +1274,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1287,8 +1287,61 @@ class MainActivity : Activity() {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
             5 -> showAudioDiagnostics()
-            6 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            6 -> showDeviceSoundCapabilities()
+            7 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun showDeviceSoundCapabilities() {
+        val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val outputs = manager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+        val routeNames = outputs.map { device ->
+            val type = when (device.type) {
+                android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in speaker"
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth stereo"
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth call audio"
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"
+                android.media.AudioDeviceInfo.TYPE_USB_HEADSET -> "USB headset"
+                android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio"
+                android.media.AudioDeviceInfo.TYPE_HDMI -> "HDMI audio"
+                else -> "Other output (type ${device.type})"
+            }
+            "$type: ${device.productName}"
+        }
+        val spatial = if (android.os.Build.VERSION.SDK_INT >= 32) {
+            val spatializer = manager.spatializer
+            "Spatial audio supported: ${spatializer.immersiveAudioLevel != android.media.Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE}\\n" +
+                "Available for current route: ${spatializer.isAvailable}\\n" +
+                "Enabled in Android: ${spatializer.isEnabled}"
+        } else "Spatial audio capability check requires Android 12L or newer."
+        val display = windowManager.defaultDisplay
+        val modes = display.supportedModes.map { it.refreshRate }.distinct().sorted()
+        val message = """
+            Connected output devices (not necessarily the active media route):
+            ${routeNames.ifEmpty { listOf("No output reported") }.joinToString("\\n")}
+
+            $spatial
+
+            Display refresh rate: ${display.refreshRate} Hz
+            Supported display modes: ${modes.joinToString(", ")} Hz
+
+            Audio recommendations:
+            • Built-in speakers: start with Flat; apply modest EQ, avoid extreme bass.
+            • Headphones: use supported Android spatial audio if available.
+            • Bluetooth: audio codec and device DSP affect quality.
+            • EQ/BassBoost only affect Pulse Player playback, not YouTube WebView audio.
+
+            Display refresh rate is separate from video FPS and audio quality.
+            The system decides whether to switch refresh rate.
+        """.trimIndent()
+        AlertDialog.Builder(this).setTitle("Sound engine · device capability scan")
+            .setMessage(message)
+            .setPositiveButton("Sound settings") { _, _ ->
+                openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun showBassDialog() {
