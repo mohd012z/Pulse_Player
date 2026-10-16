@@ -991,6 +991,44 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showRadioHealth() {
+        val stations = radioRepo.stations().filter { it.name.startsWith("MY ·") }
+        if (stations.isEmpty()) { status("No Malaysia stations saved"); return }
+        status("Checking station stream responses in background…")
+        thread(name = "PulseRadioHealth", isDaemon = true) {
+            val lines = stations.map { station ->
+                val result = runCatching {
+                    val connection = (java.net.URL(station.url).openConnection() as java.net.HttpURLConnection).apply {
+                        connectTimeout = 3500
+                        readTimeout = 3500
+                        instanceFollowRedirects = true
+                        setRequestProperty("User-Agent", "PulsePlayer/RadioHealth")
+                        setRequestProperty("Range", "bytes=0-0")
+                    }
+                    try {
+                        val code = connection.responseCode
+                        val type = connection.contentType.orEmpty()
+                        if (code in 200..299) "HTTP $code · $type" else "HTTP $code"
+                    } finally { connection.disconnect() }
+                }.getOrElse { "Unreachable: ${it.javaClass.simpleName}" }
+                "${station.name} — $result"
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val view = TextView(this).apply {
+                    text = lines.joinToString("\n\n")
+                    textSize = 12f
+                    setTextColor(Color.WHITE)
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                }
+                AlertDialog.Builder(this).setTitle("Malaysia radio · stream checks")
+                    .setMessage("HTTP checks do not guarantee successful audio decoding or playback.")
+                    .setView(ScrollView(this).apply { addView(view) })
+                    .setPositiveButton("Close", null).show()
+            }
+        }
+    }
+
     private fun showRadioTuner() {
         val stations = radioRepo.stations().filter { it.name.startsWith("MY ·") }
         if (stations.isEmpty()) {
@@ -1035,7 +1073,7 @@ class MainActivity : Activity() {
 
     private fun showMalaysiaRadioQuickMenu() = showPicker("Malaysia radio · stations", arrayOf(
         "Browse Malaysia radio stations", "Discover more Malaysia stations (online)",
-        "All saved radio stations", "Add a radio stream", "Manual station tuning slider"
+        "All saved radio stations", "Add a radio stream", "Manual station tuning slider", "Check Malaysia stream responses"
     )) { selected ->
         when (selected) {
             0 -> switchPlaylist("MY RADIO")
@@ -1043,6 +1081,7 @@ class MainActivity : Activity() {
             2 -> switchPlaylist("RADIO")
             3 -> addRadioDialog()
             4 -> showRadioTuner()
+            5 -> showRadioHealth()
         }
     }
 
