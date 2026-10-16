@@ -1311,15 +1311,15 @@ class MainActivity : Activity() {
         }
         val spatial = if (android.os.Build.VERSION.SDK_INT >= 32) {
             val spatializer = manager.spatializer
-            "Spatial audio supported: ${spatializer.immersiveAudioLevel != android.media.Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE}\\n" +
-                "Available for current route: ${spatializer.isAvailable}\\n" +
+            "Spatial audio supported: ${spatializer.immersiveAudioLevel != android.media.Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE}\n" +
+                "Available for current route: ${spatializer.isAvailable}\n" +
                 "Enabled in Android: ${spatializer.isEnabled}"
         } else "Spatial audio capability check requires Android 12L or newer."
         val display = windowManager.defaultDisplay
         val modes = display.supportedModes.map { it.refreshRate }.distinct().sorted()
         val message = """
             Connected output devices (not necessarily the active media route):
-            ${routeNames.ifEmpty { listOf("No output reported") }.joinToString("\\n")}
+            ${routeNames.ifEmpty { listOf("No output reported") }.joinToString("\n")}
 
             $spatial
 
