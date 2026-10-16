@@ -47,7 +47,7 @@ class MalaysiaRadioDirectory {
                     // Unknown bitrate is retained but ranked below documented quality streams.
                     val codecScore = when { codec.contains("AAC") -> 25; codec.contains("MP3") -> 15; else -> 0 }
                     val qualityScore = bitrate.coerceIn(0, 320) + codecScore
-                    stations.add(RadioRepository.Station("MY · $name", stream) to qualityScore)
+                    stations.add(RadioRepository.Station("MY · $name", stream, codec, bitrate) to qualityScore)
                 }
                 return stations.sortedByDescending { it.second }.map { it.first }.distinctBy { it.url }.take(70)
             } catch (e: Exception) {
