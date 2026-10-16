@@ -189,7 +189,7 @@ class AiPulseStudioActivity : Activity() {
             } else {
                 runCatching {
                     val file = File(filesDir, "ai_pulse_voice_${System.currentTimeMillis()}.m4a")
-                    val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this@AiPulseStudioActivity) else @Suppress("DEPRECATION") MediaRecorder()
+                    val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this@AiPulseStudioActivity) else MediaRecorder()
                     try {
                         r.setAudioSource(MediaRecorder.AudioSource.MIC)
                         r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -248,6 +248,8 @@ class AiPulseStudioActivity : Activity() {
                 val result = runCatching {
                     AiPulseComposer.render(request, tmp) { cancelRequested }
                     if (cancelRequested) throw InterruptedException("Cancelled")
+                    val report = AiPulseWaveInspector.inspect(tmp)
+                    require(report.durationSeconds > 0.0) { "Empty output" }
                     saveToMusic(tmp, request.title)
                 }
                 tmp.delete()
