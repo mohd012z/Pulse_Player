@@ -215,6 +215,13 @@ class AiPulseStudioActivity : Activity() {
             setTextColor(Color.WHITE)
         }
         root.addView(duration)
+        heading("Audio mastering · WAV")
+        val masteringPreset = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                AiPulseMastering.Preset.entries.map { it.name })
+        }
+        root.addView(masteringPreset)
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
         val create = Button(this).apply { text = "Generate music" }
         val cancel = Button(this).apply { text = "Cancel"; isEnabled = false }
@@ -238,6 +245,7 @@ class AiPulseStudioActivity : Activity() {
                     .setPositiveButton("OK", null).show()
                 return@setOnClickListener
             }
+            val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
             working = true
             cancelRequested = false
             create.isEnabled = false
@@ -250,7 +258,12 @@ class AiPulseStudioActivity : Activity() {
                     if (cancelRequested) throw InterruptedException("Cancelled")
                     val report = AiPulseWaveInspector.inspect(tmp)
                     require(report.durationSeconds > 0.0) { "Empty output" }
-                    saveToMusic(tmp, request.title)
+                    val mastered = File(cacheDir, "master-${System.nanoTime()}.wav")
+                    try {
+                        AiPulseMastering.process(tmp, mastered, selectedMasteringPreset) { cancelRequested }
+                        if (cancelRequested) throw InterruptedException("Cancelled")
+                        saveToMusic(mastered, request.title)
+                    } finally { mastered.delete() }
                 }
                 tmp.delete()
                 runOnUiThread {
