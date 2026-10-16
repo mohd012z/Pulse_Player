@@ -15,7 +15,11 @@ android {
         versionName = "4.0.0"
     }
 
-    externalNativeBuild {\n        cmake { path = file("src/main/cpp/CMakeLists.txt") }\n    }\n\n    buildTypes {
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt") }
+    }
+
+    buildTypes {
         release {
             isMinifyEnabled = false
         }
