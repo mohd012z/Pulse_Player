@@ -1,0 +1,22 @@
+name: Native Stereo DSP Tests
+on:
+  push:
+    branches: [main, feat/embedded-provider-browser-v5]
+    paths:
+      - 'app/src/main/cpp/**'
+      - 'app/src/test/cpp/**'
+      - '.github/workflows/native-stereo-dsp.yml'
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/**'
+      - 'app/src/test/cpp/**'
+      - '.github/workflows/native-stereo-dsp.yml'
+jobs:
+  native-dsp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile DSP regression test
+        run: g++ -std=c++17 -O2 -Wall -Wextra -Werror -Iapp/src/main/cpp app/src/test/cpp/stereo_dsp_test.cpp -o /tmp/stereo_dsp_test
+      - name: Run DSP regression test
+        run: /tmp/stereo_dsp_test

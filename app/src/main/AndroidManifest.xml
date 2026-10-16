@@ -17,6 +17,12 @@
         android:theme="@style/Theme.PulsePlayer"
         android:supportsRtl="true">
 
+        <activity android:name=".SubtitleStudioActivity" android:exported="false" />
+        <activity android:name=".AuthorizedDownloadActivity" android:exported="false" />
+        <activity android:name=".MediaExportActivity" android:exported="false" />
+        <activity android:name=".ProviderBrowserActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

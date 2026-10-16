@@ -10,7 +10,12 @@ import org.json.JSONObject
 
 /** Curated example stations and personal HTTPS stream bookmarks; does not record or redistribute radio. */
 class RadioRepository(context: Context) {
-    data class Station(val name: String, val url: String) {
+    data class Station(val name: String, val url: String, val codec: String = "", val bitrateKbps: Int = 0, val frequencyMHz: String = "", val region: String = "") {
+        fun details(): String = listOfNotNull(
+            frequencyMHz.takeIf { it.isNotBlank() }?.let { "$it MHz${if (region.isBlank()) "" else " · $region"}" } ?: "FM: not verified",
+            codec.takeIf { it.isNotBlank() } ?: "Codec unknown",
+            bitrateKbps.takeIf { it > 0 }?.let { "$it kbps" } ?: "Bitrate unknown"
+        ).joinToString(" · ")
         fun toMediaItem(): MediaItem {
             val builder = MediaItem.Builder()
                 .setUri(url)
@@ -39,14 +44,14 @@ class RadioRepository(context: Context) {
             val obj = arr.optJSONObject(i) ?: return@mapNotNull null
             val name = obj.optString("name").trim()
             val url = obj.optString("url").trim()
-            if (!name.startsWith("MY ·") || !isValidUrl(url)) null else Station(name.take(90), url)
+            if (!name.startsWith("MY ·") || !isValidUrl(url)) null else Station(name.take(90), url, obj.optString("codec"), obj.optInt("bitrate"), obj.optString("frequencyMHz"), obj.optString("region"))
         }
     }.getOrDefault(emptyList())
 
     fun replaceDiscovery(found: List<Station>): Boolean {
         val arr = JSONArray()
         found.asSequence().filter { it.name.startsWith("MY ·") && isValidUrl(it.url) }
-            .distinctBy { it.url }.take(70).forEach { arr.put(JSONObject().put("name", it.name).put("url", it.url)) }
+            .distinctBy { it.url }.take(70).forEach { arr.put(JSONObject().put("name", it.name).put("url", it.url).put("codec", it.codec).put("bitrate", it.bitrateKbps).put("frequencyMHz", it.frequencyMHz).put("region", it.region)) }
         return prefs.edit().putString("discovered_my", arr.toString()).commit()
     }
 

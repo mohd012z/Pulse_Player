@@ -60,9 +60,9 @@ class MainActivity : Activity() {
         private const val REQUEST_LYRICS = 104
         private const val REQUEST_SPECTRUM_PERMISSION = 105
         private const val EXTRA_SHORTCUT = "shortcut"
-        private const val COLOR_BG = 0xFF10141FL.toInt()
-        private const val COLOR_PANEL = 0xFF1B2331L.toInt()
-        private const val COLOR_ACCENT = 0xFF75E2C0L.toInt()
+        private const val COLOR_BG = 0xFF0B1220L.toInt()
+        private const val COLOR_PANEL = 0xFF182538L.toInt()
+        private const val COLOR_ACCENT = 0xFF4DE0CCL.toInt()
         private const val COLOR_MUTED = 0xFFB6C3CDL.toInt()
     }
 
@@ -79,6 +79,10 @@ class MainActivity : Activity() {
     private var lyricLines: List<TimedLyrics.Line> = emptyList()
     private var lyricGeneration = 0
     private var spectrumView: SpectrumView? = null
+    private var waveformDock: LinearLayout? = null
+    private var activeSpectrumSession = -1
+    private var spectrumRequestPending = false
+    private var spectrumRetryAtMs = 0L
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -97,6 +101,9 @@ class MainActivity : Activity() {
     private lateinit var titleView: TextView
     private lateinit var artistView: TextView
     private lateinit var progressView: TextView
+    private lateinit var networkView: TextView
+    private var lastRxBytes = -1L
+    private var lastRxMs = 0L
     private lateinit var statusView: TextView
     private lateinit var libraryView: TextView
     private lateinit var sourceView: TextView
@@ -119,6 +126,9 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
+            if (controller?.isPlaying == true && spectrumView == null && !spectrumRequestPending &&
+                android.os.SystemClock.elapsedRealtime() >= spectrumRetryAtMs) startSpectrumIfPermitted()
+            refreshNetworkSpeed()
             clock.postDelayed(this, 750L)
         }
     }
@@ -142,6 +152,8 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         spectrumView?.stop()
+        spectrumView = null
+        activeSpectrumSession = -1
         clock.removeCallbacks(ticker)
         controller?.removeListener(playerListener)
         controller = null
@@ -209,7 +221,7 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                showSpectrum()
+                startSpectrumIfPermitted()
             } else {
                 status("FFT visualization requires optional audio capture permission")
             }
@@ -250,15 +262,15 @@ class MainActivity : Activity() {
     private fun filterLibrary() {
         val query = filterView.text?.toString()?.trim().orEmpty()
         visibleSongs.clear()
-        visibleSongs.addAll(if (query.isEmpty()) songs else songs.filter {
+        visibleSongs.addAll((if (query.isEmpty()) songs else songs.filter {
             it.title.contains(query, ignoreCase = true) ||
                 it.artist.contains(query, ignoreCase = true)
-        })
+        }).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }) )
         val lines: List<String> = when (source) {
             "FOLDERS" -> folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }
                 .map { "${it.name}\n${it.folder}" }
             "RADIO", "MY RADIO" -> filteredStations(query)
-                .map { "${it.name}\nLIVE STREAM" }
+                .map { "${it.name}\n${it.details()} · LIVE STREAM" }
             else -> visibleSongs.map { "${it.title}\n${it.artist}" }
         }
         currentDisplaySize = lines.size
@@ -445,7 +457,7 @@ class MainActivity : Activity() {
     }
 
     private fun selectMixPreset() {
-        val options = SoundPresets.names.toTypedArray()
+        val options = SoundPresets.featuredNames.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Sound mixer · EQ profile")
             .setSingleChoiceItems(options, -1) { dialog, which ->
@@ -566,6 +578,37 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun showPerformanceSettings() {
+        val tiers = arrayOf("Automatic", "Lite · battery saver", "Balanced", "High · detailed visuals")
+        val prefs = getSharedPreferences("player_state", MODE_PRIVATE)
+        val current = prefs.getString("performance_tier", null)
+        val selected = when (current) {
+            "LITE" -> 1
+            "BALANCED" -> 2
+            "HIGH" -> 3
+            else -> 0
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Playback & visual performance")
+            .setMessage("Current: ${DevicePerformanceProfile.description(this)}. Lower profiles reduce waveform drawing workload; audio quality is unchanged. Restart the waveform after changing.")
+            .setSingleChoiceItems(tiers, selected) { dialog, index ->
+                val value = when (index) {
+                    1 -> "LITE"
+                    2 -> "BALANCED"
+                    3 -> "HIGH"
+                    else -> null
+                }
+                prefs.edit().apply {
+                    if (value == null) remove("performance_tier") else putString("performance_tier", value)
+                }.apply()
+                spectrumView?.stop()
+                status("Performance: ${DevicePerformanceProfile.description(this)}")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showCustomEqualizer() {
         val values = intArrayOf(customLow, customMid, customHigh)
         val labels = arrayOf("Bass (under 250 Hz)", "Midrange (250–4000 Hz)", "Treble (over 4000 Hz)")
@@ -615,7 +658,7 @@ class MainActivity : Activity() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
                 .setTitle("Optional live audio visualizer")
-                .setMessage("Android requires audio-capture permission for FFT visualization. PulsePlayer uses this only to display the current song spectrum, does not record sound to disk, and stops capture when closed.")
+                .setMessage("Android requires audio-capture permission for the live pixel-cloud waveform. PulsePlayer displays the current audio session only, does not save captured sound, and stops capture when the visualizer is closed.")
                 .setPositiveButton("Allow") { _, _ ->
                     requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_SPECTRUM_PERMISSION)
                 }
@@ -624,34 +667,43 @@ class MainActivity : Activity() {
     }
 
     private fun showSpectrum() {
-        customCommand(PlaybackService.CMD_STATUS) { extras, success ->
-            if (!success || isFinishing || isDestroyed) return@customCommand
-            val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
-            if (sessionId <= 0) {
-                status("Start playback before opening the audio spectrum")
-                return@customCommand
-            }
+        val row = waveformDock ?: return
+        if (row.visibility == android.view.View.VISIBLE) {
+            spectrumRetryAtMs = android.os.SystemClock.elapsedRealtime() + 60_000L
             spectrumView?.stop()
-            val view = SpectrumView(this).apply {
-                setBackgroundColor(COLOR_BG)
-                minimumHeight = dp(240)
-            }
+            spectrumView = null
+            activeSpectrumSession = -1
+            row.removeAllViews()
+            row.visibility = android.view.View.GONE
+        } else {
+            startSpectrumIfPermitted()
+        }
+    }
+
+    private fun startSpectrumIfPermitted() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (spectrumRequestPending || controller?.isPlaying != true) return
+        spectrumRetryAtMs = android.os.SystemClock.elapsedRealtime() + 5_000L
+        spectrumRequestPending = true
+        customCommand(PlaybackService.CMD_STATUS) { extras, success ->
+            spectrumRequestPending = false
+            if (!success || isFinishing || isDestroyed || controller?.isPlaying != true) return@customCommand
+            val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
+            if (sessionId <= 0 || (spectrumView != null && activeSpectrumSession == sessionId)) return@customCommand
+            val row = waveformDock ?: return@customCommand
+            spectrumView?.stop()
+            spectrumView = null
+            activeSpectrumSession = -1
+            row.removeAllViews()
+            val view = SpectrumView(this).apply { setBackgroundColor(COLOR_PANEL) }
             if (!view.start(sessionId)) {
-                status("Audio spectrum unsupported on this playback route")
+                row.visibility = android.view.View.GONE
                 return@customCommand
             }
             spectrumView = view
-            AlertDialog.Builder(this)
-                .setTitle("Live music spectrum · FFT")
-                .setView(view)
-                .setPositiveButton("Close", null)
-                .create().also { dialog ->
-                    dialog.setOnDismissListener {
-                        view.stop()
-                        if (spectrumView === view) spectrumView = null
-                    }
-                    dialog.show()
-                }
+            activeSpectrumSession = sessionId
+            row.addView(view, LinearLayout.LayoutParams(-1, dp(46)))
+            row.visibility = android.view.View.VISIBLE
         }
     }
 
@@ -791,6 +843,22 @@ class MainActivity : Activity() {
             .onFailure { status("Launcher shortcuts unavailable on this device") }
     }
 
+    private fun refreshNetworkSpeed() {
+        if (!::networkView.isInitialized) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val bytes = android.net.TrafficStats.getUidRxBytes(android.os.Process.myUid())
+        if (bytes < 0) {
+            networkView.text = "Network: unavailable"
+        } else if (lastRxBytes >= 0 && now > lastRxMs) {
+            val kbps = ((bytes - lastRxBytes).coerceAtLeast(0L) * 8.0 / (now - lastRxMs))
+            networkView.text = if (controller?.isPlaying == true && source.contains("RADIO"))
+                String.format(Locale.US, "App network ↓ %.0f kbps", kbps)
+            else "Network: idle / app total"
+        }
+        lastRxBytes = bytes
+        lastRxMs = now
+    }
+
     private fun refreshNowPlaying() {
         val c = controller
         val media = c?.currentMediaItem
@@ -798,7 +866,10 @@ class MainActivity : Activity() {
             ?: "Choose a track"
         artistView.text = media?.mediaMetadata?.artist?.toString()?.takeIf { it.isNotBlank() }
             ?: "Local audio • ExoPlayer"
-        playButton.text = if (c?.isPlaying == true) "Ⅱ" else "▶"
+        playButton.text = ""
+        playButton.setCompoundDrawablesWithIntrinsicBounds(
+            ActionIconDrawable(if (c?.isPlaying == true) "pause" else "play", dp(21)), null, null, null)
+        playButton.contentDescription = if (c?.isPlaying == true) "Pause" else "Play"
         val duration = c?.duration ?: C.TIME_UNSET
         val current = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
         progressView.text = "${formatTime(current)}  /  ${formatTime(duration)}"
@@ -871,6 +942,8 @@ class MainActivity : Activity() {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
             "YouTube Music" -> "https://music.youtube.com/"
+            "YouTube Shorts" -> "https://www.youtube.com/shorts"
+            "Short Drama" -> "https://www.youtube.com/results?search_query=short+drama"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
@@ -880,9 +953,15 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-            })
+            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music", "YouTube Shorts", "Short Drama")) {
+                startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
+                    putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, destination)
+                })
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                })
+            }
         }.onFailure {
             status("Cannot open $destination: ${it.message}")
         }
@@ -912,20 +991,114 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showRadioHealth() {
+        val stations = radioRepo.stations().filter { it.name.startsWith("MY ·") }
+        if (stations.isEmpty()) { status("No Malaysia stations saved"); return }
+        status("Checking station stream responses in background…")
+        thread(name = "PulseRadioHealth", isDaemon = true) {
+            val lines = stations.map { station ->
+                val result = runCatching {
+                    val connection = (java.net.URL(station.url).openConnection() as java.net.HttpURLConnection).apply {
+                        connectTimeout = 3500
+                        readTimeout = 3500
+                        instanceFollowRedirects = true
+                        setRequestProperty("User-Agent", "PulsePlayer/RadioHealth")
+                        setRequestProperty("Range", "bytes=0-0")
+                    }
+                    try {
+                        val code = connection.responseCode
+                        val type = connection.contentType.orEmpty()
+                        if (code in 200..299) "HTTP $code · $type" else "HTTP $code"
+                    } finally { connection.disconnect() }
+                }.getOrElse { "Unreachable: ${it.javaClass.simpleName}" }
+                "${station.name} — $result"
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val view = TextView(this).apply {
+                    text = lines.joinToString("\n\n")
+                    textSize = 12f
+                    setTextColor(Color.WHITE)
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                }
+                AlertDialog.Builder(this).setTitle("Malaysia radio · stream checks")
+                    .setMessage("HTTP checks do not guarantee successful audio decoding or playback.")
+                    .setView(ScrollView(this).apply { addView(view) })
+                    .setPositiveButton("Close", null).show()
+            }
+        }
+    }
+
+    private fun showRadioTuner() {
+        val stations = radioRepo.stations().filter { it.name.startsWith("MY ·") }
+        if (stations.isEmpty()) {
+            status("Discover Malaysia radio stations first")
+            return
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+        }
+        val current = label(stations.first().name, 16f, Color.WHITE, true)
+        val detail = label(stations.first().details() + " · internet stream", 12f, COLOR_MUTED)
+        val slider = SeekBar(this).apply { max = stations.lastIndex; progress = 0 }
+        container.addView(current)
+        container.addView(detail)
+        container.addView(slider)
+        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                current.text = stations[progress].name
+                detail.text = "Station ${progress + 1} / ${stations.size} · ${stations[progress].details()}"
+            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) {}
+        })
+        AlertDialog.Builder(this)
+            .setTitle("Malaysia Radio · manual tuning")
+            .setView(container)
+            .setPositiveButton("Play selected") { _, _ ->
+                val station = stations[slider.progress]
+                val c = controller
+                if (c == null) status("Playback service not connected")
+                else {
+                    c.setMediaItem(station.toMediaItem())
+                    c.prepare()
+                    c.play()
+                    status("Playing ${station.name}")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showMalaysiaRadioQuickMenu() = showPicker("Malaysia radio · stations", arrayOf(
+        "Browse Malaysia radio stations", "Discover more Malaysia stations (online)",
+        "All saved radio stations", "Add a radio stream", "Manual station tuning slider", "Check Malaysia stream responses"
+    )) { selected ->
+        when (selected) {
+            0 -> switchPlaylist("MY RADIO")
+            1 -> discoverMalaysiaRadio()
+            2 -> switchPlaylist("RADIO")
+            3 -> addRadioDialog()
+            4 -> showRadioTuner()
+            5 -> showRadioHealth()
+        }
+    }
+
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download", "Device performance profile"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
+            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")) {
+                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
-                "RTM official radio (stations)", "BFM 89.9 official player",
+                "Manual station tuning slider", "RTM official radio (stations)", "BFM 89.9 official player",
                 "ERA official player", "MY FM official player"
             )) {
                 when (it) {
@@ -933,15 +1106,16 @@ class MainActivity : Activity() {
                     1 -> discoverMalaysiaRadio()
                     2 -> switchPlaylist("RADIO")
                     3 -> addRadioDialog()
-                    4 -> openProvider("RTM Radio Malaysia")
-                    5 -> openProvider("BFM 89.9")
-                    6 -> openProvider("ERA Malaysia")
-                    7 -> openProvider("MY FM")
+                    4 -> showRadioTuner()
+                    5 -> openProvider("RTM Radio Malaysia")
+                    6 -> openProvider("BFM 89.9")
+                    7 -> openProvider("ERA Malaysia")
+                    8 -> openProvider("MY FM")
                 }
             }
             3 -> showAudioMenu()
-            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
-                when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog() }
+            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics", "Subtitle & translation studio")) {
+                when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog(); 2 -> startActivity(Intent(this, SubtitleStudioActivity::class.java)) }
             }
             5 -> requestSpectrum()
             6 -> showPlaybackMenu()
@@ -953,20 +1127,26 @@ class MainActivity : Activity() {
                 }
             }
             8 -> shareCurrentTrack()
+            9 -> startActivity(Intent(this, MediaExportActivity::class.java))
+            10 -> startActivity(Intent(this, AuthorizedDownloadActivity::class.java))
+            11 -> showPerformanceSettings()
         }
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
-            1 -> showCustomEqualizer()
-            2 -> showBassDialog()
-            3 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+            1 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                putString(PlaybackService.ARG_PRESET, "NovaStream TV")
+            }) { _, ok -> status(if (ok) "NovaStream TV cinematic EQ active" else "EQ unavailable on this output") }
+            2 -> showCustomEqualizer()
+            3 -> showBassDialog()
+            4 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
-            4 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            5 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
     }
 
@@ -1048,21 +1228,12 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER", 18f, COLOR_ACCENT, true)
-        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        })
-        toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
+        val brand = label("PULSE  /  STUDIO", 18f, COLOR_ACCENT, true)
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f))
+        toolbar.addView(button("Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(40)))
         root.addView(toolbar)
-
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
-        tabs.addView(button("MY Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
-        root.addView(tabs)
+        root.addView(sourceButton, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(3) })
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -1123,6 +1294,12 @@ class MainActivity : Activity() {
             background = panelBackground()
         }
         root.addView(dock)
+        val waveformRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            visibility = android.view.View.GONE
+        }
+        waveformDock = waveformRow
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
@@ -1183,7 +1360,8 @@ class MainActivity : Activity() {
             if (c.hasNextMediaItem()) c.seekToNextMediaItem()
         } }, LinearLayout.LayoutParams(dp(48), dp(44)))
         dock.addView(mini)
-
+        networkView = label("Network: waiting", 10f, COLOR_MUTED)
+        dock.addView(networkView)
         seekBar = SeekBar(this).apply {
             isEnabled = false
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1197,11 +1375,37 @@ class MainActivity : Activity() {
                 }
             })
         }
+        dock.addView(waveformRow, LinearLayout.LayoutParams(-1, dp(46)))
         dock.addView(seekBar, LinearLayout.LayoutParams(-1, dp(30)))
         progressView = label("00:00 / --:--", 11f, COLOR_MUTED).apply {
             gravity = android.view.Gravity.END
         }
         dock.addView(progressView)
+        val bottomNav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val actions = listOf(
+            "Library" to { showPlaylistDialog() },
+            "Radio" to { showMalaysiaRadioQuickMenu() },
+            "Tuner" to { showRadioTuner() },
+            "FX" to { showAudioMenu() },
+            "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
+                when (it) {
+                    0 -> lyricsForCurrent()
+                    1 -> showLyricDialog()
+                    2 -> startActivity(Intent(this, SubtitleStudioActivity::class.java))
+                }
+            } }
+        )
+        actions.forEachIndexed { index, item ->
+            bottomNav.addView(button(item.first, item.second),
+                LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                    if (index > 0) leftMargin = dp(3)
+                })
+        }
+        root.addView(bottomNav, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
+
     }
 
     private fun seekRelative(delta: Long) {
@@ -1227,19 +1431,48 @@ class MainActivity : Activity() {
     }
 
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
-        this.text = text
+        val iconKind = when {
+            text == "◀◀" -> "previous"
+            text == "▶▶" -> "next"
+            text == "▶" || text == "Ⅱ" -> "play"
+            text == "✕" -> "close"
+            text.contains("Waveform", true) -> "wave"
+            text.contains("Scan", true) -> "scan"
+            text.contains("Radio", true) || text.contains("Tuner", true) -> "radio"
+            text.contains("FX", true) || text.contains("Sound", true) -> "fx"
+            text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
+            text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"
+            text.contains("Lyrics", true) -> "wave"
+            else -> "library"
+        }
+        this.text = if (text in listOf("◀◀", "▶▶", "▶", "Ⅱ", "✕")) "" else text.trimStart { !it.isLetterOrDigit() }.trim()
+        if (iconKind != null) {
+            setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable(iconKind, dp(18)), null, null, null)
+            compoundDrawablePadding = dp(5)
+        }
         setAllCaps(false)
         textSize = 11f
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setTextColor(Color.WHITE)
-        background = GradientDrawable().apply {
-            setColor(0xFF2A3849L.toInt())
-            cornerRadius = dp(9).toFloat()
+        val accent = when {
+            text.contains("Radio", true) || text.contains("Scan", true) -> 0xFF087F83L.toInt()
+            text.contains("FX", true) || text.contains("Sound", true) -> 0xFF6742A6L.toInt()
+            text.contains("Play", true) || text.contains("Pause", true) -> 0xFF13765CL.toInt()
+            text.contains("Web", true) || text.contains("YouTube", true) -> 0xFF345CA0L.toInt()
+            else -> 0xFF27384BL.toInt()
+        }
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            intArrayOf(accent, 0xFF1A2638L.toInt())).apply {
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(1), 0xFF496177L.toInt())
         }
         minHeight = 0
         minimumHeight = 0
         minWidth = 0
         minimumWidth = 0
-        setPadding(dp(2), 0, dp(2), 0)
+        setPadding(dp(8), 0, dp(8), 0)
+        elevation = dp(2).toFloat()
+        contentDescription = when (text) { "◀◀" -> "Previous track"; "▶▶" -> "Next track"; "▶" -> "Play"; "✕" -> "Close waveform"; else -> text }
         setOnClickListener { onClick() }
     }
 

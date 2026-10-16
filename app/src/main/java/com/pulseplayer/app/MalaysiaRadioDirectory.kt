@@ -34,7 +34,7 @@ class MalaysiaRadioDirectory {
                     output.toString(Charsets.UTF_8.name())
                 }
                 val response = JSONArray(bytes)
-                val stations = ArrayList<RadioRepository.Station>()
+                val stations = ArrayList<Pair<RadioRepository.Station, Int>>()
                 for (i in 0 until minOf(response.length(), 80)) {
                     val item = response.optJSONObject(i) ?: continue
                     if (!item.optString("countrycode").equals("MY", ignoreCase = true)) continue
@@ -42,9 +42,14 @@ class MalaysiaRadioDirectory {
                     val name = item.optString("name").trim().take(85)
                     val stream = item.optString("url_resolved").ifBlank { item.optString("url") }.trim()
                     if (name.isEmpty() || !RadioRepository.isValidUrl(stream)) continue
-                    stations.add(RadioRepository.Station("MY · $name", stream))
+                    val bitrate = item.optInt("bitrate", 0)
+                    val codec = item.optString("codec").uppercase()
+                    // Unknown bitrate is retained but ranked below documented quality streams.
+                    val codecScore = when { codec.contains("AAC") -> 25; codec.contains("MP3") -> 15; else -> 0 }
+                    val qualityScore = bitrate.coerceIn(0, 320) + codecScore
+                    stations.add(RadioRepository.Station("MY · $name", stream, codec, bitrate) to qualityScore)
                 }
-                return stations.distinctBy { it.url }.take(70)
+                return stations.sortedByDescending { it.second }.map { it.first }.distinctBy { it.url }.take(70)
             } catch (e: Exception) {
                 lastError = e
                 Log.w("PulseRadio", "Radio directory host unavailable: $host", e)
