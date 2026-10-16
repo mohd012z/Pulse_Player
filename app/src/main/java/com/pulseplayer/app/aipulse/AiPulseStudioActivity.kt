@@ -1,5 +1,11 @@
 package com.pulseplayer.app.aipulse
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
+import android.os.Build
+import android.net.Uri
+import android.content.Intent
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
@@ -23,6 +29,9 @@ import kotlin.concurrent.thread
 class AiPulseStudioActivity : Activity() {
     @Volatile private var cancelRequested = false
     @Volatile private var working = false
+    private var recorder: MediaRecorder? = null
+    private var voiceFile: File? = null
+    private var recording = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +84,115 @@ class AiPulseStudioActivity : Activity() {
         }
         val title = field("Track title", "My Pulse Song")
         val mood = field("Mood (bright / sad / dark)", "bright")
+        heading("Song Creator · offline assistant")
+        val idea = field("Song idea / story", "Keeping promises and appreciating others")
+        val genre = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Pop Rock", "Ballad", "R&B", "Acoustic", "EDM"))
+        }
+        root.addView(genre)
+        val language = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Bahasa Melayu", "English", "BM + English"))
+        }
+        root.addView(language)
+        val instruments = field("Instruments (comma separated)", "Electric guitar, Bass, Drums, Piano")
+        heading("Editable lyrics / song sections")
+        val lyrics = EditText(this).apply {
+            minLines = 7
+            gravity = Gravity.TOP
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            hint = "Original lyrics"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        root.addView(lyrics)
+        root.addView(Button(this).apply {
+            text = "Assistant: Suggest structure and arrangement"
+            setOnClickListener {
+                val suggestion = AiPulseSongAssistant.style(genre.selectedItem.toString())
+                bpm.progress = suggestion.bpm - 60
+                instruments.setText(suggestion.instruments.joinToString(", "))
+                if (lyrics.text.isBlank()) lyrics.setText(
+                    AiPulseSongAssistant.lyricOutline(idea.text.toString(), language.selectedItem.toString()))
+                AlertDialog.Builder(this@AiPulseStudioActivity)
+                    .setTitle("Arrangement advice")
+                    .setMessage("Chords: ${suggestion.chords}\n${suggestion.guidance}\nLyrics are editable placeholders, not AI-generated verses.")
+                    .setPositiveButton("OK", null).show()
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Save editable project"
+            setOnClickListener {
+                runCatching {
+                    val project = AiPulseProject(title.text.toString().trim(), idea.text.toString(),
+                        genre.selectedItem.toString(), language.selectedItem.toString(),
+                        mood.text.toString(), instruments.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        lyrics.text.toString(), bpm.progress + 60)
+                    val file = File(filesDir, "ai_pulse_project.json")
+                    file.writeText(project.toJson())
+                    Toast.makeText(this@AiPulseStudioActivity, "Project saved locally", Toast.LENGTH_SHORT).show()
+                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Load saved project"
+            setOnClickListener {
+                runCatching {
+                    val project = AiPulseProject.fromJson(File(filesDir, "ai_pulse_project.json").readText())
+                    title.setText(project.title)
+                    idea.setText(project.idea)
+                    mood.setText(project.mood)
+                    lyrics.setText(project.lyrics)
+                    instruments.setText(project.instruments.joinToString(", "))
+                    bpm.progress = project.bpm - 60
+                    (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
+                    (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
+                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
+            }
+        })
+        heading("Your voice · local microphone recording")
+        val voiceStatus = heading("No voice recording · recordings stay on device")
+        val voiceButton = Button(this).apply { text = "Record voice" }
+        root.addView(voiceButton)
+        voiceButton.setOnClickListener {
+            if (recording) {
+                runCatching { recorder?.stop() }.onSuccess {
+                    voiceStatus.text = "Saved private recording: ${voiceFile?.name}"
+                }.onFailure {
+                    voiceFile?.delete()
+                    voiceStatus.text = "Recording failed: ${it.message}"
+                }
+                recorder?.release()
+                recorder = null
+                recording = false
+                voiceButton.text = "Record voice"
+            } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 300)
+            } else {
+                runCatching {
+                    val file = File(filesDir, "ai_pulse_voice_${System.currentTimeMillis()}.m4a")
+                    val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this@AiPulseStudioActivity) else @Suppress("DEPRECATION") MediaRecorder()
+                    try {
+                        r.setAudioSource(MediaRecorder.AudioSource.MIC)
+                        r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                        r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                        r.setAudioEncodingBitRate(128000)
+                        r.setAudioSamplingRate(44100)
+                        r.setOutputFile(file.absolutePath)
+                        r.prepare()
+                        r.start()
+                    } catch (e: Exception) { r.release(); file.delete(); throw e }
+                    recorder = r
+                    voiceFile = file
+                    recording = true
+                    voiceButton.text = "Stop recording"
+                    voiceStatus.text = "Recording microphone locally…"
+                }.onFailure { voiceStatus.text = "Microphone unavailable: ${it.message}" }
+            }
+        }
         heading("Tempo")
         val bpmValue = TextView(this).apply { text = "110 BPM"; setTextColor(Color.WHITE) }
         root.addView(bpmValue)
@@ -174,6 +292,16 @@ class AiPulseStudioActivity : Activity() {
             resolver.delete(uri, null, null)
             throw error
         }
+    }
+
+    override fun onStop() {
+        if (recording) {
+            runCatching { recorder?.stop() }.onFailure { voiceFile?.delete() }
+            recorder?.release()
+            recorder = null
+            recording = false
+        }
+        super.onStop()
     }
 
     override fun onDestroy() {
