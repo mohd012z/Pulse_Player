@@ -69,7 +69,6 @@ class PlaybackService : MediaSessionService() {
             preferences.getInt("custom_mid", 0),
             preferences.getInt("custom_treble", 0)
         )
-        effects.setPreset(preferences.getString("preset", "Flat") ?: "Flat")
         effects.setBass(preferences.getInt("bass", 0))
         player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
