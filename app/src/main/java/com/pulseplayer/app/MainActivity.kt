@@ -943,6 +943,7 @@ class MainActivity : Activity() {
             "YouTube" -> "https://www.youtube.com/"
             "YouTube Music" -> "https://music.youtube.com/"
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
+            "YouTube Live TV" -> "https://www.youtube.com/results?search_query=live+tv+streaming&sp=EgJAAQ%253D%253D"
             "Short Drama" -> "https://www.youtube.com/results?search_query=short+drama"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
@@ -953,7 +954,7 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music", "YouTube Shorts", "Short Drama")) {
+            if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV")) {
                 startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
                     putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, destination)
                 })
@@ -1085,6 +1086,13 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showVideoServices() = showPicker(
+        "YouTube & Short Drama",
+        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")
+    ) { index ->
+        openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")[index])
+    }
+
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
         "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download", "Device performance profile"
@@ -1093,7 +1101,7 @@ class MainActivity : Activity() {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")) {
+            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
@@ -1441,6 +1449,7 @@ class MainActivity : Activity() {
             "Library" to { showPlaylistDialog() },
             "Radio" to { showMalaysiaRadioQuickMenu() },
             "Tuner" to { showRadioTuner() },
+            "Video" to { showVideoServices() },
             "FX" to { showAudioMenu() },
             "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
                 when (it) {
@@ -1491,6 +1500,7 @@ class MainActivity : Activity() {
             text.contains("Waveform", true) -> "wave"
             text.contains("Scan", true) -> "scan"
             text.contains("Radio", true) || text.contains("Tuner", true) -> "radio"
+            text.contains("Video", true) -> "play"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
             text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
             text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"

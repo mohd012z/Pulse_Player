@@ -2,6 +2,7 @@ package com.pulseplayer.app
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -12,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.webkit.WebChromeClient
+import android.widget.FrameLayout
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -33,11 +35,25 @@ class ProviderBrowserActivity : Activity() {
             "YouTube" to "https://www.youtube.com/",
             "YouTube Music" to "https://music.youtube.com/",
             "YouTube Shorts" to "https://www.youtube.com/shorts",
+            "YouTube Live TV" to "https://www.youtube.com/results?search_query=live+tv+streaming&sp=EgJAAQ%253D%253D",
             "Short Drama" to "https://www.youtube.com/results?search_query=short+drama"
         )
     }
 
     private lateinit var browser: WebView
+    private lateinit var rootLayout: LinearLayout
+    private lateinit var videoHost: FrameLayout
+    private lateinit var exitCinemaButton: Button
+    private lateinit var headerView: View
+    private lateinit var statusView: View
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var portraitCinema = false
+    private var videoFullscreenMode = false
+    private var landscapeRequested = false
+    private var drama = false
+    private var previousOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    private var previousUiFlags = 0
     private lateinit var controls: LinearLayout
     private lateinit var controlsContainer: HorizontalScrollView
     private lateinit var status: TextView
@@ -61,6 +77,9 @@ class ProviderBrowserActivity : Activity() {
         super.onCreate(savedInstanceState)
         val provider = intent.getStringExtra(EXTRA_PROVIDER).orEmpty()
         home = providers[provider] ?: run { finish(); return }
+        drama = provider == "Short Drama" || provider == "YouTube Shorts"
+        previousOrientation = requestedOrientation
+        previousUiFlags = window.decorView.systemUiVisibility
         window.statusBarColor = Color.rgb(16, 20, 31)
         window.navigationBarColor = Color.rgb(16, 20, 31)
 
@@ -69,8 +88,9 @@ class ProviderBrowserActivity : Activity() {
             setBackgroundColor(Color.rgb(16, 20, 31))
             setPadding(0, 0, 0, 0)
         }
+        rootLayout = root
         root.setOnApplyWindowInsetsListener { view, insets ->
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
+            if (android.os.Build.VERSION.SDK_INT >= 30 && !portraitCinema) {
                 val bars = insets.getInsets(WindowInsets.Type.systemBars())
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             }
@@ -90,6 +110,7 @@ class ProviderBrowserActivity : Activity() {
         toggle = Button(this).apply { text = "Hide tools" }
         header.addView(toggle)
         root.addView(header)
+        headerView = header
 
         status = TextView(this).apply {
             text = "Web player: some services require opening in their official app."
@@ -98,6 +119,7 @@ class ProviderBrowserActivity : Activity() {
             setPadding(12, 4, 12, 6)
         }
         root.addView(status)
+        statusView = status
         if (provider == "Spotify") {
             status.text = "Spotify playback may require the official app or a supported browser."
             root.addView(Button(this).apply {
@@ -118,7 +140,20 @@ class ProviderBrowserActivity : Activity() {
             settings.javaScriptCanOpenWindowsAutomatically = false
             settings.setSupportMultipleWindows(false)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
-            webChromeClient = WebChromeClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                    if (view == null || fullscreenView != null) {
+                        callback?.onCustomViewHidden()
+                        return
+                    }
+                    fullscreenView = view
+                    fullscreenCallback = callback
+                    videoHost.addView(view, videoHost.indexOfChild(exitCinemaButton), FrameLayout.LayoutParams(-1, -1))
+                    browser.visibility = View.GONE
+                    enterPortraitCinema(providerFullscreen = true)
+                }
+                override fun onHideCustomView() { leaveFullscreenVideo() }
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                     if (BrowserPolicy.blockTracker(request.url.host.orEmpty(), request.isForMainFrame, privacyFilterEnabled)) {
@@ -142,9 +177,18 @@ class ProviderBrowserActivity : Activity() {
                 }
             }
         }
-        root.addView(browser, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
+        videoHost = FrameLayout(this)
+        videoHost.addView(browser, FrameLayout.LayoutParams(-1, -1))
+        exitCinemaButton = Button(this).apply {
+            text = "✕"
+            contentDescription = "Exit cinema or video fullscreen"
+            visibility = View.GONE
+            setOnClickListener { leavePortraitCinema() }
+        }
+        videoHost.addView(exitCinemaButton, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.END))
+        root.addView(videoHost, LinearLayout.LayoutParams(-1, 0, 1f))
         controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -155,6 +199,18 @@ class ProviderBrowserActivity : Activity() {
                 textSize = 11f
                 setOnClickListener { action() }
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight))
+        }
+        if (drama) button("Cinema", 1.3f) {
+            if (portraitCinema) leavePortraitCinema() else enterPortraitCinema()
+        }
+        if (drama) button("Landscape", 1.4f) {
+            landscapeRequested = !landscapeRequested
+            requestedOrientation = if (landscapeRequested)
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            status.text = if (landscapeRequested)
+                "Landscape enabled. Tap the YouTube player's fullscreen icon for video-only view."
+            else "Automatic orientation restored."
         }
         button("Back") { if (browser.canGoBack()) browser.goBack() else finish() }
         button("Forward") { if (browser.canGoForward()) browser.goForward() }
@@ -176,6 +232,11 @@ class ProviderBrowserActivity : Activity() {
             addView(controls)
         }
         root.addView(controlsContainer)
+        if (drama) header.addView(Button(this).apply {
+            text = "⛶"
+            contentDescription = "Portrait cinema"
+            setOnClickListener { if (portraitCinema) leavePortraitCinema() else enterPortraitCinema() }
+        })
         toggle.setOnClickListener {
             controlsVisible = !controlsVisible
             controlsContainer.visibility = if (controlsVisible) View.VISIBLE else View.GONE
@@ -184,6 +245,56 @@ class ProviderBrowserActivity : Activity() {
         }
         setContentView(root)
         if (savedInstanceState == null || browser.restoreState(savedInstanceState) == null) browser.loadUrl(home)
+        scheduleAutoHide()
+    }
+
+    private fun enterPortraitCinema(providerFullscreen: Boolean = false) {
+        portraitCinema = true
+        videoFullscreenMode = providerFullscreen
+        headerView.visibility = View.GONE
+        statusView.visibility = View.GONE
+        controlsContainer.visibility = View.GONE
+        if (providerFullscreen) {
+            // The provider may display landscape video even from the Short Drama page.
+            requestedOrientation = if (landscapeRequested)
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        } else if (drama) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        exitCinemaButton.visibility = View.VISIBLE
+        exitCinemaButton.bringToFront()
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        )
+        rootLayout.setPadding(0, 0, 0, 0)
+        hideHandler.removeCallbacks(hideControls)
+    }
+
+    private fun leaveFullscreenVideo() {
+        val video = fullscreenView ?: return
+        videoHost.removeView(video)
+        fullscreenView = null
+        browser.visibility = View.VISIBLE
+        val callback = fullscreenCallback
+        fullscreenCallback = null
+        callback?.onCustomViewHidden()
+        leavePortraitCinema()
+    }
+
+    private fun leavePortraitCinema() {
+        if (fullscreenView != null) { leaveFullscreenVideo(); return }
+        portraitCinema = false
+        videoFullscreenMode = false
+        exitCinemaButton.visibility = View.GONE
+        headerView.visibility = View.VISIBLE
+        statusView.visibility = View.VISIBLE
+        controlsContainer.visibility = if (controlsVisible) View.VISIBLE else View.GONE
+        window.decorView.systemUiVisibility = previousUiFlags
+        requestedOrientation = if (landscapeRequested)
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else previousOrientation
+        rootLayout.requestApplyInsets()
         scheduleAutoHide()
     }
 
@@ -209,7 +320,12 @@ class ProviderBrowserActivity : Activity() {
 
     @Deprecated("Use OnBackPressedDispatcher in a future AndroidX migration")
     override fun onBackPressed() {
-        if (::browser.isInitialized && browser.canGoBack()) browser.goBack() else super.onBackPressed()
+        when {
+            fullscreenView != null -> leaveFullscreenVideo()
+            portraitCinema -> leavePortraitCinema()
+            ::browser.isInitialized && browser.canGoBack() -> browser.goBack()
+            else -> super.onBackPressed()
+        }
     }
 
     override fun onPause() {
@@ -220,11 +336,12 @@ class ProviderBrowserActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::controlsContainer.isInitialized) scheduleAutoHide()
+        if (::controlsContainer.isInitialized && !portraitCinema) scheduleAutoHide()
     }
 
     override fun onDestroy() {
         hideHandler.removeCallbacks(hideControls)
+        if (fullscreenView != null) leaveFullscreenVideo()
         if (::browser.isInitialized) {
             (browser.parent as? ViewGroup)?.removeView(browser)
             browser.stopLoading()
