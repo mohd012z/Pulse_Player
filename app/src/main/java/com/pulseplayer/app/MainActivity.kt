@@ -80,6 +80,8 @@ class MainActivity : Activity() {
     private var lyricGeneration = 0
     private var spectrumView: SpectrumView? = null
     private var waveformDock: LinearLayout? = null
+    private var activeSpectrumSession = -1
+    private var spectrumRequestPending = false
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -123,6 +125,7 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
+            if (controller?.isPlaying == true && spectrumView == null && !spectrumRequestPending) startSpectrumIfPermitted()
             refreshNetworkSpeed()
             clock.postDelayed(this, 750L)
         }
@@ -147,6 +150,8 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         spectrumView?.stop()
+        spectrumView = null
+        activeSpectrumSession = -1
         clock.removeCallbacks(ticker)
         controller?.removeListener(playerListener)
         controller = null
@@ -214,7 +219,7 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                showSpectrum()
+                startSpectrumIfPermitted()
             } else {
                 status("FFT visualization requires optional audio capture permission")
             }
@@ -664,32 +669,36 @@ class MainActivity : Activity() {
         if (row.visibility == android.view.View.VISIBLE) {
             spectrumView?.stop()
             spectrumView = null
+            activeSpectrumSession = -1
             row.removeAllViews()
             row.visibility = android.view.View.GONE
-            return
+        } else {
+            startSpectrumIfPermitted()
         }
+    }
+
+    private fun startSpectrumIfPermitted() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (spectrumRequestPending || controller?.isPlaying != true) return
+        spectrumRequestPending = true
         customCommand(PlaybackService.CMD_STATUS) { extras, success ->
-            if (!success || isFinishing || isDestroyed) return@customCommand
+            spectrumRequestPending = false
+            if (!success || isFinishing || isDestroyed || controller?.isPlaying != true) return@customCommand
             val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
-            if (sessionId <= 0) {
-                status("Start local playback before opening the pixel-cloud waveform")
-                return@customCommand
-            }
+            if (sessionId <= 0 || (spectrumView != null && activeSpectrumSession == sessionId)) return@customCommand
+            val row = waveformDock ?: return@customCommand
             spectrumView?.stop()
+            spectrumView = null
+            activeSpectrumSession = -1
             row.removeAllViews()
             val view = SpectrumView(this).apply { setBackgroundColor(COLOR_PANEL) }
             if (!view.start(sessionId)) {
-                status("Audio waveform unsupported on this playback route")
+                row.visibility = android.view.View.GONE
                 return@customCommand
             }
             spectrumView = view
-            row.addView(view, LinearLayout.LayoutParams(0, dp(78), 1f))
-            row.addView(button("✕") {
-                view.stop()
-                if (spectrumView === view) spectrumView = null
-                row.removeAllViews()
-                row.visibility = android.view.View.GONE
-            }, LinearLayout.LayoutParams(dp(36), dp(40)))
+            activeSpectrumSession = sessionId
+            row.addView(view, LinearLayout.LayoutParams(-1, dp(46)))
             row.visibility = android.view.View.VISIBLE
         }
     }
@@ -1262,7 +1271,6 @@ class MainActivity : Activity() {
             visibility = android.view.View.GONE
         }
         waveformDock = waveformRow
-        dock.addView(waveformRow, LinearLayout.LayoutParams(-1, dp(82)))
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
@@ -1325,16 +1333,6 @@ class MainActivity : Activity() {
         dock.addView(mini)
         networkView = label("Network: waiting", 10f, COLOR_MUTED)
         dock.addView(networkView)
-        val visualizerAction = button("Waveform") { requestSpectrum() }.apply {
-            setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable("wave", dp(18)), null, null, null)
-            compoundDrawablePadding = dp(6)
-            contentDescription = "Show or hide live pixel cloud waveform"
-        }
-        dock.addView(visualizerAction, LinearLayout.LayoutParams(-1, dp(36)).apply {
-            topMargin = dp(3)
-            bottomMargin = dp(2)
-        })
-
         seekBar = SeekBar(this).apply {
             isEnabled = false
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1348,6 +1346,7 @@ class MainActivity : Activity() {
                 }
             })
         }
+        dock.addView(waveformRow, LinearLayout.LayoutParams(-1, dp(46)))
         dock.addView(seekBar, LinearLayout.LayoutParams(-1, dp(30)))
         progressView = label("00:00 / --:--", 11f, COLOR_MUTED).apply {
             gravity = android.view.Gravity.END
