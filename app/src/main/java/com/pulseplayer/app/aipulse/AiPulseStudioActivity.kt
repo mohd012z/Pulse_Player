@@ -53,6 +53,26 @@ class AiPulseStudioActivity : Activity() {
         }
         heading("AI PULSE · Offline Composer")
         heading("Original synthesized instrumentals — not neural text-to-music")
+        heading("Visual display presets · preview (not live audio FFT)")
+        val visuals = AiPulseVisualView(this)
+        root.addView(visuals, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
+        val presets = arrayOf("Spectrum Bars", "Neon Wave", "Orbit", "Minimal")
+        val presetButton = Button(this).apply { text = "Visual: Spectrum Bars" }
+        root.addView(presetButton)
+        presetButton.setOnClickListener {
+            AlertDialog.Builder(this).setTitle("Choose visual preset")
+                .setSingleChoiceItems(presets, visuals.preset.ordinal) { dialog, which ->
+                    visuals.preset = AiPulseVisualView.Preset.entries[which]
+                    presetButton.text = "Visual: ${presets[which]}"
+                    dialog.dismiss()
+                }.setNegativeButton("Cancel", null).show()
+        }
+        val motionButton = Button(this).apply { text = "Motion: On (tap to reduce)" }
+        root.addView(motionButton)
+        motionButton.setOnClickListener {
+            visuals.motionEnabled = !visuals.motionEnabled
+            motionButton.text = if (visuals.motionEnabled) "Motion: On (tap to reduce)" else "Motion: Off"
+        }
         val title = field("Track title", "My Pulse Song")
         val mood = field("Mood (bright / sad / dark)", "bright")
         heading("Tempo")
