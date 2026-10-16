@@ -1038,16 +1038,19 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
-            1 -> showCustomEqualizer()
-            2 -> showBassDialog()
-            3 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+            1 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                putString(PlaybackService.ARG_PRESET, "NovaStream TV")
+            }) { _, ok -> status(if (ok) "NovaStream TV cinematic EQ active" else "EQ unavailable on this output") }
+            2 -> showCustomEqualizer()
+            3 -> showBassDialog()
+            4 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
-            4 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            5 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
     }
 
