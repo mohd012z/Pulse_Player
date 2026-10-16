@@ -1085,6 +1085,13 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showVideoServices() = showPicker(
+        "YouTube & Short Drama",
+        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "YouTube Music")
+    ) { index ->
+        openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Music")[index])
+    }
+
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
         "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download", "Device performance profile"
@@ -1441,6 +1448,7 @@ class MainActivity : Activity() {
             "Library" to { showPlaylistDialog() },
             "Radio" to { showMalaysiaRadioQuickMenu() },
             "Tuner" to { showRadioTuner() },
+            "Video" to { showVideoServices() },
             "FX" to { showAudioMenu() },
             "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
                 when (it) {
@@ -1491,6 +1499,7 @@ class MainActivity : Activity() {
             text.contains("Waveform", true) -> "wave"
             text.contains("Scan", true) -> "scan"
             text.contains("Radio", true) || text.contains("Tuner", true) -> "radio"
+            text.contains("Video", true) -> "play"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
             text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
             text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"
