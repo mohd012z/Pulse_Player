@@ -84,6 +84,21 @@ class AiPulseStudioActivity : Activity() {
         }
         val title = field("Track title", "My Pulse Song")
         val mood = field("Mood (bright / sad / dark)", "bright")
+        heading("Tempo")
+        val bpmValue = TextView(this).apply { text = "110 BPM"; setTextColor(Color.WHITE) }
+        root.addView(bpmValue)
+        val bpm = SeekBar(this).apply {
+            max = 120
+            progress = 50
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                    bpmValue.text = "${value + 60} BPM"
+                }
+                override fun onStartTrackingTouch(bar: SeekBar?) {}
+                override fun onStopTrackingTouch(bar: SeekBar?) {}
+            })
+        }
+        root.addView(bpm)
         heading("Song Creator · offline assistant")
         val idea = field("Song idea / story", "Keeping promises and appreciating others")
         val genre = android.widget.Spinner(this).apply {
@@ -193,21 +208,6 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure { voiceStatus.text = "Microphone unavailable: ${it.message}" }
             }
         }
-        heading("Tempo")
-        val bpmValue = TextView(this).apply { text = "110 BPM"; setTextColor(Color.WHITE) }
-        root.addView(bpmValue)
-        val bpm = SeekBar(this).apply {
-            max = 120
-            progress = 50
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    bpmValue.text = "${value + 60} BPM"
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
-            })
-        }
-        root.addView(bpm)
         heading("Duration")
         val duration = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
