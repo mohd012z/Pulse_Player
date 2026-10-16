@@ -29,6 +29,7 @@ import android.widget.HorizontalScrollView
 class ProviderBrowserActivity : Activity() {
     companion object {
         const val EXTRA_PROVIDER = "provider"
+        const val EXTRA_SEARCH = "live_tv_search"
         private val providers = mapOf(
             "Spotify" to "https://open.spotify.com/",
             "JOOX" to "https://www.joox.com/",
@@ -77,6 +78,13 @@ class ProviderBrowserActivity : Activity() {
         super.onCreate(savedInstanceState)
         val provider = intent.getStringExtra(EXTRA_PROVIDER).orEmpty()
         home = providers[provider] ?: run { finish(); return }
+        if (provider == "YouTube Live TV") {
+            val query = intent.getStringExtra(EXTRA_SEARCH)?.trim()?.take(100).orEmpty()
+            if (query.isNotEmpty()) {
+                home = "https://www.youtube.com/results?search_query=" +
+                    Uri.encode(query) + "&sp=EgJAAQ%253D%253D"
+            }
+        }
         drama = provider == "Short Drama" || provider == "YouTube Shorts"
         previousOrientation = requestedOrientation
         previousUiFlags = window.decorView.systemUiVisibility
