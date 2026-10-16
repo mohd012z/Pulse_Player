@@ -1,6 +1,10 @@
 package com.pulseplayer.app
 
 import android.app.PendingIntent
+import android.content.Context
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -33,6 +37,8 @@ class PlaybackService : MediaSessionService() {
         const val CMD_SET_BASS = "com.pulseplayer.command.BASS"
         const val CMD_SET_CUSTOM = "com.pulseplayer.command.CUSTOM_EQ"
         const val CMD_SET_SLEEP = "com.pulseplayer.command.SLEEP"
+        const val CMD_AUTO_SOUND = "com.pulseplayer.command.AUTO_SOUND"
+        const val ARG_AUTO_SOUND = "auto_sound"
         const val CMD_STATUS = "com.pulseplayer.command.STATUS"
         const val ARG_PRESET = "preset"
         const val ARG_BASS = "bass"
@@ -48,6 +54,33 @@ class PlaybackService : MediaSessionService() {
     private val handler = Handler(Looper.getMainLooper())
     private val effects = AudioEffectsManager()
     private val pcmDsp = PulsePcmProcessor()
+    private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    private var autoSound = false
+    private val deviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            if (autoSound) updateAutomaticSound()
+        }
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            if (autoSound) updateAutomaticSound()
+        }
+    }
+
+    private fun updateAutomaticSound() {
+        if (!autoSound) return
+        // Connected outputs are not necessarily the active media route.
+        val types = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.type }.toSet()
+        val profile = when {
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP in types ||
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES in types ||
+                AudioDeviceInfo.TYPE_WIRED_HEADSET in types ||
+                AudioDeviceInfo.TYPE_USB_HEADSET in types -> "Stereo Clarity"
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER in types -> "Balanced Speaker"
+            else -> "Flat"
+        }
+        effects.setPreset(profile)
+        effects.setBass(0)
+    }
+
     private val preferences by lazy { getSharedPreferences("player_state", MODE_PRIVATE) }
     private lateinit var player: ExoPlayer
     private var session: MediaSession? = null
@@ -74,6 +107,9 @@ class PlaybackService : MediaSessionService() {
             preferences.getInt("custom_treble", 0)
         )
         effects.setBass(preferences.getInt("bass", 0))
+        autoSound = preferences.getBoolean("auto_sound", false)
+        audioManager.registerAudioDeviceCallback(deviceCallback, handler)
+        if (autoSound) updateAutomaticSound()
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
                 context: android.content.Context,
@@ -138,6 +174,7 @@ class PlaybackService : MediaSessionService() {
                     .add(SessionCommand(CMD_SET_CUSTOM, Bundle.EMPTY))
                     .add(SessionCommand(CMD_SET_SLEEP, Bundle.EMPTY))
                     .add(SessionCommand(CMD_STATUS, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_AUTO_SOUND, Bundle.EMPTY))
                     .build()
                 builder.setAvailableSessionCommands(commands)
             }
@@ -192,11 +229,24 @@ class PlaybackService : MediaSessionService() {
                         true
                     }
                 }
+                CMD_AUTO_SOUND -> {
+                    if (!args.containsKey(ARG_AUTO_SOUND)) false else {
+                        autoSound = args.getBoolean(ARG_AUTO_SOUND)
+                        preferences.edit().putBoolean("auto_sound", autoSound).apply()
+                        if (autoSound) updateAutomaticSound()
+                        else {
+                            effects.setPreset(preferences.getString("preset", "Flat") ?: "Flat")
+                            effects.setBass(preferences.getInt("bass", 0))
+                        }
+                        true
+                    }
+                }
                 CMD_STATUS -> true
                 else -> false
             }
             val data = Bundle().apply {
                 putBoolean(ARG_EQ_SUPPORTED, effects.hasEqualizer)
+                putBoolean(ARG_AUTO_SOUND, autoSound)
                 putBoolean(ARG_BASS_SUPPORTED, effects.hasBassBoost)
                 putString(ARG_PRESET, effects.preset)
                 putInt(ARG_BASS, effects.bass)
@@ -277,6 +327,7 @@ class PlaybackService : MediaSessionService() {
         persistState()
         session?.release()
         session = null
+        audioManager.unregisterAudioDeviceCallback(deviceCallback)
         effects.release()
         if (::player.isInitialized) player.release()
         super.onDestroy()
