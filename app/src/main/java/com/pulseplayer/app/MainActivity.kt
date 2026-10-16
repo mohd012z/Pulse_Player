@@ -969,7 +969,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download", "Device performance profile"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -1010,6 +1010,7 @@ class MainActivity : Activity() {
             8 -> shareCurrentTrack()
             9 -> startActivity(Intent(this, MediaExportActivity::class.java))
             10 -> startActivity(Intent(this, AuthorizedDownloadActivity::class.java))
+            11 -> showPerformanceSettings()
         }
     }
 
