@@ -35,6 +35,7 @@ class ProviderBrowserActivity : Activity() {
             "YouTube" to "https://www.youtube.com/",
             "YouTube Music" to "https://music.youtube.com/",
             "YouTube Shorts" to "https://www.youtube.com/shorts",
+            "YouTube Live TV" to "https://www.youtube.com/results?search_query=live+tv+streaming&sp=EgJAAQ%253D%253D",
             "Short Drama" to "https://www.youtube.com/results?search_query=short+drama"
         )
     }
