@@ -131,6 +131,7 @@ class PlaybackService : MediaSessionService() {
                 addListener(object : Player.Listener {
                     override fun onAudioSessionIdChanged(audioSessionId: Int) {
                         effects.attach(audioSessionId)
+                        if (autoSound) updateAutomaticSound()
                     }
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         persistState()
