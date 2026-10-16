@@ -14,7 +14,10 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory\nimport androidx.media3.exoplayer.audio.AudioSink\nimport androidx.media3.exoplayer.audio.DefaultAudioSink\nimport androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -43,7 +46,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private val effects = AudioEffectsManager()\n    private val pcmDsp = PulsePcmProcessor()
+    private val effects = AudioEffectsManager()
+    private val pcmDsp = PulsePcmProcessor()
     private val preferences by lazy { getSharedPreferences("player_state", MODE_PRIVATE) }
     private lateinit var player: ExoPlayer
     private var session: MediaSession? = null
@@ -70,7 +74,21 @@ class PlaybackService : MediaSessionService() {
             preferences.getInt("custom_treble", 0)
         )
         effects.setBass(preferences.getInt("bass", 0))
-        val renderers = object : DefaultRenderersFactory(this) {\n            override fun buildAudioSink(\n                context: android.content.Context,\n                enableFloatOutput: Boolean,\n                enableAudioOutputPlaybackParams: Boolean\n            ): AudioSink {\n                return DefaultAudioSink.Builder(context)\n                    .setEnableFloatOutput(false)\n                    .setEnableAudioTrackPlaybackParams(enableAudioOutputPlaybackParams)\n                    .setAudioProcessors(arrayOf(pcmDsp))\n                    .build()\n            }\n        }\n        pcmDsp.enabled = PulsePcmProcessor.available() && preferences.getBoolean("native_dsp", false)\n        player = ExoPlayer.Builder(this, renderers)
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioOutputPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(false)
+                    .setEnableAudioTrackPlaybackParams(enableAudioOutputPlaybackParams)
+                    .setAudioProcessors(arrayOf(pcmDsp))
+                    .build()
+            }
+        }
+        pcmDsp.enabled = PulsePcmProcessor.available() && preferences.getBoolean("native_dsp", false)
+        player = ExoPlayer.Builder(this, renderers)
             .setHandleAudioBecomingNoisy(true)
             .build().apply {
                 setAudioAttributes(attrs, true)
