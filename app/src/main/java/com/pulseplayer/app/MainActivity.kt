@@ -945,7 +945,7 @@ class MainActivity : Activity() {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
             1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
+                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
@@ -964,8 +964,8 @@ class MainActivity : Activity() {
                 }
             }
             3 -> showAudioMenu()
-            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
-                when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog() }
+            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics", "Subtitle & translation studio")) {
+                when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog(); 2 -> startActivity(Intent(this, SubtitleStudioActivity::class.java)) }
             }
             5 -> requestSpectrum()
             6 -> showPlaybackMenu()
