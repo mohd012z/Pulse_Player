@@ -1110,6 +1110,7 @@ class MainActivity : Activity() {
             "▣ Live Entertainment",
             "▣ Live Education",
             "★ Saved favorite searches",
+            "★ Manage / remove favorites",
             "＋ Add favorite search",
             "⌕ Custom channel / live search",
             "▶ Browse all YouTube Live"
@@ -1127,19 +1128,38 @@ class MainActivity : Activity() {
                         }
                     }
                 }
-                7, 8 -> {
+                7 -> {
+                    val favorites = prefs.all.keys.sorted()
+                    if (favorites.isEmpty()) {
+                        status("No saved Live TV searches to remove")
+                    } else {
+                        showPicker("Remove saved search", favorites.toTypedArray()) { selected ->
+                            val term = favorites[selected]
+                            AlertDialog.Builder(this)
+                                .setTitle("Remove favorite?")
+                                .setMessage(term)
+                                .setPositiveButton("Remove") { _, _ ->
+                                    prefs.edit().remove(term).apply()
+                                    status("Removed favorite: $term")
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
+                    }
+                }
+                8, 9 -> {
                     val input = EditText(this).apply {
                         hint = "Channel or live TV search"
                         setSingleLine(true)
                     }
                     AlertDialog.Builder(this)
-                        .setTitle(if (index == 7) "Save Live TV search" else "Search YouTube Live")
+                        .setTitle(if (index == 8) "Save Live TV search" else "Search YouTube Live")
                         .setView(input)
-                        .setPositiveButton(if (index == 7) "Save" else "Search") { _, _ ->
+                        .setPositiveButton(if (index == 8) "Save" else "Search") { _, _ ->
                             val query = input.text.toString().trim().take(100)
                             if (query.isBlank()) {
                                 status("Enter a channel or search term")
-                            } else if (index == 7) {
+                            } else if (index == 8) {
                                 prefs.edit().putBoolean(query, true).apply()
                                 status("Saved favorite: $query")
                             } else {
@@ -1149,7 +1169,7 @@ class MainActivity : Activity() {
                         .setNegativeButton("Cancel", null)
                         .show()
                 }
-                9 -> openProvider("YouTube Live TV")
+                10 -> openProvider("YouTube Live TV")
             }
         }
     }
@@ -1163,7 +1183,7 @@ class MainActivity : Activity() {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
             1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")[it])
+                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
