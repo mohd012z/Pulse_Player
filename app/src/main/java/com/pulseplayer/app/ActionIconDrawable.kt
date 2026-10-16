@@ -24,6 +24,11 @@ class ActionIconDrawable(private val kind: String, private val sizePx: Int) : Dr
         canvas.translate(b.left.toFloat(), b.top.toFloat())
         canvas.scale(b.width() / 24f, b.height() / 24f)
         when (kind) {
+            "previous" -> { canvas.drawLine(6f,5f,6f,19f,pen); canvas.drawLine(19f,5f,8f,12f,pen); canvas.drawLine(8f,12f,19f,19f,pen) }
+            "next" -> { canvas.drawLine(18f,5f,18f,19f,pen); canvas.drawLine(5f,5f,16f,12f,pen); canvas.drawLine(16f,12f,5f,19f,pen) }
+            "play" -> { canvas.drawLine(7f,4f,19f,12f,pen); canvas.drawLine(19f,12f,7f,20f,pen); canvas.drawLine(7f,20f,7f,4f,pen) }
+            "pause" -> { canvas.drawRoundRect(6f,4f,9f,20f,1f,1f,pen); canvas.drawRoundRect(15f,4f,18f,20f,1f,1f,pen) }
+            "close" -> { canvas.drawLine(5f,5f,19f,19f,pen); canvas.drawLine(19f,5f,5f,19f,pen) }
             "radio" -> {
                 canvas.drawRoundRect(3f, 8f, 21f, 20f, 2f, 2f, pen)
                 canvas.drawLine(5f, 8f, 18f, 3f, pen)
