@@ -9,6 +9,7 @@ import android.media.MediaRouter2
 import android.provider.Settings
 import android.widget.Toast
 import org.json.JSONArray
+import com.pulseplayer.app.aipulse.AiPulseStudioActivity
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -1063,6 +1064,9 @@ class MainActivity : Activity() {
         tabs.addView(button("♫ FX") { selectMixPreset() },
             LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
         root.addView(tabs)
+        root.addView(button("✦ AI Pulse Studio") {
+            startActivity(Intent(this, AiPulseStudioActivity::class.java))
+        }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
