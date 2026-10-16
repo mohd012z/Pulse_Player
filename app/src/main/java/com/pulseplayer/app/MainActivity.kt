@@ -82,6 +82,7 @@ class MainActivity : Activity() {
     private var waveformDock: LinearLayout? = null
     private var activeSpectrumSession = -1
     private var spectrumRequestPending = false
+    private var spectrumRetryAtMs = 0L
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -125,7 +126,8 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
-            if (controller?.isPlaying == true && spectrumView == null && !spectrumRequestPending) startSpectrumIfPermitted()
+            if (controller?.isPlaying == true && spectrumView == null && !spectrumRequestPending &&
+                android.os.SystemClock.elapsedRealtime() >= spectrumRetryAtMs) startSpectrumIfPermitted()
             refreshNetworkSpeed()
             clock.postDelayed(this, 750L)
         }
@@ -667,6 +669,7 @@ class MainActivity : Activity() {
     private fun showSpectrum() {
         val row = waveformDock ?: return
         if (row.visibility == android.view.View.VISIBLE) {
+            spectrumRetryAtMs = android.os.SystemClock.elapsedRealtime() + 60_000L
             spectrumView?.stop()
             spectrumView = null
             activeSpectrumSession = -1
@@ -680,6 +683,7 @@ class MainActivity : Activity() {
     private fun startSpectrumIfPermitted() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         if (spectrumRequestPending || controller?.isPlaying != true) return
+        spectrumRetryAtMs = android.os.SystemClock.elapsedRealtime() + 5_000L
         spectrumRequestPending = true
         customCommand(PlaybackService.CMD_STATUS) { extras, success ->
             spectrumRequestPending = false
