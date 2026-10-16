@@ -2,7 +2,6 @@ package com.pulseplayer.app
 
 import android.app.ActivityManager
 import android.content.Context
-import android.os.Build
 
 /** Device-aware defaults. User preference overrides automatic classification. */
 object DevicePerformanceProfile {
@@ -21,7 +20,7 @@ object DevicePerformanceProfile {
         return runCatching { Tier.valueOf(prefs.getString("performance_tier", "") ?: "") }
             .getOrDefault(detect(context))
     }
-    fun enableNativeDspByDefault(context: Context): Boolean = false
+    fun enableNativeDspByDefault(): Boolean = false
     fun recommendedSpectrumFps(context: Context): Int = when(selected(context)) {
         Tier.LITE -> 15
         Tier.BALANCED -> 30
