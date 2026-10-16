@@ -1274,7 +1274,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1288,8 +1288,37 @@ class MainActivity : Activity() {
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
             5 -> showAudioDiagnostics()
             6 -> showDeviceSoundCapabilities()
-            7 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            7 -> applySuggestedOutputSound()
+            8 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun applySuggestedOutputSound() {
+        val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val outputs = manager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+        val types = outputs.map { it.type }.toSet()
+        // This is a conservative recommendation based on connected devices, not
+        // proof of the currently routed media output. Never enable extreme bass.
+        val selected = when {
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP in types ||
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES in types ||
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET in types ||
+                android.media.AudioDeviceInfo.TYPE_USB_HEADSET in types -> "Stereo Clarity"
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER in types -> "Balanced Speaker"
+            else -> "Flat"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Suggested sound profile")
+            .setMessage("Detected connected outputs suggest: $selected. This is not speaker calibration or Dolby Atmos. Apply only to Pulse Player local/radio playback?")
+            .setPositiveButton("Apply") { _, _ ->
+                customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                    putString(PlaybackService.ARG_PRESET, selected)
+                }) { _, ok ->
+                    status(if (ok) "Sound profile applied: $selected" else "EQ unavailable for this output")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showDeviceSoundCapabilities() {
