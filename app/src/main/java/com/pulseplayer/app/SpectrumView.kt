@@ -30,6 +30,11 @@ class SpectrumView(context: Context) : View(context) {
         DevicePerformanceProfile.Tier.HIGH -> 10
     }
     private var lastFrameMs = 0L
+    private var receivedNonSilentAudio = false
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.LTGRAY
+        textSize = resources.displayMetrics.scaledDensity * 10f
+    }
 
     fun start(sessionId: Int): Boolean {
         stop()
@@ -49,8 +54,10 @@ class SpectrumView(context: Context) : View(context) {
                         val index = (i.toLong() * data.size / next.size).toInt().coerceIn(0, data.lastIndex)
                         next[i] = ((data[index].toInt() and 0xFF) - 128) / 128f
                     }
+                    val audible = next.any { kotlin.math.abs(it) > 0.025f }
                     post {
                         if (effect !== v) return@post
+                        if (audible) receivedNonSilentAudio = true
                         for (i in next.indices) wave[i] = wave[i] * 0.2f + next[i] * 0.8f
                         invalidate()
                     }
@@ -74,6 +81,7 @@ class SpectrumView(context: Context) : View(context) {
         runCatching { previous?.release() }
         wave.fill(0f)
         lastFrameMs = 0L
+        receivedNonSilentAudio = false
         invalidate()
     }
 
@@ -82,9 +90,15 @@ class SpectrumView(context: Context) : View(context) {
         super.onDetachedFromWindow()
     }
 
+    private fun dpFloat(value: Float): Float = value * resources.displayMetrics.density
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
+        if (!receivedNonSilentAudio) {
+            canvas.drawText("Waiting for audio capture · route may block visualizer", dpFloat(5f), height / 2f, hintPaint)
+            return
+        }
         val center = height / 2f
         val pixel = (resources.displayMetrics.density * 1.15f).coerceAtLeast(1f)
         val spacing = pixel * 1.85f
