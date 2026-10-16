@@ -12,6 +12,10 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.ArrayAdapter
 import android.widget.TextView
+import android.graphics.Color
+import android.os.Build
+import android.view.WindowInsets
+import android.view.Gravity
 import java.util.Locale
 
 /**
@@ -32,11 +36,13 @@ class SubtitleStudioActivity : Activity() {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setBackgroundColor(0xFF10141F.toInt())
         }
         root.addView(TextView(this).apply {
-            text = "Subtitle Studio · English / Bahasa Melayu"
-            textSize = 21f
+            text = "Subtitle Studio"
+            textSize = 19f
+            setTextColor(0xFF75E2C0.toInt())
         })
         root.addView(TextView(this).apply {
             text = "Import, edit and export SRT. Speech recognition can create a short draft using your device's recognizer. Translation opens a compatible installed app; translated text must be pasted back and checked before export."
@@ -47,11 +53,16 @@ class SubtitleStudioActivity : Activity() {
                 arrayOf("English", "Bahasa Melayu"))
         }
         root.addView(language)
-        status = TextView(this).apply { text = "No subtitles loaded" }
+        status = TextView(this).apply { text = "No subtitles loaded"; setTextColor(Color.LTGRAY) }
         root.addView(status)
         editor = EditText(this).apply {
             hint = "1\n00:00:00,000 --> 00:00:03,000\nSubtitle text"
-            minLines = 12
+            minLines = 6
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+            setBackgroundColor(0xFF1B2331.toInt())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             gravity = android.view.Gravity.TOP
             setTextIsSelectable(true)
         }
@@ -60,7 +71,14 @@ class SubtitleStudioActivity : Activity() {
         }
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         fun action(label: String, click: () -> Unit) {
-            root.addView(Button(this).apply { text = label; setOnClickListener { click() } })
+            root.addView(Button(this).apply {
+                text = label
+                textSize = 12f
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF27384B.toInt()))
+                setOnClickListener { click() }
+            }, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(3) })
         }
         action("Import SRT") {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -107,8 +125,19 @@ class SubtitleStudioActivity : Activity() {
                 putExtra(Intent.EXTRA_TITLE, subtitleName)
             }, exportCode)
         }
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                view.setPadding(dp(14) + bars.left, dp(12) + bars.top, dp(14) + bars.right, dp(12) + bars.bottom)
+                insets
+            }
+        }
+        window.statusBarColor = 0xFF10141F.toInt()
+        window.navigationBarColor = 0xFF10141F.toInt()
         setContentView(root)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     @Deprecated("Legacy Activity result API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
