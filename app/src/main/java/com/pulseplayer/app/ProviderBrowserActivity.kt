@@ -44,11 +44,7 @@ class ProviderBrowserActivity : Activity() {
     private lateinit var toggle: Button
     private var controlsVisible = true
     private var home = ""
-    private val trackerHosts = setOf("google-analytics.com", "analytics.google.com",
-        "stats.g.doubleclick.net", "connect.facebook.net", "bat.bing.com",
-        "static.hotjar.com", "script.hotjar.com", "cdn.segment.com")
-    private fun isTracker(host: String): Boolean =
-        trackerHosts.any { host == it || host.endsWith(".$it") }
+    private var privacyFilterEnabled = true
 
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable {
@@ -125,7 +121,7 @@ class ProviderBrowserActivity : Activity() {
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                    if (!request.isForMainFrame && isTracker(request.url.host.orEmpty().lowercase())) {
+                    if (BrowserPolicy.blockTracker(request.url.host.orEmpty(), request.isForMainFrame, privacyFilterEnabled)) {
                         return WebResourceResponse("text/plain", "UTF-8",
                             java.io.ByteArrayInputStream(ByteArray(0)))
                     }
@@ -134,8 +130,8 @@ class ProviderBrowserActivity : Activity() {
 
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val uri = request.url
-                    if (uri.scheme != "https") {
-                        openExternal(uri)
+                    if (!BrowserPolicy.allowWebNavigation(uri.scheme, uri.host)) {
+                        status.text = "Only HTTPS navigation is supported."
                         return true
                     }
                     return false
@@ -169,6 +165,11 @@ class ProviderBrowserActivity : Activity() {
             button("Drama") { browser.loadUrl("https://www.youtube.com/results?search_query=short+drama") }
         }
         button("CC") { status.text = "Use the video player's CC control for available subtitles." }
+        button("Privacy") {
+            privacyFilterEnabled = !privacyFilterEnabled
+            status.text = if (privacyFilterEnabled) "Tracker filtering ON; reload to apply"
+                else "Tracker filtering OFF; reload to apply"
+        }
         button("External", 1.3f) { openExternal(Uri.parse(browser.url ?: home)) }
         controlsContainer = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -192,7 +193,7 @@ class ProviderBrowserActivity : Activity() {
     }
 
     private fun openSpotify(uri: Uri) {
-        val safe = if (uri.scheme == "https" && uri.host?.endsWith("spotify.com") == true) uri else Uri.parse(home)
+        val safe = if (BrowserPolicy.allowSpotifyHandoff(uri.scheme, uri.host)) uri else Uri.parse(home)
         val app = Intent(Intent.ACTION_VIEW, safe).apply {
             setPackage("com.spotify.music")
             addCategory(Intent.CATEGORY_BROWSABLE)
