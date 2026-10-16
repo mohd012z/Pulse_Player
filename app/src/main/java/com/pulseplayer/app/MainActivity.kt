@@ -1046,7 +1046,7 @@ class MainActivity : Activity() {
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
-                "RTM official radio (stations)", "BFM 89.9 official player",
+                "Manual station tuning slider", "RTM official radio (stations)", "BFM 89.9 official player",
                 "ERA official player", "MY FM official player"
             )) {
                 when (it) {
@@ -1054,10 +1054,11 @@ class MainActivity : Activity() {
                     1 -> discoverMalaysiaRadio()
                     2 -> switchPlaylist("RADIO")
                     3 -> addRadioDialog()
-                    4 -> openProvider("RTM Radio Malaysia")
-                    5 -> openProvider("BFM 89.9")
-                    6 -> openProvider("ERA Malaysia")
-                    7 -> openProvider("MY FM")
+                    4 -> showRadioTuner()
+                    5 -> openProvider("RTM Radio Malaysia")
+                    6 -> openProvider("BFM 89.9")
+                    7 -> openProvider("ERA Malaysia")
+                    8 -> openProvider("MY FM")
                 }
             }
             3 -> showAudioMenu()
