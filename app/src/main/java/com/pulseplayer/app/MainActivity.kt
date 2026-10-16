@@ -60,9 +60,9 @@ class MainActivity : Activity() {
         private const val REQUEST_LYRICS = 104
         private const val REQUEST_SPECTRUM_PERMISSION = 105
         private const val EXTRA_SHORTCUT = "shortcut"
-        private const val COLOR_BG = 0xFF10141FL.toInt()
-        private const val COLOR_PANEL = 0xFF1B2331L.toInt()
-        private const val COLOR_ACCENT = 0xFF75E2C0L.toInt()
+        private const val COLOR_BG = 0xFF0B1220L.toInt()
+        private const val COLOR_PANEL = 0xFF182538L.toInt()
+        private const val COLOR_ACCENT = 0xFF4DE0CCL.toInt()
         private const val COLOR_MUTED = 0xFFB6C3CDL.toInt()
     }
 
@@ -1228,26 +1228,12 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("PULSE PLAYER  ·  STUDIO", 16f, COLOR_ACCENT, true)
-        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        })
-        toolbar.addView(button("Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(44)))
+        val brand = label("PULSE  /  STUDIO", 18f, COLOR_ACCENT, true)
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f))
+        toolbar.addView(button("Menu") { showMoreMenu() }, LinearLayout.LayoutParams(dp(88), dp(40)))
         root.addView(toolbar)
-
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1.25f))
-        tabs.addView(button("Radio") { showMalaysiaRadioQuickMenu() },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("FX") { showAudioMenu() },
-            LinearLayout.LayoutParams(0, dp(48), 0.8f).apply { leftMargin = dp(6) })
-        root.addView(tabs)
-        val radioTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        radioTools.addView(button("📡 Scan MY") { discoverMalaysiaRadio() }, LinearLayout.LayoutParams(0, dp(40), 1f))
-        radioTools.addView(button("📻 All radio") { switchPlaylist("RADIO") }, LinearLayout.LayoutParams(0, dp(40), 1f))
-        // Keep secondary radio discovery controls in the Radio menu, not permanently above the library.
-        // root.addView(radioTools)
+        root.addView(sourceButton, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(3) })
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -1395,6 +1381,31 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.END
         }
         dock.addView(progressView)
+        val bottomNav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val actions = listOf(
+            "Library" to { showPlaylistDialog() },
+            "Radio" to { showMalaysiaRadioQuickMenu() },
+            "Tuner" to { showRadioTuner() },
+            "FX" to { showAudioMenu() },
+            "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
+                when (it) {
+                    0 -> lyricsForCurrent()
+                    1 -> showLyricDialog()
+                    2 -> startActivity(Intent(this, SubtitleStudioActivity::class.java))
+                }
+            } }
+        )
+        actions.forEachIndexed { index, item ->
+            bottomNav.addView(button(item.first, item.second),
+                LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                    if (index > 0) leftMargin = dp(3)
+                })
+        }
+        root.addView(bottomNav, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
+
     }
 
     private fun seekRelative(delta: Long) {
@@ -1427,10 +1438,11 @@ class MainActivity : Activity() {
             text == "✕" -> "close"
             text.contains("Waveform", true) -> "wave"
             text.contains("Scan", true) -> "scan"
-            text.contains("Radio", true) -> "radio"
+            text.contains("Radio", true) || text.contains("Tuner", true) -> "radio"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
             text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
             text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"
+            text.contains("Lyrics", true) -> "wave"
             else -> "library"
         }
         this.text = if (text in listOf("◀◀", "▶▶", "▶", "Ⅱ", "✕")) "" else text.trimStart { !it.isLetterOrDigit() }.trim()
@@ -1439,7 +1451,7 @@ class MainActivity : Activity() {
             compoundDrawablePadding = dp(5)
         }
         setAllCaps(false)
-        textSize = 12f
+        textSize = 11f
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setTextColor(Color.WHITE)
         val accent = when {
