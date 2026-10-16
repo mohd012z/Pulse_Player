@@ -1088,9 +1088,70 @@ class MainActivity : Activity() {
 
     private fun showVideoServices() = showPicker(
         "YouTube & Short Drama",
-        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")
+        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "Live TV Dashboard", "YouTube Music")
     ) { index ->
-        openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")[index])
+        if (index == 3) showLiveTvDashboard() else openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Music")[if (index > 3) index - 1 else index])
+    }
+
+    private fun showLiveTvDashboard() {
+        val prefs = getSharedPreferences("live_tv_favorites", MODE_PRIVATE)
+        val categories = arrayOf("Malaysia", "News", "Sports", "Music", "Entertainment", "Education")
+        fun openLiveSearch(term: String) {
+            startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
+                putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, "YouTube Live TV")
+                putExtra(ProviderBrowserActivity.EXTRA_SEARCH, term)
+            })
+        }
+        val actions = arrayOf(
+            "▶ Live channels · Malaysia",
+            "◉ Live News",
+            "◉ Live Sports",
+            "♫ Live Music",
+            "▣ Live Entertainment",
+            "▣ Live Education",
+            "★ Saved favorite searches",
+            "＋ Add favorite search",
+            "⌕ Custom channel / live search",
+            "▶ Browse all YouTube Live"
+        )
+        showPicker("Live TV · channel discovery", actions) { index ->
+            when (index) {
+                in 0..5 -> openLiveSearch(categories[index] + " live tv")
+                6 -> {
+                    val favorites = prefs.all.keys.sorted()
+                    if (favorites.isEmpty()) {
+                        status("No saved Live TV searches yet")
+                    } else {
+                        showPicker("Favorite live searches", favorites.toTypedArray()) { selected ->
+                            openLiveSearch(favorites[selected])
+                        }
+                    }
+                }
+                7, 8 -> {
+                    val input = EditText(this).apply {
+                        hint = "Channel or live TV search"
+                        setSingleLine(true)
+                    }
+                    AlertDialog.Builder(this)
+                        .setTitle(if (index == 7) "Save Live TV search" else "Search YouTube Live")
+                        .setView(input)
+                        .setPositiveButton(if (index == 7) "Save" else "Search") { _, _ ->
+                            val query = input.text.toString().trim().take(100)
+                            if (query.isBlank()) {
+                                status("Enter a channel or search term")
+                            } else if (index == 7) {
+                                prefs.edit().putBoolean(query, true).apply()
+                                status("Saved favorite: $query")
+                            } else {
+                                openLiveSearch(query + " live")
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+                9 -> openProvider("YouTube Live TV")
+            }
+        }
     }
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
