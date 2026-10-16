@@ -1274,7 +1274,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1289,8 +1289,35 @@ class MainActivity : Activity() {
             5 -> showAudioDiagnostics()
             6 -> showDeviceSoundCapabilities()
             7 -> applySuggestedOutputSound()
-            8 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            8 -> showAutoSoundToggle()
+            9 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun showAutoSoundToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("auto_sound", false)
+        AlertDialog.Builder(this)
+            .setTitle("Automatic sound profile")
+            .setMessage("Current setting: ${if (enabled) "ON" else "OFF"}.\\n\\n" +
+                "Opt-in EQ adjustments when audio devices connect or disconnect. " +
+                "This detects connected devices, not the exact active route. " +
+                "Applies only to Pulse Player local/radio audio, not YouTube. " +
+                "Bass boost is disabled in automatic mode.")
+            .setPositiveButton(if (enabled) "Turn off" else "Turn on") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_AUTO_SOUND, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_AUTO_SOUND, next)
+                }) { _, ok ->
+                    if (ok) {
+                        getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                            .putBoolean("auto_sound", next).apply()
+                    }
+                    status(if (ok) "Auto sound: ${if (next) "ON" else "OFF"}" else "Could not change auto sound")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun applySuggestedOutputSound() {
