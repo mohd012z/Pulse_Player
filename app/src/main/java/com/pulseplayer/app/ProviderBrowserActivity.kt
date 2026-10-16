@@ -48,6 +48,7 @@ class ProviderBrowserActivity : Activity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var portraitCinema = false
+    private var videoFullscreenMode = false
     private var drama = false
     private var previousOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var previousUiFlags = 0
@@ -147,7 +148,7 @@ class ProviderBrowserActivity : Activity() {
                     fullscreenCallback = callback
                     videoHost.addView(view, videoHost.indexOfChild(exitCinemaButton), FrameLayout.LayoutParams(-1, -1))
                     browser.visibility = View.GONE
-                    enterPortraitCinema()
+                    enterPortraitCinema(providerFullscreen = true)
                 }
                 override fun onHideCustomView() { leaveFullscreenVideo() }
             }
@@ -236,12 +237,16 @@ class ProviderBrowserActivity : Activity() {
         scheduleAutoHide()
     }
 
-    private fun enterPortraitCinema() {
+    private fun enterPortraitCinema(providerFullscreen: Boolean = false) {
         portraitCinema = true
+        videoFullscreenMode = providerFullscreen
         headerView.visibility = View.GONE
         statusView.visibility = View.GONE
         controlsContainer.visibility = View.GONE
-        if (drama) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (providerFullscreen) {
+            // The provider may display landscape video even from the Short Drama page.
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        } else if (drama) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         exitCinemaButton.visibility = View.VISIBLE
         exitCinemaButton.bringToFront()
         window.decorView.systemUiVisibility = (
@@ -267,6 +272,7 @@ class ProviderBrowserActivity : Activity() {
     private fun leavePortraitCinema() {
         if (fullscreenView != null) { leaveFullscreenVideo(); return }
         portraitCinema = false
+        videoFullscreenMode = false
         exitCinemaButton.visibility = View.GONE
         headerView.visibility = View.VISIBLE
         statusView.visibility = View.VISIBLE
