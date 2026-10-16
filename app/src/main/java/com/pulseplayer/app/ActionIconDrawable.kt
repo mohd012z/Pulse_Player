@@ -59,6 +59,18 @@ class ActionIconDrawable(private val kind: String, private val sizePx: Int) : Dr
                     canvas.drawCircle(x, y, 0.8f, pen)
                 }
             }
+            "captions" -> {
+                canvas.drawRoundRect(2f, 5f, 22f, 19f, 3f, 3f, pen)
+                canvas.drawLine(6f, 12f, 11f, 12f, pen)
+                canvas.drawLine(13f, 12f, 18f, 12f, pen)
+                canvas.drawLine(6f, 15f, 18f, 15f, pen)
+            }
+            "library" -> {
+                canvas.drawRoundRect(3f, 5f, 20f, 20f, 2f, 2f, pen)
+                canvas.drawLine(8f, 9f, 16f, 9f, pen)
+                canvas.drawLine(8f, 13f, 16f, 13f, pen)
+                canvas.drawLine(8f, 17f, 14f, 17f, pen)
+            }
             "device" -> {
                 canvas.drawRoundRect(5f, 3f, 19f, 21f, 2f, 2f, pen)
                 canvas.drawLine(10f, 17f, 14f, 17f, pen)
