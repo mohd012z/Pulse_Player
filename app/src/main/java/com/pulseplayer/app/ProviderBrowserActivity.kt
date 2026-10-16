@@ -49,6 +49,7 @@ class ProviderBrowserActivity : Activity() {
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var portraitCinema = false
     private var videoFullscreenMode = false
+    private var landscapeRequested = false
     private var drama = false
     private var previousOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var previousUiFlags = 0
@@ -179,7 +180,7 @@ class ProviderBrowserActivity : Activity() {
         videoHost.addView(browser, FrameLayout.LayoutParams(-1, -1))
         exitCinemaButton = Button(this).apply {
             text = "✕"
-            contentDescription = "Exit portrait fullscreen"
+            contentDescription = "Exit cinema or video fullscreen"
             visibility = View.GONE
             setOnClickListener { leavePortraitCinema() }
         }
@@ -198,8 +199,17 @@ class ProviderBrowserActivity : Activity() {
                 setOnClickListener { action() }
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight))
         }
-        if (drama) button("Portrait", 1.3f) {
+        if (drama) button("Cinema", 1.3f) {
             if (portraitCinema) leavePortraitCinema() else enterPortraitCinema()
+        }
+        if (drama) button("Landscape", 1.4f) {
+            landscapeRequested = !landscapeRequested
+            requestedOrientation = if (landscapeRequested)
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            status.text = if (landscapeRequested)
+                "Landscape enabled. Tap the YouTube player's fullscreen icon for video-only view."
+            else "Automatic orientation restored."
         }
         button("Back") { if (browser.canGoBack()) browser.goBack() else finish() }
         button("Forward") { if (browser.canGoForward()) browser.goForward() }
@@ -245,7 +255,9 @@ class ProviderBrowserActivity : Activity() {
         controlsContainer.visibility = View.GONE
         if (providerFullscreen) {
             // The provider may display landscape video even from the Short Drama page.
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            requestedOrientation = if (landscapeRequested)
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else ActivityInfo.SCREEN_ORIENTATION_SENSOR
         } else if (drama) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         exitCinemaButton.visibility = View.VISIBLE
         exitCinemaButton.bringToFront()
@@ -278,7 +290,9 @@ class ProviderBrowserActivity : Activity() {
         statusView.visibility = View.VISIBLE
         controlsContainer.visibility = if (controlsVisible) View.VISIBLE else View.GONE
         window.decorView.systemUiVisibility = previousUiFlags
-        requestedOrientation = previousOrientation
+        requestedOrientation = if (landscapeRequested)
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        else previousOrientation
         rootLayout.requestApplyInsets()
         scheduleAutoHide()
     }
