@@ -98,6 +98,9 @@ class MainActivity : Activity() {
     private lateinit var titleView: TextView
     private lateinit var artistView: TextView
     private lateinit var progressView: TextView
+    private lateinit var networkView: TextView
+    private var lastRxBytes = -1L
+    private var lastRxMs = 0L
     private lateinit var statusView: TextView
     private lateinit var libraryView: TextView
     private lateinit var sourceView: TextView
@@ -120,6 +123,7 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
+            refreshNetworkSpeed()
             clock.postDelayed(this, 750L)
         }
     }
@@ -826,6 +830,22 @@ class MainActivity : Activity() {
             .onFailure { status("Launcher shortcuts unavailable on this device") }
     }
 
+    private fun refreshNetworkSpeed() {
+        if (!::networkView.isInitialized) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val bytes = android.net.TrafficStats.getUidRxBytes(android.os.Process.myUid())
+        if (bytes < 0) {
+            networkView.text = "Network: unavailable"
+        } else if (lastRxBytes >= 0 && now > lastRxMs) {
+            val kbps = ((bytes - lastRxBytes).coerceAtLeast(0L) * 8.0 / (now - lastRxMs))
+            networkView.text = if (controller?.isPlaying == true && source.contains("RADIO"))
+                String.format(Locale.US, "App network ↓ %.0f kbps", kbps)
+            else "Network: idle / app total"
+        }
+        lastRxBytes = bytes
+        lastRxMs = now
+    }
+
     private fun refreshNowPlaying() {
         val c = controller
         val media = c?.currentMediaItem
@@ -833,7 +853,10 @@ class MainActivity : Activity() {
             ?: "Choose a track"
         artistView.text = media?.mediaMetadata?.artist?.toString()?.takeIf { it.isNotBlank() }
             ?: "Local audio • ExoPlayer"
-        playButton.text = if (c?.isPlaying == true) "Ⅱ" else "▶"
+        playButton.text = ""
+        playButton.setCompoundDrawablesWithIntrinsicBounds(
+            ActionIconDrawable(if (c?.isPlaying == true) "pause" else "play", dp(21)), null, null, null)
+        playButton.contentDescription = if (c?.isPlaying == true) "Pause" else "Play"
         val duration = c?.duration ?: C.TIME_UNSET
         val current = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
         progressView.text = "${formatTime(current)}  /  ${formatTime(duration)}"
@@ -1253,6 +1276,8 @@ class MainActivity : Activity() {
             if (c.hasNextMediaItem()) c.seekToNextMediaItem()
         } }, LinearLayout.LayoutParams(dp(48), dp(44)))
         dock.addView(mini)
+        networkView = label("Network: waiting", 10f, COLOR_MUTED)
+        dock.addView(networkView)
         val visualizerAction = button("Waveform") { requestSpectrum() }.apply {
             setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable("wave", dp(18)), null, null, null)
             compoundDrawablePadding = dp(6)
@@ -1307,14 +1332,19 @@ class MainActivity : Activity() {
 
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
         val iconKind = when {
+            text == "◀◀" -> "previous"
+            text == "▶▶" -> "next"
+            text == "▶" || text == "Ⅱ" -> "play"
+            text == "✕" -> "close"
+            text.contains("Waveform", true) -> "wave"
             text.contains("Scan", true) -> "scan"
             text.contains("Radio", true) -> "radio"
             text.contains("FX", true) || text.contains("Sound", true) -> "fx"
             text.contains("More", true) || text.contains("Menu", true) || text.contains("Setting", true) -> "settings"
             text.contains("DEVICE", true) || text.contains("FOLDERS", true) -> "device"
-            else -> null
+            else -> "library"
         }
-        this.text = text.trimStart { !it.isLetterOrDigit() }.trim()
+        this.text = if (text in listOf("◀◀", "▶▶", "▶", "Ⅱ", "✕")) "" else text.trimStart { !it.isLetterOrDigit() }.trim()
         if (iconKind != null) {
             setCompoundDrawablesWithIntrinsicBounds(ActionIconDrawable(iconKind, dp(18)), null, null, null)
             compoundDrawablePadding = dp(5)
@@ -1341,7 +1371,7 @@ class MainActivity : Activity() {
         minimumWidth = 0
         setPadding(dp(8), 0, dp(8), 0)
         elevation = dp(2).toFloat()
-        contentDescription = this.text.toString()
+        contentDescription = when (text) { "◀◀" -> "Previous track"; "▶▶" -> "Next track"; "▶" -> "Play"; "✕" -> "Close waveform"; else -> text }
         setOnClickListener { onClick() }
     }
 
