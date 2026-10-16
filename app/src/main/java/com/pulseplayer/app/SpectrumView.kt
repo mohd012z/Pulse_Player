@@ -23,6 +23,13 @@ class SpectrumView(context: Context) : View(context) {
     }
     private val pixelSize = resources.displayMetrics.density * 1.25f
     private var effect: Visualizer? = null
+    private val profile get() = DevicePerformanceProfile.selected(context)
+    private val layerRadius get() = when (profile) {
+        DevicePerformanceProfile.Tier.LITE -> 3
+        DevicePerformanceProfile.Tier.BALANCED -> 6
+        DevicePerformanceProfile.Tier.HIGH -> 10
+    }
+    private var lastFrameMs = 0L
 
     fun start(sessionId: Int): Boolean {
         stop()
@@ -30,9 +37,13 @@ class SpectrumView(context: Context) : View(context) {
         return try {
             val visualizer = Visualizer(sessionId)
             visualizer.captureSize = Visualizer.getCaptureSizeRange()[0].coerceAtLeast(256)
+            val targetFps = DevicePerformanceProfile.recommendedSpectrumFps(context)
             visualizer.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                 override fun onWaveFormDataCapture(v: Visualizer?, data: ByteArray?, rate: Int) {
                     if (data == null || data.isEmpty()) return
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (now - lastFrameMs < 1000L / targetFps) return
+                    lastFrameMs = now
                     val next = FloatArray(wave.size)
                     for (i in next.indices) {
                         val index = (i.toLong() * data.size / next.size).toInt().coerceIn(0, data.lastIndex)
@@ -45,7 +56,7 @@ class SpectrumView(context: Context) : View(context) {
                     }
                 }
                 override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, rate: Int) = Unit
-            }, minOf(12_000, Visualizer.getMaxCaptureRate()), true, false)
+            }, minOf(targetFps * 1000, Visualizer.getMaxCaptureRate()), true, false)
             effect = visualizer
             visualizer.enabled = true
             true
@@ -62,6 +73,7 @@ class SpectrumView(context: Context) : View(context) {
         runCatching { previous?.enabled = false }
         runCatching { previous?.release() }
         wave.fill(0f)
+        lastFrameMs = 0L
         invalidate()
     }
 
@@ -76,7 +88,13 @@ class SpectrumView(context: Context) : View(context) {
         val center = height / 2f
         val pixel = (resources.displayMetrics.density * 1.15f).coerceAtLeast(1f)
         val spacing = pixel * 1.85f
-        val columns = (width / spacing).toInt().coerceAtLeast(1)
+        val stride = when (profile) {
+            DevicePerformanceProfile.Tier.LITE -> 3
+            DevicePerformanceProfile.Tier.BALANCED -> 2
+            DevicePerformanceProfile.Tier.HIGH -> 1
+        }
+        val columns = (width / (spacing * stride)).toInt().coerceAtLeast(1)
+        val layerCount = layerRadius
         val amplitude = height * 0.31f
         line.style = Paint.Style.FILL
         // A layered sine-wave cloud. Actual waveform energy controls its shape and thickness.
@@ -91,8 +109,8 @@ class SpectrumView(context: Context) : View(context) {
             val phase = t * 19f
             val mainY = center - amplitude * (signal * 0.45f + kotlin.math.sin(phase) * swing * 0.75f)
             val spread = height * (0.09f + energy * 0.17f) * envelope
-            for (layer in -10..10) {
-                val distance = kotlin.math.abs(layer) / 10f
+            for (layer in -layerCount..layerCount) {
+                val distance = kotlin.math.abs(layer).toFloat() / layerCount
                 val ripple = kotlin.math.sin(phase * 1.35f + layer * 0.41f) * amplitude * 0.13f * swing
                 val jitter = kotlin.math.sin(column * 1.71f + layer * 2.37f) * pixel * 0.8f
                 val y = mainY + layer * spread / 10f + ripple + jitter
@@ -102,7 +120,7 @@ class SpectrumView(context: Context) : View(context) {
                 line.color = Color.HSVToColor((opacity * 255f).toInt(),
                     floatArrayOf(hue, 0.74f, 0.98f))
                 val size = pixel * (0.55f + opacity * 0.25f)
-                canvas.drawRect(column * spacing, y, column * spacing + size, y + size, line)
+                canvas.drawRect(column * spacing * stride, y, column * spacing * stride + size, y + size, line)
             }
         }
     }
