@@ -567,6 +567,37 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun showPerformanceSettings() {
+        val tiers = arrayOf("Automatic", "Lite · battery saver", "Balanced", "High · detailed visuals")
+        val prefs = getSharedPreferences("player_state", MODE_PRIVATE)
+        val current = prefs.getString("performance_tier", null)
+        val selected = when (current) {
+            "LITE" -> 1
+            "BALANCED" -> 2
+            "HIGH" -> 3
+            else -> 0
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Playback & visual performance")
+            .setMessage("Current: ${DevicePerformanceProfile.description(this)}. Lower profiles reduce waveform drawing workload; audio quality is unchanged. Restart the waveform after changing.")
+            .setSingleChoiceItems(tiers, selected) { dialog, index ->
+                val value = when (index) {
+                    1 -> "LITE"
+                    2 -> "BALANCED"
+                    3 -> "HIGH"
+                    else -> null
+                }
+                prefs.edit().apply {
+                    if (value == null) remove("performance_tier") else putString("performance_tier", value)
+                }.apply()
+                spectrumView?.stop()
+                status("Performance: ${DevicePerformanceProfile.description(this)}")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showCustomEqualizer() {
         val values = intArrayOf(customLow, customMid, customHigh)
         val labels = arrayOf("Bass (under 250 Hz)", "Midrange (250–4000 Hz)", "Treble (over 4000 Hz)")
