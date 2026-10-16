@@ -1133,8 +1133,59 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showAudioDiagnostics() {
+        val c = controller
+        if (c == null) { status("Connect the playback service first"); return }
+        val audioFormats = c.currentTracks.groups
+            .filter { it.type == C.TRACK_TYPE_AUDIO }
+            .flatMap { group ->
+                (0 until group.length).filter { group.isTrackSelected(it) }.map { group.getTrackFormat(it) }
+            }
+        val format = audioFormats.firstOrNull()
+        val item = c.currentMediaItem
+        val sourceUri = item?.localConfiguration?.uri
+        val source = when (sourceUri?.scheme?.lowercase(Locale.US)) {
+            "content", "file" -> "Local audio"
+            "https", "http" -> "Network stream (quality depends on source)"
+            else -> "Unknown / no selected media"
+        }
+        val bitrate = format?.bitrate?.takeIf { it > 0 }?.let { "${it / 1000} kbps (declared)" } ?: "Not reported"
+        val sampleRate = format?.sampleRate?.takeIf { it > 0 }?.let { "$it Hz" } ?: "Not reported"
+        val channels = format?.channelCount?.takeIf { it > 0 }?.toString() ?: "Not reported"
+        val codec = format?.sampleMimeType ?: "Not reported"
+        val message = """
+            Source: $source
+            Codec: $codec
+            Bitrate: $bitrate
+            Sample rate: $sampleRate
+            Channels: $channels
+
+            These are stream metadata, not measured fidelity or loudness. Low bitrate, clipping,
+            distortion and channel imbalance require separate PCM analysis.
+
+            For weak audio: try Flat first, then Noise Softening if needed. Avoid stacking
+            maximum BassBoost with boosted EQ bands; use moderate listening volume.
+
+            Pulse Player effects apply to its own playback session, not protected audio
+            playing inside YouTube, Spotify or JOOX.
+        """.trimIndent()
+        AlertDialog.Builder(this).setTitle("Audio quality · diagnostics")
+            .setMessage(message)
+            .setPositiveButton("Use Flat EQ") { _, _ ->
+                customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                    putString(PlaybackService.ARG_PRESET, "Flat")
+                }) { _, ok -> status(if (ok) "Flat EQ selected" else "EQ unavailable on this route") }
+            }
+            .setNeutralButton("Noise Softening") { _, _ ->
+                customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                    putString(PlaybackService.ARG_PRESET, "Noise Softening")
+                }) { _, ok -> status(if (ok) "Noise Softening selected" else "EQ unavailable on this route") }
+            }
+            .setNegativeButton("Close", null).show()
+    }
+
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1146,7 +1197,8 @@ class MainActivity : Activity() {
             4 -> customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
-            5 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            5 -> showAudioDiagnostics()
+            6 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
     }
 
