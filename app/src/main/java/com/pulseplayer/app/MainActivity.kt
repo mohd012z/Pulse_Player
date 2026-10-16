@@ -270,7 +270,7 @@ class MainActivity : Activity() {
             "FOLDERS" -> folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }
                 .map { "${it.name}\n${it.folder}" }
             "RADIO", "MY RADIO" -> filteredStations(query)
-                .map { "${it.name}\nLIVE STREAM" }
+                .map { "${it.name}\n${it.details()} · LIVE STREAM" }
             else -> visibleSongs.map { "${it.title}\n${it.artist}" }
         }
         currentDisplaySize = lines.size
@@ -1002,7 +1002,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(12), dp(20), dp(8))
         }
         val current = label(stations.first().name, 16f, Color.WHITE, true)
-        val detail = label("Internet station selector · not FM MHz tuning", 12f, COLOR_MUTED)
+        val detail = label(stations.first().details() + " · internet stream", 12f, COLOR_MUTED)
         val slider = SeekBar(this).apply { max = stations.lastIndex; progress = 0 }
         container.addView(current)
         container.addView(detail)
@@ -1011,7 +1011,7 @@ class MainActivity : Activity() {
             override fun onStartTrackingTouch(seekBar: SeekBar) {}
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 current.text = stations[progress].name
-                detail.text = "Station ${progress + 1} / ${stations.size} · internet stream"
+                detail.text = "Station ${progress + 1} / ${stations.size} · ${stations[progress].details()}"
             }
             override fun onStopTrackingTouch(seekBar: SeekBar) {}
         })
