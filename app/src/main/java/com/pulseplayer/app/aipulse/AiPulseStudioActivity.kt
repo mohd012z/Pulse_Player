@@ -263,6 +263,12 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure { voiceStatus.text = "Microphone unavailable: ${it.message}" }
             }
         }
+        val useRecordedVoice = android.widget.CheckBox(this).apply {
+            text = "Mix my latest microphone recording (AAC/M4A) into generated music"
+            setTextColor(Color.WHITE)
+            isChecked = false
+        }
+        root.addView(useRecordedVoice)
         heading("Vocal mixing · optional PCM WAV")
         val importedVoiceStatus = heading("No PCM WAV vocal selected. AAC/M4A recordings are not yet supported by the mixer.")
         root.addView(Button(this).apply {
@@ -344,7 +350,17 @@ class AiPulseStudioActivity : Activity() {
                     try {
                         AiPulseMastering.process(tmp, mastered, selectedMasteringPreset) { cancelRequested }
                         if (cancelRequested) throw InterruptedException("Cancelled")
-                        val vocal = importedVoiceWav
+                        val decodedVoice = if (useRecordedVoice.isChecked) {
+                            val recordingFile = voiceFile
+                            require(!recording && recordingFile != null && recordingFile.exists()) {
+                                "Finish recording before generation"
+                            }
+                            File(cacheDir, "decoded-voice-${System.nanoTime()}.wav").also {
+                                AiPulseVoiceDecoder.decode(applicationContext, Uri.fromFile(recordingFile), it) { cancelRequested }
+                            }
+                        } else null
+                        val vocal = decodedVoice ?: importedVoiceWav
+                        try {
                         if (vocal != null && vocal.exists()) {
                             val combined = File(cacheDir, "vocal-mix-${System.nanoTime()}.wav")
                             try {
@@ -352,6 +368,7 @@ class AiPulseStudioActivity : Activity() {
                                 saveToMusic(combined, request.title)
                             } finally { combined.delete() }
                         } else saveToMusic(mastered, request.title)
+                        } finally { decodedVoice?.delete() }
                     } finally { mastered.delete() }
                 }
                 tmp.delete()
