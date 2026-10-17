@@ -642,9 +642,35 @@ class MainActivity : Activity() {
                 return@customCommand
             }
             spectrumView = view
+            val wrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(8), dp(6), dp(8), dp(6))
+                setBackgroundColor(COLOR_BG)
+            }
+            val modes = arrayOf("Spectrum Bars", "Spectrum Wave", "Spectrum Orbit")
+            val switch = button("Visual preset: ${modes[view.mode.ordinal]}") {
+                val next = (view.mode.ordinal + 1) % SpectrumView.Mode.entries.size
+                view.mode = SpectrumView.Mode.entries[next]
+                getSharedPreferences("spectrum_ui", MODE_PRIVATE).edit()
+                    .putInt("mode", next).apply()
+                status("Live spectrum: ${modes[next]}")
+            }
+            val previous = getSharedPreferences("spectrum_ui", MODE_PRIVATE)
+                .getInt("mode", 0).coerceIn(0, SpectrumView.Mode.entries.lastIndex)
+            view.mode = SpectrumView.Mode.entries[previous]
+            switch.text = "Visual preset: ${modes[previous]}"
+            switch.setOnClickListener {
+                val next = (view.mode.ordinal + 1) % SpectrumView.Mode.entries.size
+                view.mode = SpectrumView.Mode.entries[next]
+                switch.text = "Visual preset: ${modes[next]}"
+                getSharedPreferences("spectrum_ui", MODE_PRIVATE).edit()
+                    .putInt("mode", next).apply()
+            }
+            wrapper.addView(switch, LinearLayout.LayoutParams(-1, dp(44)))
+            wrapper.addView(view, LinearLayout.LayoutParams(-1, dp(240)))
             AlertDialog.Builder(this)
-                .setTitle("Live music spectrum · FFT")
-                .setView(view)
+                .setTitle("Live music spectrum · FFT (audio reactive)")
+                .setView(wrapper)
                 .setPositiveButton("Close", null)
                 .create().also { dialog ->
                     dialog.setOnDismissListener {
@@ -1064,6 +1090,8 @@ class MainActivity : Activity() {
         tabs.addView(button("♫ FX") { selectMixPreset() },
             LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
         root.addView(tabs)
+        root.addView(button("▥ Live Audio Spectrum · FFT") { requestSpectrum() },
+            LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
         root.addView(button("✦ AI Pulse Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
         }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
