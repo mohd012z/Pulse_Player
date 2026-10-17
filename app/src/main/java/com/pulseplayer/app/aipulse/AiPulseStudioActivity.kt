@@ -2,6 +2,7 @@ package com.pulseplayer.app.aipulse
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.net.Uri
@@ -30,6 +31,7 @@ class AiPulseStudioActivity : Activity() {
     @Volatile private var cancelRequested = false
     @Volatile private var working = false
     private var recorder: MediaRecorder? = null
+    private var voicePreviewPlayer: MediaPlayer? = null
     private var voiceFile: File? = null
     private var recording = false
     private var importedVoiceWav: File? = null
@@ -467,6 +469,8 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
             } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 300)
             } else {
+                voicePreviewPlayer?.release()
+                voicePreviewPlayer = null
                 runCatching {
                     val file = File(filesDir, "ai_pulse_voice_${System.currentTimeMillis()}.m4a")
                     val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this@AiPulseStudioActivity) else MediaRecorder()
@@ -488,6 +492,47 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
                 }.onFailure { voiceStatus.text = "Microphone unavailable: ${it.message}" }
             }
         }
+        root.addView(Button(this).apply {
+            text = "Play recorded voice · M4A preview"
+            setOnClickListener {
+                if (voicePreviewPlayer != null) {
+                    voicePreviewPlayer?.release()
+                    voicePreviewPlayer = null
+                    text = "Play recorded voice · M4A preview"
+                } else {
+                    val latest = AiPulseVoiceFiles.latestRecording(filesDir)
+                    if (recording || latest == null) {
+                        Toast.makeText(this@AiPulseStudioActivity,
+                            "Stop recording first, then preview your saved voice", Toast.LENGTH_SHORT).show()
+                    } else {
+                        runCatching {
+                            MediaPlayer().apply {
+                                setDataSource(latest.absolutePath)
+                                setOnCompletionListener {
+                                    it.release()
+                                    if (voicePreviewPlayer === it) voicePreviewPlayer = null
+                                    text = "Play recorded voice · M4A preview"
+                                }
+                                prepare()
+                                start()
+                            }
+                        }.onSuccess {
+                            voicePreviewPlayer = it
+                            text = "Stop voice preview"
+                        }.onFailure {
+                            voicePreviewPlayer?.release()
+                            voicePreviewPlayer = null
+                            Toast.makeText(this@AiPulseStudioActivity,
+                                "Unable to play M4A: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        })
+        root.addView(TextView(this).apply {
+            text = "Recordings are private to AI Pulse. Export M4A below to a Music folder to find it in the player."
+            setTextColor(Color.LTGRAY)
+        })
         val useRecordedVoice = android.widget.CheckBox(this).apply {
             text = "Mix my latest microphone recording (AAC/M4A) into generated music"
             setTextColor(Color.WHITE)
@@ -1252,6 +1297,8 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
     }
 
     override fun onStop() {
+        voicePreviewPlayer?.release()
+        voicePreviewPlayer = null
         if (recording) {
             runCatching { recorder?.stop() }.onFailure { voiceFile?.delete() }
             recorder?.release()
