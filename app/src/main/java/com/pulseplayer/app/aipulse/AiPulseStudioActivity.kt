@@ -115,6 +115,30 @@ class AiPulseStudioActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
         }
         simple.addView(quickLyrics)
+        simple.addView(Button(this).apply {
+            text = "✨ AI PULSE · GENERATE LYRICS FROM KEYWORDS"
+            setOnClickListener {
+                val keywords = quickIdea.text.toString().lowercase()
+                val draft = when {
+                    listOf("rindu", "kehilangan", "sedih", "miss", "lonely").any { it in keywords } ->
+                        "[Verse 1]\\nDi hujung malam ku terkenang\\nSuara yang jauh masih terbayang\\nWalau jarak memisahkan langkah\\nKenangan kita tetap bercahaya\\n\\n[Chorus]\\nRindu ini kubawa pulang\\nDalam doa yang tidak pernah hilang\\nBiar waktu terus berlalu\\nAda harapan menunggu di situ"
+                    listOf("semangat", "impian", "berani", "dream", "power").any { it in keywords } ->
+                        "[Verse 1]\\nHari baru membuka jalan\\nKukumpul kuat dalam genggaman\\nWalau langkah pernah terhenti\\nAku bangkit sekali lagi\\n\\n[Chorus]\\nTerus melangkah, jangan menyerah\\nImpian besar bermula di sini\\nDengan harapan dan usaha\\nKita mampu menggapai cahaya"
+                    listOf("tenang", "damai", "peace", "calm", "relax").any { it in keywords } ->
+                        "[Verse 1]\\nAngin lembut menyapa pagi\\nCahaya turun ke bumi\\nDi antara langit dan laut\\nHatiku kembali teduh\\n\\n[Chorus]\\nTenanglah jiwa, dengar dunia\\nSetiap nafas membawa cerita\\nDalam sunyi kutemui arah\\nDamai hadir perlahan-lahan"
+                    else ->
+                        "[Verse 1]\\nHari ini kisah bermula\\nSatu langkah membuka cerita\\nKucari makna di setiap waktu\\nDengan harapan yang baru\\n\\n[Chorus]\\nBiar lagu ini bersuara\\nMembawa mimpi dan cita\\nSetiap detik jadi cerita\\nKita terus melangkah bersama"
+                }
+                if (quickLyrics.text.isNotBlank()) {
+                    AlertDialog.Builder(this@AiPulseStudioActivity)
+                        .setTitle("Replace current lyrics?")
+                        .setMessage("AI Pulse will replace your edited lyrics with a keyword-based draft.")
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Replace") { _, _ -> quickLyrics.setText(draft) }
+                        .show()
+                } else quickLyrics.setText(draft)
+            }
+        })
         simpleLabel("2 · Style & mood")
         val quickStyle = EditText(this).apply {
             hint = "Pop rock, acoustic guitar, 110 bpm"
