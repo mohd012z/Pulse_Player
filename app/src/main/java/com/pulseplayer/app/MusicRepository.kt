@@ -36,9 +36,8 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.DISPLAY_NAME,
-            MediaStore.Audio.Media.RELATIVE_PATH
-        )
+            MediaStore.Audio.Media.DISPLAY_NAME
+        ) + if (android.os.Build.VERSION.SDK_INT >= 29) arrayOf(MediaStore.Audio.Media.RELATIVE_PATH) else emptyArray<String>()
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
