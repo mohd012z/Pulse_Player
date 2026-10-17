@@ -47,6 +47,29 @@ class AiPulseVoicePackActivity : Activity() {
         val framesInput = EditText(this).apply { hint = "Durations in frames, e.g. 40,40,40"; setSingleLine() }
         val midiInput = EditText(this).apply { hint = "MIDI pitches per frame, e.g. 60x40,62x40,64x40"; setSingleLine() }
         root.addView(tokenInput); root.addView(framesInput); root.addView(midiInput)
+        val syllableInput = EditText(this).apply { hint = "Syllables separated by spaces"; setSingleLine() }
+        val notesInput = EditText(this).apply { hint = "MIDI:seconds pairs e.g. 60:0.5,62:0.5"; setSingleLine() }
+        root.addView(syllableInput); root.addView(notesInput)
+        button("Prepare phonemes from dictionary.json") {
+            try {
+                val syllables = syllableInput.text.toString().trim().split(Regex("\\s+"))
+                val pitches = notesInput.text.toString().split(",").map {
+                    val fields = it.trim().split(":")
+                    require(fields.size == 2)
+                    fields[0].toInt() to fields[1].toDouble()
+                }
+                require(syllables.size == pitches.size)
+                val dictionary = File(packDir, "dictionary.json")
+                require(dictionary.isFile && dictionary.length() in 1..65536)
+                val phrase = AiPulsePhraseBuilder.build(syllables.indices.map { i ->
+                    AiPulsePhraseBuilder.Note(syllables[i], pitches[i].first, pitches[i].second)
+                }, dictionary.readText(), 100)
+                tokenInput.setText(phrase.phonemeTokens.joinToString(","))
+                framesInput.setText(phrase.phonemeFrames.joinToString(","))
+                midiInput.setText(phrase.midiNotes.joinToString(",") { "${it.toInt()}x1" })
+                status.text = "Prepared ${phrase.phonemeTokens.size} phonemes; check model frame rate"
+            } catch (e: Exception) { status.text = "Phoneme preparation failed: ${e.message}" }
+        }
         button("Render experimental neural WAV (offline)") {
             try {
                 val tokens = tokenInput.text.toString().split(",").map { it.trim().toLong() }.toLongArray()
@@ -85,7 +108,7 @@ class AiPulseVoicePackActivity : Activity() {
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             }
         }
-        if (name !in setOf("manifest.json", "acoustic.onnx", "vocoder.onnx")) {
+        if (name !in setOf("manifest.json", "acoustic.onnx", "vocoder.onnx", "dictionary.json")) {
             status.text = "Only manifest.json, acoustic.onnx and vocoder.onnx accepted"
             return
         }
