@@ -1,0 +1,16 @@
+name: AI Pulse pronunciation tests
+on:
+  push:
+    branches: [feat/ai-pulse-studio-foundation]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  pronunciation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify local BM and English pronunciation
+        run: node tools/ai_pulse_local/test_pronunciation.cjs
