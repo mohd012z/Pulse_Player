@@ -24,5 +24,8 @@ jobs:
         run: |
           python -m unittest discover -s tools/ai_pulse_validation -p 'test_*.py' -v
           python -m unittest discover -s tools/ai_pulse_local -p 'test_*.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Verify offline Android browser composer produces PCM WAV
         run: node tools/ai_pulse_local/test_offline_composer.cjs
