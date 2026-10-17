@@ -63,7 +63,7 @@ class AiPulseVoicePackActivity : Activity() {
                 require(dictionary.isFile && dictionary.length() in 1..65536)
                 val phrase = AiPulsePhraseBuilder.build(syllables.indices.map { i ->
                     AiPulsePhraseBuilder.Note(syllables[i], pitches[i].first, pitches[i].second)
-                }, dictionary.readText(), 100)
+                }, dictionary.readText(), org.json.JSONObject(File(packDir, "manifest.json").readText()).optInt("frame_rate", 100))
                 tokenInput.setText(phrase.phonemeTokens.joinToString(","))
                 framesInput.setText(phrase.phonemeFrames.joinToString(","))
                 midiInput.setText(phrase.midiNotes.joinToString(",") { "${it.toInt()}x1" })
@@ -77,7 +77,9 @@ class AiPulseVoicePackActivity : Activity() {
                 val notes = midiInput.text.toString().split(",").flatMap { part ->
                     val fields = part.trim().split("x")
                     require(fields.size == 2) { "Use pitch x frames, e.g. 60x40" }
-                    List(fields[1].toInt()) { fields[0].toFloat() }
+                    val count = fields[1].toInt()
+                    require(count in 1..100000) { "Invalid frame count" }
+                    List(count) { fields[0].toFloat() }
                 }.toFloatArray()
                 val pack = AiPulseModelPack.load(packDir)
                 status.text = "Running on-device ONNX inference…"
@@ -109,7 +111,7 @@ class AiPulseVoicePackActivity : Activity() {
             }
         }
         if (name !in setOf("manifest.json", "acoustic.onnx", "vocoder.onnx", "dictionary.json")) {
-            status.text = "Only manifest.json, acoustic.onnx and vocoder.onnx accepted"
+            status.text = "Only manifest.json, acoustic.onnx, vocoder.onnx and dictionary.json accepted"
             return
         }
         try {
