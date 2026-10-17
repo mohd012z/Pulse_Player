@@ -77,8 +77,6 @@ assert 'getString("display_mode", "FREQUENCY_BARS")' in activity_text, (
 assert 'putString("display_mode"' in activity_text, "Visualization selection must persist"
 assert "true, true)" in spectrum_source, "Both waveform and FFT captures must be enabled"
 assert "spectrum[i] = maxOf(next[i]" in spectrum_source, "FFT data must update visible spectrum"
-assert 'getString("display_mode", "FREQUENCY_BARS")' in activity_text, "Frequency bars must remain default"
-assert 'putString("display_mode"' in activity_text, "Visualization selection must persist"
 assert "CMD_SET_CUSTOM" in service_text
 assert "PlaybackService.CMD_SET_CUSTOM" in activity_text
 assert (ROOT / "app/src/test/java/com/pulseplayer/app/TimedLyricsTest.kt").is_file()
