@@ -280,7 +280,7 @@ class MainActivity : Activity() {
         libraryView.text = "${source}  ·  $currentDisplaySize tracks / stations"
         if (::sourceView.isInitialized) sourceView.text = "${source.replace('_', ' ')} · ${currentDisplaySize} items"
         if (::sourceButton.isInitialized) {
-            sourceButton.text = "▣\nLibrary"
+            sourceButton.text = "♫\nLibrary"
             sourceButton.contentDescription = "Music source: $source. Tap to change source"
         }
     }
@@ -1009,8 +1009,12 @@ class MainActivity : Activity() {
     }
 
     private fun showMoviesDialog() {
-        val options = arrayOf("YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports")
-        showPicker("Movies · TV · Sports (official sources)", options) { index ->
+        val options = arrayOf(
+            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
+            "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
+            "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming"
+        )
+        showPicker("Watch · Movies · Learn · Live", options) { index ->
             openProvider(options[index])
         }
     }
@@ -1108,7 +1112,7 @@ class MainActivity : Activity() {
                 }
             }
             8 -> shareCurrentTrack()
-            9 -> showDiscoveryDialog()
+            9 -> showMoviesDialog()
             10 -> showRadioTuner()
         }
     }
@@ -1373,20 +1377,20 @@ class MainActivity : Activity() {
                 maxLines = 2
             }
         // Five primary destinations keep labels readable on narrow phones.
-        sourceButton = navButton("▣", "Library") { showPlaylistDialog() }
+        sourceButton = navButton("♫", "Library") { showPlaylistDialog() }
         bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(54), 1f))
-        bottomNav.addView(navButton("▶", "Online") {
+        bottomNav.addView(navButton("◎", "Online") {
             showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
             }
         }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
-        bottomNav.addView(navButton("▤", "Movies") { showMoviesDialog() },
+        bottomNav.addView(navButton("▣", "Watch") { showMoviesDialog() },
             LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
-        bottomNav.addView(navButton("✦", "Studio") {
+        bottomNav.addView(navButton("♬", "Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
         }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
         // Discovery and station tuner are accessible without displacing the five main tabs.
-        bottomNav.addView(navButton("⋮", "More") { showMoreMenu() },
+        bottomNav.addView(navButton("☰", "More") { showMoreMenu() },
             LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
         root.addView(bottomNav)
     }
