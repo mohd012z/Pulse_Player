@@ -1274,7 +1274,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "PCM safety limiter on/off", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1290,8 +1290,29 @@ class MainActivity : Activity() {
             6 -> showDeviceSoundCapabilities()
             7 -> applySuggestedOutputSound()
             8 -> showAutoSoundToggle()
-            9 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            9 -> showSafetyLimiterToggle()
+            10 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun showSafetyLimiterToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("safety_limiter", false)
+        AlertDialog.Builder(this)
+            .setTitle("PCM safety limiter")
+            .setMessage("Currently: ${if (enabled) "ON" else "OFF"}. Limits PCM16 stereo peaks in Pulse Player's audio processor. It cannot repair clipped recordings or control YouTube audio. Enable only if needed.")
+            .setPositiveButton(if (enabled) "Disable" else "Enable") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_LIMITER, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_LIMITER, next)
+                }) { _, ok ->
+                    if (ok) getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                        .putBoolean("safety_limiter", next).apply()
+                    status(if (ok) "PCM limiter: ${if (next) "ON" else "OFF"}" else "Limiter command failed")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showAutoSoundToggle() {
