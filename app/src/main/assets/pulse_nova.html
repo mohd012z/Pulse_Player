@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PULSE-NOVA Offline Composer</title>
-<style>body{background:#101827;color:#eef5ff;font:16px system-ui;margin:0;padding:18px;max-width:700px}h1{font-size:1.4rem}label{display:block;margin:12px 0}input,select,button{font:inherit;padding:10px;border-radius:9px;border:1px solid #71819a;background:#1d2b40;color:white;max-width:100%}button{margin:6px 4px 6px 0;background:#225f7b}audio{width:100%;margin-top:14px}small{color:#afc1d5}#status{min-height:1.6em}</style></head>
+<style>body{background:#101827;color:#eef5ff;font:16px system-ui;margin:0;padding:18px;max-width:700px}h1{font-size:1.4rem}label{display:block;margin:12px 0}input,select,button,textarea{font:inherit;padding:10px;border-radius:9px;border:1px solid #71819a;background:#1d2b40;color:white;max-width:100%}button{margin:6px 4px 6px 0;background:#225f7b}audio{width:100%;margin-top:14px}small{color:#afc1d5}#status{min-height:1.6em}</style></head>
 <body><h1>PULSE-NOVA · Offline Composer</h1><p>Free procedural instrumental generator. Works without a model or internet after the page is saved. This is <strong>not neural AI inference</strong>.</p>
 <section id="aiPulseAssist" style="padding:12px;border:1px solid #46647d;border-radius:12px;margin:12px 0;background:#16263a">
 <strong>✨ AI PULSE · Offline assistant</strong><p style="font-size:.85rem;color:#afc1d5">Suggest original lyrics and musical style from your keywords. Rule-based; no network or neural model.</p>
@@ -13,7 +13,7 @@
 <label>Tempo (BPM) <input id="bpm" type="number" min="60" max="180" value="108"></label>
 <label>Bars <input id="bars" type="number" min="2" max="16" value="4"></label>
 <label>Seed <input id="seed" type="number" value="42"></label>
-<label>Lyrics language <select id="lyricLanguage"><option value="bm">Bahasa Melayu</option><option value="en">English</option></select></label><label>Lyrics arrangement <input id="lyricMode" type="checkbox"> Follow lyric sections</label><label>Lyrics <textarea id="lyrics" rows="7" style="width:100%;box-sizing:border-box" placeholder="[Verse 1]&#10;Walking down the silent street&#10;[Chorus]&#10;Feel the pulse inside the night"></textarea></label><button id="lrc" disabled>Export timed lyrics (.lrc)</button><p id="lyricNow" aria-live="polite"></p><label><input id="vocalPreview" type="checkbox"> Vocal Preview (experimental vowel tones)</label><button id="generate">Generate WAV</button><button id="play" disabled>Play</button><button id="save" disabled>Save WAV</button>
+<label>Lyrics language <select id="lyricLanguage"><option value="bm">Bahasa Melayu</option><option value="en">English</option></select></label><label>Lyrics arrangement <input id="lyricMode" type="checkbox"> Follow lyric sections</label><label>Lyrics <textarea id="lyrics" rows="7" style="width:100%;box-sizing:border-box" placeholder="[Verse 1]&#10;Walking down the silent street&#10;[Chorus]&#10;Feel the pulse inside the night"></textarea></label><button id="lrc" disabled>Export timed lyrics (.lrc)</button><p id="lyricNow" aria-live="polite"></p><label><input id="vocalPreview" type="checkbox"> Vocal Preview (experimental vowel tones)</label><button id="generate">Generate &amp; Preview WAV</button><button id="play" disabled>▶ Preview / Play</button><button id="save" disabled>Save WAV</button>
 <p id="status" role="status"></p><audio id="player" controls></audio>
 <small>Output: mono 16-bit PCM WAV, 22,050 Hz. Deterministic seed, chord progression, melody, bass and percussion. WAV is generated entirely in your browser.</small>
 <script src="./pulse_pronunciation.js"></script><script src="./pulse_vowel_formants.js"></script><script>
@@ -55,9 +55,11 @@ function addTone(data,start,duration,midi,gain,waveType){
     const t=i/RATE-start,remaining=duration-t;
     const env=Math.max(0,Math.min(1,t/Math.max(attack,.001)))*(t<attack?1:sustain+(1-sustain)*Math.exp(-(t-attack)/Math.max(decay,.001)))*Math.min(1,remaining/Math.max(release,.001));
     const phase=2*Math.PI*freq*t;
-    const osc=waveType==="bass"? .78*Math.sin(phase)+.17*Math.sin(2*phase)+.05*Math.sin(3*phase)
-      :waveType==="lead"?.66*Math.sin(phase)+.23*Math.sin(2*phase)+.11*Math.sin(3*phase)
-      :.62*Math.sin(phase)+.23*Math.sin(2*phase)+.1*Math.sin(3*phase)+.05*Math.sin(4*phase);
+    const osc=waveType==="bass"
+      ? .72*Math.sin(phase)+.18*Math.sin(2*phase)+.07*Math.sin(3*phase)
+      :waveType==="lead"
+        ? (.50*Math.sin(phase)+.25*Math.sin(2*phase)+.14*Math.sin(3*phase)+.07*Math.sin(5*phase)+.04*Math.sin(7*phase))*Math.exp(-t*1.4)
+        : (.52*Math.sin(phase)+.20*Math.sin(2*phase)+.12*Math.sin(3*phase)+.09*Math.sin(4*phase)+.07*Math.sin(6*phase))*Math.exp(-t*2.3);
     data[i]+=gain*env*osc;
   }
 }
@@ -244,8 +246,8 @@ $("generate").onclick=()=>{
   $("lrc").disabled=!currentTimeline;currentWav=bytes;
   if(currentUrl)URL.revokeObjectURL(currentUrl);
   currentUrl=URL.createObjectURL(new Blob([bytes],{type:"audio/wav"}));
-  $("player").src=currentUrl;$("play").disabled=false;$("save").disabled=false;
-  $("status").textContent="WAV ready ("+(bytes.byteLength/1024/1024).toFixed(2)+" MiB). No network used.";
+  $("player").src=currentUrl;$("player").load();$("play").disabled=false;$("save").disabled=false;
+  $("status").textContent="Preview ready ("+(bytes.byteLength/1024/1024).toFixed(2)+" MiB). Tap Play to listen or Save WAV to export. No network used.";
  }catch(e){$("status").textContent="Error: "+e.message;}
 };
 $("player").addEventListener("timeupdate",()=>{const now=$("player").currentTime;const event=currentTimeline?.events.find(e=>now>=e.start&&now<e.start+e.duration);$("lyricNow").textContent=event?event.line:"";});
