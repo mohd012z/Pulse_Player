@@ -4,6 +4,10 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
+import android.content.pm.ActivityInfo
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebChromeClient
@@ -19,6 +23,10 @@ import android.widget.TextView
  */
 class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var fullscreenContainer: FrameLayout? = null
+    private var previousOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,7 +86,28 @@ class OnlineMediaActivity : Activity() {
                 return target.scheme != "https"
             }
         }
-        web.webChromeClient = WebChromeClient()
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                if (view == null || fullscreenView != null) {
+                    callback?.onCustomViewHidden()
+                    return
+                }
+                previousOrientation = requestedOrientation
+                fullscreenView = view
+                fullscreenCallback = callback
+                val container = FrameLayout(this@OnlineMediaActivity).apply {
+                    setBackgroundColor(Color.BLACK)
+                    addView(view, FrameLayout.LayoutParams(-1, -1))
+                }
+                fullscreenContainer = container
+                addContentView(container, ViewGroup.LayoutParams(-1, -1))
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
+
+            override fun onHideCustomView() {
+                exitFullscreen()
+            }
+        }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         AlertDialog.Builder(this)
@@ -89,7 +118,22 @@ class OnlineMediaActivity : Activity() {
             .show()
     }
 
+    private fun exitFullscreen() {
+        val container = fullscreenContainer ?: return
+        fullscreenContainer = null
+        fullscreenView = null
+        (container.parent as? ViewGroup)?.removeView(container)
+        val callback = fullscreenCallback
+        fullscreenCallback = null
+        requestedOrientation = previousOrientation
+        callback?.onCustomViewHidden()
+    }
+
     override fun onBackPressed() {
+        if (fullscreenView != null) {
+            exitFullscreen()
+            return
+        }
         val web = browser
         if (web?.canGoBack() == true) web.goBack() else super.onBackPressed()
     }
@@ -105,6 +149,7 @@ class OnlineMediaActivity : Activity() {
     }
 
     override fun onDestroy() {
+        exitFullscreen()
         browser?.apply { stopLoading(); destroy() }
         browser = null
         super.onDestroy()
