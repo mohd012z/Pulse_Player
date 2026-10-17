@@ -608,6 +608,21 @@ class AiPulseStudioActivity : Activity() {
         root.addView(aceStepMode)
         val neuralStatus = heading("Connect your ACE-Step server over HTTPS; model runs on the server.")
         root.addView(Button(this).apply {
+            text = "Test ACE-Step connection"
+            setOnClickListener {
+                val endpoint = neuralEndpoint.text.toString().trim()
+                neuralStatus.text = "Checking ACE-Step server…"
+                thread(name = "AceStepHealth") {
+                    val result = runCatching {
+                        AceStepClient(applicationContext).checkHealth(endpoint)
+                    }
+                    runOnUiThread {
+                        neuralStatus.text = result.getOrElse { "Connection failed: ${it.message}" }
+                    }
+                }
+            }
+        })
+        root.addView(Button(this).apply {
             text = "Generate neural song"
             setOnClickListener {
                 if (working) return@setOnClickListener
