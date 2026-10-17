@@ -19,13 +19,13 @@ class VoicebankPreflightTests(unittest.TestCase):
     def test_local_vocoder_custom_filename(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "dsconfig.yaml").write_text("acoustic: acoustic.onnx\\nphonemes: phonemes.txt\\nvocoder: custom\\n")
+            (root / "dsconfig.yaml").write_text("acoustic: acoustic.onnx\nphonemes: phonemes.txt\nvocoder: custom\n")
             (root / "acoustic.onnx").write_bytes(b"acoustic-fixture")
-            (root / "phonemes.txt").write_text("SP\\na\\n")
+            (root / "phonemes.txt").write_text("SP\na\n")
             voc = root / "dsvocoder"
             voc.mkdir()
             (voc / "vocoder.yaml").write_text(
-                "model: custom_vocoder.onnx\\nsample_rate: 44100\\nhop_size: 512\\nnum_mel_bins: 128\\n"
+                "model: custom_vocoder.onnx\nsample_rate: 44100\nhop_size: 512\nnum_mel_bins: 128\n"
             )
             (voc / "custom_vocoder.onnx").write_bytes(b"vocoder-fixture")
             result = inspect(root)
