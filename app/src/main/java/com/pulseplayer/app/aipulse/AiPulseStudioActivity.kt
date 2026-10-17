@@ -364,6 +364,48 @@ class AiPulseStudioActivity : Activity() {
             isChecked = false
         }
         root.addView(exportStems)
+        root.addView(Button(this).apply {
+            text = "Save mixer preset"
+            setOnClickListener {
+                runCatching {
+                    val preset = AiPulseMixPreset(
+                        lead = leadLevel.progress, bass = bassLevel.progress,
+                        pad = padLevel.progress, drums = drumsLevel.progress,
+                        muteLead = muteLead.isChecked, muteBass = muteBass.isChecked,
+                        mutePad = mutePad.isChecked, muteDrums = muteDrums.isChecked,
+                        solo = AiPulseTrackMixer.Track.entries[soloTrack.selectedItemPosition],
+                        musicGain = instrumentalGain.progress, vocalGain = recordedVoiceGain.progress,
+                        vocalDelayMs = vocalDelay.text.toString().toIntOrNull()
+                            ?: error("Enter a valid vocal delay"),
+                        exportStems = exportStems.isChecked
+                    )
+                    File(filesDir, "ai_pulse_mixer.json").writeText(preset.toJson())
+                    Toast.makeText(this@AiPulseStudioActivity, "Mixer preset saved locally", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(this@AiPulseStudioActivity, "Save failed: ${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Load mixer preset"
+            setOnClickListener {
+                runCatching {
+                    val p = AiPulseMixPreset.fromJson(File(filesDir, "ai_pulse_mixer.json").readText())
+                    leadLevel.progress = p.lead; bassLevel.progress = p.bass
+                    padLevel.progress = p.pad; drumsLevel.progress = p.drums
+                    muteLead.isChecked = p.muteLead; muteBass.isChecked = p.muteBass
+                    mutePad.isChecked = p.mutePad; muteDrums.isChecked = p.muteDrums
+                    soloTrack.setSelection(p.solo.ordinal)
+                    instrumentalGain.progress = p.musicGain
+                    recordedVoiceGain.progress = p.vocalGain
+                    vocalDelay.setText(p.vocalDelayMs.toString())
+                    exportStems.isChecked = p.exportStems
+                    Toast.makeText(this@AiPulseStudioActivity, "Mixer preset restored", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(this@AiPulseStudioActivity, "Load failed: ${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        })
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
         val create = Button(this).apply { text = "Generate music" }
         val cancel = Button(this).apply { text = "Cancel"; isEnabled = false }
