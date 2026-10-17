@@ -334,6 +334,12 @@ class AiPulseStudioActivity : Activity() {
                 AiPulseMastering.Preset.entries.map { it.name })
         }
         root.addView(masteringPreset)
+        val exportStems = android.widget.CheckBox(this).apply {
+            text = "Also export separate lead, bass, pad and drum WAV stems"
+            setTextColor(Color.WHITE)
+            isChecked = false
+        }
+        root.addView(exportStems)
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
         val create = Button(this).apply { text = "Generate music" }
         val cancel = Button(this).apply { text = "Cancel"; isEnabled = false }
@@ -369,6 +375,7 @@ class AiPulseStudioActivity : Activity() {
                 voiceDelayMs = delayMs
             )
             val includeRecordedVoice = useRecordedVoice.isChecked
+            val saveStems = exportStems.isChecked
             val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
             working = true
             cancelRequested = false
@@ -416,6 +423,22 @@ class AiPulseStudioActivity : Activity() {
                             decodedVoice?.delete()
                         }
                     } finally { mastered.delete() }
+                }
+                if (result.isSuccess && saveStems && !cancelRequested) {
+                    for (stem in AiPulseStereoRenderer.Stem.entries.filter { it != AiPulseStereoRenderer.Stem.MIX }) {
+                        val stemFile = File(cacheDir, "stem-${stem.name.lowercase()}-${System.nanoTime()}.wav")
+                        try {
+                            AiPulseStereoRenderer.render(request, stemFile, stem) { cancelRequested }
+                            if (cancelRequested) break
+                            saveToMusic(stemFile, "${request.title}-${stem.name.lowercase()}")
+                        } catch (error: Exception) {
+                            runOnUiThread {
+                                Toast.makeText(this@AiPulseStudioActivity,
+                                    "Stem export issue: ${error.message}", Toast.LENGTH_LONG).show()
+                            }
+                            break
+                        } finally { stemFile.delete() }
+                    }
                 }
                 tmp.delete()
                 runOnUiThread {
