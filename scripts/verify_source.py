@@ -66,6 +66,7 @@ for feature in ("REQUEST_LYRICS", "TimedLyrics.activeIndex", "discoverMalaysiaRa
 assert "bycountrycodeexact/MY" in (source / "MalaysiaRadioDirectory.kt").read_text()
 spectrum_source = (source / "SpectrumView.kt").read_text()
 assert "onFftDataCapture" in spectrum_source
+assert "enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER, MIRROR_BARS, OSCILLOSCOPE }" in spectrum_source, "Expected four supported spectrum modes"
 for mode in ("FREQUENCY_BARS", "PIXEL_WATER", "MIRROR_BARS", "OSCILLOSCOPE"):
     assert mode in spectrum_source, f"Missing spectrum mode: {mode}"
 assert "SpectrumView.DisplayMode.entries" in activity_text, (
