@@ -14,27 +14,67 @@ import kotlin.math.roundToLong
  */
 object AiPulseWavResampler {
     enum class Quality { LINEAR, WINDOWED_SINC }
-    private data class Source(val rate: Int, val channels: Int, val frames: Long)
+    private data class Source(
+        val rate: Int,
+        val channels: Int,
+        val frames: Long,
+        val dataOffset: Long
+    )
 
+    /**
+     * RIFF/WAVE is chunk-based: metadata and extended fmt chunks may appear
+     * before PCM data. Validate every chunk against the declared RIFF boundary
+     * before seeking, and retain the actual data offset for block reads.
+     */
     private fun header(input: RandomAccessFile): Source {
         require(input.length() >= 44) { "Short WAV file" }
         fun four() = ByteArray(4).also { input.readFully(it) }.toString(Charsets.US_ASCII)
         fun u16(): Int = input.readUnsignedByte() or (input.readUnsignedByte() shl 8)
         fun u32(): Long = u16().toLong() or (u16().toLong() shl 16)
-        require(four() == "RIFF")
-        u32()
-        require(four() == "WAVE" && four() == "fmt " && u32() == 16L)
-        require(u16() == 1) { "Only PCM WAV supported" }
-        val channels = u16()
-        val rate = u32().toInt()
-        u32()
-        val alignment = u16()
-        require(u16() == 16 && channels in 1..2 && rate in 8000..192000)
-        require(alignment == channels * 2)
-        require(four() == "data")
-        val bytes = u32()
-        require(bytes % alignment == 0L && bytes + 44 <= input.length()) { "Invalid WAV size" }
-        return Source(rate, channels, bytes / alignment)
+        require(four() == "RIFF") { "Not a RIFF WAV file" }
+        val riffSize = u32()
+        require(riffSize >= 36 && riffSize <= input.length() - 8) { "Invalid RIFF length" }
+        require(four() == "WAVE") { "Not WAVE audio" }
+        val riffEnd = 8L + riffSize
+        var rate = 0
+        var channels = 0
+        var alignment = 0
+        var dataOffset = -1L
+        var dataBytes = -1L
+        while (input.filePointer + 8 <= riffEnd) {
+            val chunk = four()
+            val chunkBytes = u32()
+            val chunkStart = input.filePointer
+            require(chunkBytes <= riffEnd - chunkStart) { "WAV chunk exceeds RIFF boundary" }
+            when (chunk) {
+                "fmt " -> {
+                    require(chunkBytes >= 16) { "Invalid WAV format chunk" }
+                    require(u16() == 1) { "Only PCM WAV supported" }
+                    channels = u16()
+                    rate = u32().toInt()
+                    val byteRate = u32()
+                    alignment = u16()
+                    val bits = u16()
+                    require(bits == 16 && channels in 1..2 && rate in 8000..192000) {
+                        "Only mono/stereo PCM16 WAV at 8–192 kHz is supported"
+                    }
+                    require(alignment == channels * 2 &&
+                        byteRate == rate.toLong() * alignment) { "Invalid PCM block alignment" }
+                }
+                "data" -> if (dataOffset < 0) {
+                    dataOffset = chunkStart
+                    dataBytes = chunkBytes
+                }
+            }
+            val paddedEnd = chunkStart + chunkBytes + (chunkBytes and 1L)
+            require(paddedEnd <= riffEnd) { "Invalid WAV chunk padding" }
+            input.seek(paddedEnd)
+        }
+        require(rate > 0 && dataOffset >= 0 && dataBytes > 0) {
+            "WAV must contain PCM format and nonempty data chunks"
+        }
+        require(dataBytes % alignment == 0L) { "Incomplete PCM frame" }
+        return Source(rate, channels, dataBytes / alignment, dataOffset)
     }
 
     fun sampleRate(input: File): Int =
@@ -77,7 +117,7 @@ object AiPulseWavResampler {
                         if (cachedStart < 0 || pos < cachedStart || pos >= cachedStart + cachedCount) {
                             cachedStart = (pos / blockFrames) * blockFrames
                             cachedCount = min(blockFrames.toLong(), format.frames - cachedStart).toInt()
-                            source.seek(44 + cachedStart * format.channels * 2)
+                            source.seek(format.dataOffset + cachedStart * format.channels * 2)
                             source.readFully(cache, 0, cachedCount * format.channels * 2)
                         }
                         val offset = ((pos - cachedStart) * format.channels * 2).toInt()
