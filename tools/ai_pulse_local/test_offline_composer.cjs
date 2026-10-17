@@ -20,3 +20,23 @@ const different=vm.runInContext('compose({style:"pop",bpm:108,bars:4,seed:43})',
 assert.notDeepEqual(Buffer.from(render),Buffer.from(different),'different seed should change melody');
 assert.throws(()=>vm.runInContext('compose({style:"pop",bpm:0,bars:4,seed:42})',ctx));
 console.log('PASS: offline composer renders valid deterministic PCM16 WAV, seed variation, bounds validation');
+for(const style of ['pop','ambient','rock']){
+ const buf=vm.runInContext('compose({style:"'+style+'",bpm:120,bars:2,seed:123})',ctx,{timeout:10000});
+ const dv=new DataView(buf);
+ const expectedFrames=Math.ceil(4*22050);
+ assert.equal(dv.getUint32(4,true),buf.byteLength-8,'RIFF chunk size');
+ assert.equal(dv.getUint32(16,true),16,'PCM fmt chunk size');
+ assert.equal(dv.getUint16(20,true),1,'PCM encoding');
+ assert.equal(dv.getUint16(22,true),1,'mono');
+ assert.equal(dv.getUint32(24,true),22050,'sample rate');
+ assert.equal(dv.getUint32(28,true),44100,'byte rate');
+ assert.equal(dv.getUint16(32,true),2,'block align');
+ assert.equal(dv.getUint16(34,true),16,'bits per sample');
+ assert.equal(dv.getUint32(40,true),expectedFrames*2,'data chunk size');
+ assert.equal(buf.byteLength,44+expectedFrames*2,'payload length');
+ let peak=0,energy=0;
+ for(let i=44;i<buf.byteLength;i+=2){const n=dv.getInt16(i,true);peak=Math.max(peak,Math.abs(n));energy+=n*n;}
+ assert.ok(peak>0 && peak<=32767,'valid non-silent PCM');
+ assert.ok(energy>0,'nonzero signal energy');
+}
+console.log('PASS: all three styles have valid RIFF/PCM metadata and non-silent samples');
