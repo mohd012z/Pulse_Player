@@ -29,3 +29,14 @@ jobs:
           node-version: '20'
       - name: Verify offline Android browser composer produces PCM WAV
         run: node tools/ai_pulse_local/test_offline_composer.cjs
+      - name: Install Playwright Chromium (ephemeral CI dependency)
+        run: |
+          mkdir -p /tmp/pulse-playwright
+          cd /tmp/pulse-playwright
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run Chromium audio Blob and download integration
+        env:
+          NODE_PATH: /tmp/pulse-playwright/node_modules
+        run: node tools/ai_pulse_local/test_browser_playwright.cjs
