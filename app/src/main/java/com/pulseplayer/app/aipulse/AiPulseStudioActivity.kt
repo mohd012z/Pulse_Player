@@ -67,6 +67,10 @@ class AiPulseStudioActivity : Activity() {
             }
         }
         heading("AI PULSE · Offline Composer")
+        root.addView(Button(this).apply {
+            text = "Open PULSE-NOVA · Generate / Play / Save WAV offline"
+            setOnClickListener { startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java)) }
+        })
         TextView(this).apply {
             text = "Offline instrumental composer · lyrics, arrangement, recording and WAV export"
             textSize = 13f
