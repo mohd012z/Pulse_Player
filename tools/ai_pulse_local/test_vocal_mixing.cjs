@@ -8,7 +8,7 @@ const embedded=html.match(/<script>([\s\S]*?)<\/script>/);
 assert.ok(embedded,'composer inline script exists');
 const elements={};
 const document={getElementById(id){return elements[id]??(elements[id]={value:id==='lyricLanguage'?'bm':'42',checked:false,disabled:false,textContent:'',addEventListener(){},click(){},play(){return Promise.resolve()}});},createElement(){return {click(){}}}};
-const ctx=vm.createContext({document,console,Math,Number,Float32Array,ArrayBuffer,DataView,Blob,URL,Error,setTimeout,clearTimeout});
+const ctx=vm.createContext({document,window:{},console,Math,Number,Float32Array,ArrayBuffer,DataView,Blob,URL,Error,setTimeout,clearTimeout});
 for(const src of [...scripts,embedded[1]])vm.runInContext(src,ctx,{timeout:2000});
 const output=vm.runInContext(`composeFromLyrics({style:"pop",bpm:108,seed:42,lyricsText:"[Verse]\\nbuku kaki sayang"})`,ctx,{timeout:15000});
 const instrumental=output.audio;
