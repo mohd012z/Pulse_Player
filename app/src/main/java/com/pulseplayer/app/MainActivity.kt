@@ -1273,6 +1273,48 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun showSoundStudio() {
+        showPicker("PULSE SOUND STUDIO · local / radio", arrayOf(
+            "🎧 Headphone & Bluetooth output",
+            "◉ Auto device sound tuning",
+            "♫ Equalizer & audio presets",
+            "▥ Bass / custom EQ / limiter",
+            "◎ Speaker, spatial & refresh diagnostics",
+            "⚙ Android audio output settings"
+        )) { choice ->
+            when (choice) {
+                0 -> showPicker("Headphones & Bluetooth", arrayOf(
+                    "Select Android audio output",
+                    "Apply recommended headphone EQ",
+                    "Enable / disable automatic tuning",
+                    "Inspect audio device capabilities"
+                )) { selected ->
+                    when (selected) {
+                        0 -> chooseAudioOutput()
+                        1 -> applySuggestedOutputSound()
+                        2 -> showAutoSoundToggle()
+                        3 -> showDeviceSoundCapabilities()
+                    }
+                }
+                1 -> showAutoSoundToggle()
+                2 -> selectMixPreset()
+                3 -> showPicker("Audio processing", arrayOf(
+                    "Custom 3-band EQ", "Bass strength", "PCM peak limiter",
+                    "All sound effects and presets"
+                )) { selected ->
+                    when (selected) {
+                        0 -> showCustomEqualizer()
+                        1 -> showBassDialog()
+                        2 -> showSafetyLimiterToggle()
+                        3 -> showAudioMenu()
+                    }
+                }
+                4 -> showDeviceSoundCapabilities()
+                5 -> chooseAudioOutput()
+            }
+        }
+    }
+
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
         "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "PCM safety limiter on/off", "Android system sound settings"
     )) {
@@ -1661,7 +1703,7 @@ class MainActivity : Activity() {
             "Radio" to { showMalaysiaRadioQuickMenu() },
             "Tuner" to { showRadioTuner() },
             "Video" to { showVideoServices() },
-            "FX" to { showAudioMenu() },
+            "Sound" to { showSoundStudio() },
             "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
                 when (it) {
                     0 -> lyricsForCurrent()
