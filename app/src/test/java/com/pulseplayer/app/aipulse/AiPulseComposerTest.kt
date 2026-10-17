@@ -23,6 +23,21 @@ class AiPulseComposerTest {
         } finally { file.delete() }
     }
 
+    @Test fun genreChangesArrangement() {
+        val pop = File.createTempFile("pulse-pop-", ".wav")
+        val edm = File.createTempFile("pulse-edm-", ".wav")
+        try {
+            AiPulseComposer.render(AiPulseComposer.Request("Pop", genre = "Pop Rock", seconds = 2), pop)
+            AiPulseComposer.render(AiPulseComposer.Request("EDM", genre = "EDM", seconds = 2), edm)
+            assertEquals(pop.length(), edm.length())
+            assertTrue("Different genres should not produce identical PCM",
+                !pop.readBytes().contentEquals(edm.readBytes()))
+        } finally {
+            pop.delete()
+            edm.delete()
+        }
+    }
+
     @Test fun rejectsOutOfBoundsGeneration() {
         try {
             AiPulseComposer.validate(AiPulseComposer.Request("Test", seconds = 3600))
