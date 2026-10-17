@@ -19,6 +19,31 @@ class AiPulseStereoRendererTest {
             assertTrue(bytes.drop(44).any { it.toInt() != 0 })
         } finally { output.delete() }
     }
+    @Test fun channelsDifferAndPeakStaysWithinHeadroom() {
+        val output = File.createTempFile("pulse-channel-", ".wav")
+        try {
+            AiPulseStereoRenderer.render(
+                AiPulseComposer.Request("Stereo separation", genre = "R&B", seconds = 2), output
+            )
+            val bytes = output.readBytes()
+            var differenceCount = 0
+            var maxAbsolute = 0
+            fun pcm(offset: Int): Int {
+                val raw = (bytes[offset].toInt() and 255) or
+                    ((bytes[offset + 1].toInt() and 255) shl 8)
+                return raw.toShort().toInt()
+            }
+            for (i in 44 until bytes.size - 3 step 4) {
+                val left = pcm(i)
+                val right = pcm(i + 2)
+                if (left != right) differenceCount++
+                maxAbsolute = maxOf(maxAbsolute, kotlin.math.abs(left), kotlin.math.abs(right))
+            }
+            assertTrue("Stereo channels should differ", differenceCount > 100)
+            assertTrue("Output must retain headroom", maxAbsolute < 32767)
+        } finally { output.delete() }
+    }
+
     @Test fun cancellationRemovesPartialFile() {
         val output = File.createTempFile("pulse-cancel-", ".wav")
         output.delete()
