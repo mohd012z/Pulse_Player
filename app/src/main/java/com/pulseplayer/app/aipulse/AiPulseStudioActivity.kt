@@ -606,6 +606,13 @@ class AiPulseStudioActivity : Activity() {
                     }.show()
             }
         })
+        heading("Offline neural voice · experimental")
+        root.addView(Button(this).apply {
+            text = "Import / validate local ONNX singer and render WAV"
+            setOnClickListener {
+                startActivity(Intent(this@AiPulseStudioActivity, AiPulseVoicePackActivity::class.java))
+            }
+        })
         heading("Neural song generation · optional connected engine")
         val neuralEndpoint = field("HTTPS server URL · ACE-Step 1.5 base URL or direct WAV POST", "")
         neuralEndpoint.setText(getPreferences(MODE_PRIVATE).getString("neural_endpoint", ""))
