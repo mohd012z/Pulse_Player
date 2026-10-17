@@ -66,15 +66,15 @@ for feature in ("REQUEST_LYRICS", "TimedLyrics.activeIndex", "discoverMalaysiaRa
 assert "bycountrycodeexact/MY" in (source / "MalaysiaRadioDirectory.kt").read_text()
 spectrum_source = (source / "SpectrumView.kt").read_text()
 assert "onFftDataCapture" in spectrum_source
-assert "enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER }" in spectrum_source, (
-    "Expected both frequency bar and pixel-water modes in SpectrumView"
+for mode in ("FREQUENCY_BARS", "PIXEL_WATER", "MIRROR_BARS", "OSCILLOSCOPE"):
+    assert mode in spectrum_source, f"Missing spectrum mode: {mode}"
+assert "SpectrumView.DisplayMode.entries" in activity_text, (
+    "Main player must cycle the available spectrum modes"
 )
-assert "SpectrumView.DisplayMode.FREQUENCY_BARS" in activity_text, (
-    "Main player frequency-bar option regressed"
+assert 'getString("display_mode", "FREQUENCY_BARS")' in activity_text, (
+    "Frequency bars must remain the default visualization"
 )
-assert "SpectrumView.DisplayMode.PIXEL_WATER" in activity_text, (
-    "Main player pixel-water option regressed"
-)
+assert 'putString("display_mode"' in activity_text, "Visualization selection must persist"
 assert "true, true)" in spectrum_source, "Both waveform and FFT captures must be enabled"
 assert "spectrum[i] = maxOf(next[i]" in spectrum_source, "FFT data must update visible spectrum"
 assert 'getString("display_mode", "fft")' in activity_text, "FFT must remain default"
