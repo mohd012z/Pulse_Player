@@ -15,8 +15,8 @@ BACKENDS = {
     "diffsinger": {"kind": "voicebank_inference", "source": "https://github.com/openvpi/DiffSinger", "weight_license": "VERIFY_VOICEBANK_AND_VOCODER"},
 }
 BLOCKED = [
-    r"\\b(?:clone|imitate|impersonate)\\s+(?:the\\s+)?voice\\s+of\\b",
-    r"\\b(?:sound exactly like|identical to the voice of)\\b",
+    r"\b(?:clone|imitate|impersonate)\s+(?:the\s+)?voice\s+of\b",
+    r"\b(?:sound exactly like|identical to the voice of)\b",
 ]
 
 
@@ -62,7 +62,7 @@ def main():
         plan = build_plan(json.load(src))
     with open(args.output, "w", encoding="utf-8") as dst:
         json.dump(plan, dst, indent=2, ensure_ascii=False)
-        dst.write("\\n")
+        dst.write("\n")
     print(json.dumps({"status": plan["status"], "backend": plan["backend"]}))
 
 
