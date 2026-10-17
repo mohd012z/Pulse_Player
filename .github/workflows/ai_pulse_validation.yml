@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'tools/ai_pulse_validation/**'
+      - 'tools/ai_pulse_local/**'
       - '.github/workflows/ai_pulse_validation.yml'
   workflow_dispatch:
 jobs:
