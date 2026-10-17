@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.graphics.Color
+import android.view.WindowInsets
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
@@ -177,6 +178,30 @@ class AiPulseStudioActivity : Activity() {
                 putExtra("pulse_auto_generate", autoGenerate)
             })
         }
+        simple.addView(Button(this).apply {
+            text = "PREVIEW LAST RECORDED VOICE (M4A)"
+            setOnClickListener {
+                val latest = AiPulseVoiceFiles.latestRecording(filesDir)
+                if (recording || latest == null) {
+                    Toast.makeText(this@AiPulseStudioActivity, "Record and stop a voice take first", Toast.LENGTH_SHORT).show()
+                } else {
+                    voicePreviewPlayer?.release()
+                    voicePreviewPlayer = null
+                    runCatching {
+                        MediaPlayer().apply {
+                            setDataSource(latest.absolutePath)
+                            setOnCompletionListener { player ->
+                                player.release()
+                                if (voicePreviewPlayer === player) voicePreviewPlayer = null
+                            }
+                            prepare()
+                            start()
+                        }
+                    }.onSuccess { voicePreviewPlayer = it }
+                        .onFailure { Toast.makeText(this@AiPulseStudioActivity, "Preview failed: ${it.message}", Toast.LENGTH_LONG).show() }
+                }
+            }
+        })
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         actions.addView(Button(this).apply {
             text = "PREVIEW"
@@ -193,8 +218,17 @@ class AiPulseStudioActivity : Activity() {
         })
         simple.addView(Button(this).apply {
             text = "Record voice (M4A) · Advanced Studio"
-            setOnClickListener { setContentView(scroller) }
+            setOnClickListener { setContentView(scroller); scroller.requestApplyInsets() }
         })
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val applyInsets = android.view.View.OnApplyWindowInsetsListener { view, insets ->
+                val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+                insets
+            }
+            landing.setOnApplyWindowInsetsListener(applyInsets)
+            scroller.setOnApplyWindowInsetsListener(applyInsets)
+        }
         setContentView(landing)
         fun heading(text: String): TextView = TextView(this).apply {
             this.text = text
@@ -489,6 +523,7 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
                 recording = false
                 voiceButton.text = "Record voice"
             } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                voiceStatus.text = "Requesting microphone permission…"
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 300)
             } else {
                 voicePreviewPlayer?.release()
@@ -552,7 +587,7 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
             }
         })
         root.addView(TextView(this).apply {
-            text = "Recordings are private to AI Pulse. Export M4A below to a Music folder to find it in the player."
+            text = "New recordings publish to Music/AI Pulse on Android 10+. Export older recordings below."
             setTextColor(Color.LTGRAY)
         })
         val useRecordedVoice = android.widget.CheckBox(this).apply {
