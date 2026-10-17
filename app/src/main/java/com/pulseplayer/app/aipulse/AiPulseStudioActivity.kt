@@ -481,6 +481,29 @@ class AiPulseStudioActivity : Activity() {
                 }
             }
         })
+        fun applySavedProject(project: AiPulseProject) {
+            title.setText(project.title)
+            idea.setText(project.idea)
+            mood.setText(project.mood)
+            lyrics.setText(project.lyrics)
+            instruments.setText(project.instruments.joinToString(", "))
+            bpm.progress = project.bpm - 60
+            val p = project.mixer
+            leadLevel.progress = p.lead; bassLevel.progress = p.bass
+            padLevel.progress = p.pad; drumsLevel.progress = p.drums
+            muteLead.isChecked = p.muteLead; muteBass.isChecked = p.muteBass
+            mutePad.isChecked = p.mutePad; muteDrums.isChecked = p.muteDrums
+            soloTrack.setSelection(p.solo.ordinal)
+            instrumentalGain.progress = p.musicGain
+            recordedVoiceGain.progress = p.vocalGain
+            vocalDelay.setText(p.vocalDelayMs.toString())
+            exportStems.isChecked = p.exportStems
+            editedArrangement = project.arrangement
+            timelineView.plan = project.arrangement
+            project.arrangement?.let { duration.setText(AiPulseRenderDuration.secondsFor(it).toString()) }
+            (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
+            (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
+        }
         root.addView(Button(this).apply {
             text = "Save editable project"
             setOnClickListener {
@@ -503,9 +526,8 @@ class AiPulseStudioActivity : Activity() {
                         editedArrangement?.takeIf {
                             it.genre == genre.selectedItem.toString() && it.bpm == bpm.progress + 60
                         })
-                    val file = File(filesDir, "ai_pulse_project.json")
-                    file.writeText(project.toJson())
-                    Toast.makeText(this@AiPulseStudioActivity, "Project saved locally", Toast.LENGTH_SHORT).show()
+                    AiPulseProjectLibrary(filesDir).save(project)
+                    Toast.makeText(this@AiPulseStudioActivity, "Project saved · ${project.title}", Toast.LENGTH_SHORT).show()
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
             }
         })
@@ -513,7 +535,65 @@ class AiPulseStudioActivity : Activity() {
             text = "Load saved project"
             setOnClickListener {
                 runCatching {
-                    val project = AiPulseProject.fromJson(File(filesDir, "ai_pulse_project.json").readText())
+                    val library = AiPulseProjectLibrary(filesDir)
+                    val projects = library.list()
+                    if (projects.isEmpty()) {
+                        Toast.makeText(this@AiPulseStudioActivity, "No saved projects", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    val names = projects.map { file ->
+                        runCatching { library.load(file).title }.getOrElse { file.name }
+                    }.toTypedArray()
+                    AlertDialog.Builder(this@AiPulseStudioActivity)
+                        .setTitle("My creations · tap to load")
+                        .setItems(names) { _, selected ->
+                            runCatching {
+                                val project = library.load(projects[selected])
+                                applySavedProject(project)
+                            }.onFailure {
+                                Toast.makeText(this@AiPulseStudioActivity, "Load failed: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .setNeutralButton("Manage / delete") { _, _ ->
+                            AlertDialog.Builder(this@AiPulseStudioActivity)
+                                .setTitle("Delete saved project only")
+                                .setItems(names) { _, selected ->
+                                    AlertDialog.Builder(this@AiPulseStudioActivity)
+                                        .setTitle("Delete ${names[selected]}?")
+                                        .setMessage("The editable project will be deleted. Exported WAV audio will remain.")
+                                        .setNegativeButton("Cancel", null)
+                                        .setPositiveButton("Delete") { _, _ ->
+                                            val removed = library.delete(projects[selected])
+                                            Toast.makeText(this@AiPulseStudioActivity,
+                                                if (removed) "Project deleted" else "Delete failed", Toast.LENGTH_SHORT).show()
+                                        }.show()
+                                }.show()
+                        }
+                        .setNegativeButton("Close", null)
+                        .show()
+                    return@setOnClickListener
+                }.onFailure {
+                                Toast.makeText(this@AiPulseStudioActivity, "Load failed: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        .setNeutralButton("Manage / delete") { _, _ ->
+                            AlertDialog.Builder(this@AiPulseStudioActivity)
+                                .setTitle("Delete saved project only")
+                                .setItems(names) { _, selected ->
+                                    AlertDialog.Builder(this@AiPulseStudioActivity)
+                                        .setTitle("Delete ${names[selected]}?")
+                                        .setMessage("The editable project will be deleted. Exported WAV audio will remain.")
+                                        .setNegativeButton("Cancel", null)
+                                        .setPositiveButton("Delete") { _, _ ->
+                                            val removed = library.delete(projects[selected])
+                                            Toast.makeText(this@AiPulseStudioActivity,
+                                                if (removed) "Project deleted" else "Delete failed", Toast.LENGTH_SHORT).show()
+                                        }.show()
+                                }.show()
+                        }
+                        .setNegativeButton("Close", null)
+                        .show()
+                    return@setOnClickListener
                     title.setText(project.title)
                     idea.setText(project.idea)
                     mood.setText(project.mood)
