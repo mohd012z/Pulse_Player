@@ -4,7 +4,6 @@ on:
     paths:
       - 'tools/ai_pulse_validation/**'
       - 'tools/ai_pulse_local/**'
-      - 'tools/ai_pulse_local/**'
       - '.github/workflows/ai_pulse_validation.yml'
   pull_request:
     paths:
