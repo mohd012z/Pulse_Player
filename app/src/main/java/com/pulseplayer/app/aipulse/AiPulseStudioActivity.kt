@@ -238,7 +238,8 @@ class AiPulseStudioActivity : Activity() {
                     title = title.text.toString().trim(),
                     mood = mood.text.toString().trim(),
                     bpm = bpm.progress + 60,
-                    seconds = duration.text.toString().toIntOrNull() ?: 0
+                    seconds = duration.text.toString().toIntOrNull() ?: 0,
+                    genre = genre.selectedItem.toString()
                 ).also(AiPulseComposer::validate)
             } catch (e: IllegalArgumentException) {
                 AlertDialog.Builder(this).setMessage(e.message ?: "Invalid input")
