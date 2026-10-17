@@ -39,6 +39,36 @@ class AiPulseStudioActivity : Activity() {
     private var recordStatus: TextView? = null
     private var importedVoiceStatusView: TextView? = null
 
+    /** Publish a copy of a completed voice take so the system audio library can index it. */
+    private fun publishRecordedVoice(file: File): Boolean {
+        if (!file.isFile || file.length() == 0L) return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        val prefs = getSharedPreferences("ai_pulse_recording_exports", MODE_PRIVATE)
+        if (prefs.getBoolean(file.name, false)) return true
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.DISPLAY_NAME, file.name)
+            put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4")
+            put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/AI Pulse")
+            put(MediaStore.Audio.Media.IS_PENDING, 1)
+        }
+        val uri = contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+        return try {
+            contentResolver.openOutputStream(uri)?.use { output ->
+                file.inputStream().use { input -> input.copyTo(output) }
+            } ?: error("Cannot open Music destination")
+            contentResolver.update(uri, ContentValues().apply {
+                put(MediaStore.Audio.Media.IS_PENDING, 0)
+            }, null, null)
+            prefs.edit().putBoolean(file.name, true).apply()
+            true
+        } catch (error: Exception) {
+            contentResolver.delete(uri, null, null)
+            false
+        }
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         voiceFile = AiPulseVoiceFiles.latestRecording(filesDir)
@@ -503,7 +533,9 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
         voiceButton.setOnClickListener {
             if (recording) {
                 runCatching { recorder?.stop() }.onSuccess {
-                    voiceStatus.text = "Saved private recording: ${voiceFile?.name}"
+                    voiceStatus.text = if (voiceFile?.let { publishRecordedVoice(it) } == true)
+                        "Saved to Music/AI Pulse: ${voiceFile?.name}" else
+                        "Saved privately: ${voiceFile?.name} · use Export M4A"
                 }.onFailure {
                     voiceFile?.delete()
                     voiceStatus.text = "Recording failed: ${it.message}"
@@ -1346,7 +1378,7 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
         voicePreviewPlayer?.release()
         voicePreviewPlayer = null
         if (recording) {
-            runCatching { recorder?.stop() }.onFailure { voiceFile?.delete() }
+            runCatching { recorder?.stop() }.onSuccess { voiceFile?.let { publishRecordedVoice(it) } }.onFailure { voiceFile?.delete() }
             recorder?.release()
             recorder = null
             recording = false
