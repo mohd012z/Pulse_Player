@@ -37,6 +37,10 @@ object AiPulseComposer {
         val notes = if (cheerful) intArrayOf(0, 4, 7, 12, 7, 4, 2, 7)
                     else intArrayOf(0, 3, 7, 10, 7, 3, 5, 7)
         val root = 48 + Math.floorMod(request.seed, 12)
+        val plannedBars = max(8, (((request.seconds / beatSeconds / 4.0).toInt() + 3) / 4) * 4)
+        val arrangement = AiPulseBrain.plan(
+            AiPulseBrain.Input(request.genre, request.mood, request.bpm, plannedBars, request.seed)
+        )
         val chordRoots = when (request.genre) {
             "Ballad" -> intArrayOf(0, 7, 9, 5)
             "R&B" -> intArrayOf(0, 5, 9, 7)
@@ -59,7 +63,10 @@ object AiPulseComposer {
                         val t = index.toDouble() / sampleRate
                         val beat = t / beatSeconds
                         val noteIndex = (beat.toInt() / 2) % notes.size
-                        val chord = chordRoots[(beat / 4.0).toInt() % chordRoots.size]
+                        val bar = (beat / 4.0).toInt()
+                        val section = arrangement.segments.lastOrNull { bar >= it.startBar }
+                            ?: arrangement.segments.first()
+                        val chord = section.chordRoots[bar % section.chordRoots.size]
                         val freq = 440.0 * Math.pow(2.0, (root + chord + notes[noteIndex] - 69) / 12.0)
                         val phase = beat % 2.0
                         val envelope = exp(-1.2 * phase)
@@ -82,7 +89,7 @@ object AiPulseComposer {
                         val shimmer = if (request.genre == "EDM")
                             sin(2 * PI * freq * 2.0 * t) * 0.055 * envelope else 0.0
                         val sample = ((lead + harmony + kick + syncopation + shimmer) *
-                            genreGain * intro * outro).coerceIn(-0.9, 0.9)
+                            genreGain * section.energy * intro * outro).coerceIn(-0.9, 0.9)
                         val pcm = (sample * 32767).toInt()
                         buffer[j * 2] = (pcm and 255).toByte()
                         buffer[j * 2 + 1] = ((pcm ushr 8) and 255).toByte()
