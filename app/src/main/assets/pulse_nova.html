@@ -151,6 +151,12 @@ function formatLrc(plan){
  }).join("\n");
 }
 
+window.pulsePrefill = function(config){
+ $("tags").value=config.style||"";
+ $("lyrics").value=config.lyrics||"";
+ $("lyricMode").checked=!!config.enabled;
+ if(config.enabled && config.lyrics) $("generate").click();
+};
 let currentTimeline=null;
 $("generate").onclick=()=>{
  try{
