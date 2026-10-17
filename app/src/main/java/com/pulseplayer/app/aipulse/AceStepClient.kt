@@ -124,13 +124,8 @@ internal class AceStepClient(private val context: Context) {
                 "failed" -> error("Generation failed: ${job.optString("error", "unknown")}")
                 "succeeded" -> {
                     val result = job.optJSONObject("result") ?: error("Missing generation result")
-                    val files = result.optJSONArray("audio_files")
-                        ?: result.optJSONArray("files")
-                        ?: error("No audio files in result")
-                    require(files.length() > 0) { "Empty generated audio list" }
-                    val item = files.getJSONObject(0)
-                    val rawPath = item.optString("url").ifBlank {
-                        item.optString("file").ifBlank { item.optString("path") }
+                    val rawPath = result.optString("first_audio_path").ifBlank {
+                        result.optJSONArray("audio_paths")?.optString(0).orEmpty()
                     }
                     require(rawPath.isNotBlank()) { "No generated audio path" }
                     val audioUrl = URL(base, rawPath)
