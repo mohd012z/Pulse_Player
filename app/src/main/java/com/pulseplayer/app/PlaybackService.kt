@@ -37,6 +37,8 @@ class PlaybackService : MediaSessionService() {
         const val CMD_SET_BASS = "com.pulseplayer.command.BASS"
         const val CMD_SET_CUSTOM = "com.pulseplayer.command.CUSTOM_EQ"
         const val CMD_SET_SLEEP = "com.pulseplayer.command.SLEEP"
+        const val CMD_LIMITER = "com.pulseplayer.command.LIMITER"
+        const val ARG_LIMITER = "limiter"
         const val CMD_AUTO_SOUND = "com.pulseplayer.command.AUTO_SOUND"
         const val ARG_AUTO_SOUND = "auto_sound"
         const val CMD_STATUS = "com.pulseplayer.command.STATUS"
@@ -123,6 +125,7 @@ class PlaybackService : MediaSessionService() {
                     .build()
             }
         }
+        pcmDsp.safetyLimiterEnabled = preferences.getBoolean("safety_limiter", false)
         pcmDsp.enabled = PulsePcmProcessor.available() && preferences.getBoolean("native_dsp", false)
         player = ExoPlayer.Builder(this, renderers)
             .setHandleAudioBecomingNoisy(true)
@@ -176,6 +179,7 @@ class PlaybackService : MediaSessionService() {
                     .add(SessionCommand(CMD_SET_SLEEP, Bundle.EMPTY))
                     .add(SessionCommand(CMD_STATUS, Bundle.EMPTY))
                     .add(SessionCommand(CMD_AUTO_SOUND, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_LIMITER, Bundle.EMPTY))
                     .build()
                 builder.setAvailableSessionCommands(commands)
             }
@@ -230,6 +234,14 @@ class PlaybackService : MediaSessionService() {
                         true
                     }
                 }
+                CMD_LIMITER -> {
+                    if (!args.containsKey(ARG_LIMITER)) false else {
+                        val enabled = args.getBoolean(ARG_LIMITER)
+                        pcmDsp.safetyLimiterEnabled = enabled
+                        preferences.edit().putBoolean("safety_limiter", enabled).apply()
+                        true
+                    }
+                }
                 CMD_AUTO_SOUND -> {
                     if (!args.containsKey(ARG_AUTO_SOUND)) false else {
                         autoSound = args.getBoolean(ARG_AUTO_SOUND)
@@ -248,6 +260,7 @@ class PlaybackService : MediaSessionService() {
             val data = Bundle().apply {
                 putBoolean(ARG_EQ_SUPPORTED, effects.hasEqualizer)
                 putBoolean(ARG_AUTO_SOUND, autoSound)
+                putBoolean(ARG_LIMITER, pcmDsp.safetyLimiterEnabled)
                 putBoolean(ARG_BASS_SUPPORTED, effects.hasBassBoost)
                 putString(ARG_PRESET, effects.preset)
                 putInt(ARG_BASS, effects.bass)
