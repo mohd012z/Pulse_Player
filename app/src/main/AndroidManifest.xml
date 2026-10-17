@@ -27,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".OnlineMediaActivity" android:exported="false" />
+        <activity android:name=".OnlineMediaActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity android:name=".aipulse.AiPulseStudioActivity" android:exported="false" />
 
