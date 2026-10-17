@@ -48,6 +48,48 @@ internal class AceStepClient(private val context: Context) {
         }
     }
 
+    /**
+     * ACE-Step audio-editing request contract. Editing requires an uploaded source
+     * reference from the user's own recording; a local Android path is not a server path.
+     * Keep editing disabled until the backend upload response supplies a trusted reference.
+     */
+    internal data class EditSpec(
+        val taskType: String,
+        val sourceAudioReference: String,
+        val caption: String,
+        val repaintStart: Double? = null,
+        val repaintEnd: Double? = null
+    ) {
+        fun validate() {
+            require(taskType in setOf("cover", "repaint", "lego", "extract", "complete")) {
+                "Unsupported ACE-Step editing task"
+            }
+            require(sourceAudioReference.isNotBlank() &&
+                !sourceAudioReference.startsWith("file:") &&
+                !sourceAudioReference.startsWith("/storage/")) {
+                "Upload source audio first; local file paths are not server references"
+            }
+            if (taskType == "repaint") {
+                require(repaintStart != null && repaintEnd != null &&
+                    repaintStart.isFinite() && repaintEnd.isFinite() &&
+                    repaintStart >= 0.0 && repaintEnd > repaintStart) {
+                    "Repaint requires a valid time interval"
+                }
+            }
+        }
+        fun payload(): JSONObject {
+            validate()
+            return JSONObject().apply {
+                put("task_type", taskType)
+                put("caption", caption)
+                put("audio_format", "wav")
+                put("reference_audio", sourceAudioReference)
+                if (repaintStart != null) put("repainting_start", repaintStart)
+                if (repaintEnd != null) put("repainting_end", repaintEnd)
+            }
+        }
+    }
+
     fun generate(baseUrl: String, request: AiPulseNeuralBridge.Request, cancelled: () -> Boolean): File {
         val base = URL(baseUrl.trim().trimEnd('/') + "/")
         require(base.protocol == "https" && base.userInfo == null && base.ref == null) {
