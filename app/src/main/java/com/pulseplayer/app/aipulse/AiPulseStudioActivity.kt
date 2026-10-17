@@ -349,8 +349,7 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
                             discoveryResult.text = result.fold(
                                 onSuccess = { matches ->
                                     if (matches.isEmpty()) "No cached matches. Online search requires a connection."
-                                    else matches.joinToString("\
-") { "${it.title} — ${it.artist}" }
+                                    else matches.joinToString("\n") { "${it.title} — ${it.artist}" }
                                 },
                                 onFailure = { "Lookup unavailable: ${it.message}. Offline creation still works." }
                             )
@@ -384,8 +383,7 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
                 editedArrangement = plan
                 timelineView.plan = plan
                 duration.setText(AiPulseRenderDuration.secondsFor(plan).toString())
-                val summary = plan.segments.joinToString("\
-") {
+                val summary = plan.segments.joinToString("\n") {
                     "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
                 AlertDialog.Builder(this@AiPulseStudioActivity)
