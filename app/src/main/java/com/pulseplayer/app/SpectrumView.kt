@@ -7,9 +7,15 @@ import android.graphics.Paint
 import android.media.audiofx.Visualizer
 import android.util.Log
 import android.view.View
+import kotlin.math.hypot
+import kotlin.math.ln
 
 /** Pixel-sharp, centered AC-style waveform from the active audio session. */
 class SpectrumView(context: Context) : View(context) {
+    enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER }
+    var displayMode: DisplayMode = DisplayMode.FREQUENCY_BARS
+        set(value) { field = value; invalidate() }
+    private val spectrum = FloatArray(32)
     private val wave = FloatArray(256)
     private data class Drop(var x: Float, var y: Float, val speed: Float, val energy: Float)
     private data class Ripple(val x: Float, var age: Float, val energy: Float)
@@ -70,8 +76,32 @@ class SpectrumView(context: Context) : View(context) {
                         invalidate()
                     }
                 }
-                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, rate: Int) = Unit
-            }, minOf(targetFps * 1000, Visualizer.getMaxCaptureRate()), true, false)
+                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, rate: Int) {
+                    if (fft == null || fft.size < 64) return
+                    val bins = fft.size / 2
+                    val next = FloatArray(spectrum.size)
+                    for (i in next.indices) {
+                        val start = kotlin.math.exp(ln((bins - 1).toDouble()) *
+                            i / next.size).toInt().coerceAtLeast(1)
+                        val end = kotlin.math.exp(ln((bins - 1).toDouble()) *
+                            (i + 1) / next.size).toInt().coerceIn(start + 1, bins)
+                        var peak = 0.0
+                        for (bin in start until end) {
+                            val re = fft[bin * 2].toInt().toDouble()
+                            val im = fft[bin * 2 + 1].toInt().toDouble()
+                            peak = maxOf(peak, hypot(re, im))
+                        }
+                        next[i] = (peak / 110.0).toFloat().coerceIn(0f, 1f)
+                    }
+                    post {
+                        if (effect !== v) return@post
+                        for (i in next.indices) {
+                            spectrum[i] = maxOf(next[i], spectrum[i] * 0.82f)
+                        }
+                        invalidate()
+                    }
+                }
+            }, minOf(targetFps * 1000, Visualizer.getMaxCaptureRate()), true, true)
             effect = visualizer
             visualizer.enabled = true
             true
@@ -91,6 +121,7 @@ class SpectrumView(context: Context) : View(context) {
         ripples.clear()
         lastWaterNs = 0L
         wave.fill(0f)
+        spectrum.fill(0f)
         lastFrameMs = 0L
         receivedNonSilentAudio = false
         invalidate()
@@ -171,9 +202,35 @@ class SpectrumView(context: Context) : View(context) {
         }
     }
 
+    private fun drawFrequencyBars(canvas: Canvas) {
+        val gap = dpFloat(3f)
+        val barWidth = (width - gap * (spectrum.size - 1)) / spectrum.size
+        if (barWidth <= 0f) return
+        liquid.style = Paint.Style.FILL
+        for (index in spectrum.indices) {
+            val strength = spectrum[index].coerceIn(0f, 1f)
+            val visibleHeight = if (strength <= 0f) dpFloat(2f) else
+                (height * strength).coerceAtLeast(dpFloat(2f))
+            liquid.color = Color.HSVToColor(floatArrayOf(
+                170f + index.toFloat() * 130f / spectrum.size, 0.77f, 0.98f
+            ))
+            val left = index * (barWidth + gap)
+            canvas.drawRoundRect(left, height - visibleHeight,
+                left + barWidth, height.toFloat(), dpFloat(2f), dpFloat(2f), liquid)
+        }
+        if (spectrum.all { it < 0.001f }) {
+            canvas.drawText("Waiting for live audio FFT...", dpFloat(5f),
+                height / 2f, hintPaint)
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
+        if (displayMode == DisplayMode.FREQUENCY_BARS) {
+            drawFrequencyBars(canvas)
+            return
+        }
         if (!receivedNonSilentAudio) {
             canvas.drawText("Waiting for audio capture · route may block visualizer", dpFloat(5f), height / 2f, hintPaint)
             return
