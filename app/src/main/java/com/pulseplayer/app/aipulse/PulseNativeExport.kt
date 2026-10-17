@@ -18,7 +18,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.zip.CRC32
 
 /** Serial, ACK-driven, bounded transfer; all session state belongs to the I/O executor. */
-class PulseNativeExport(private val context: Context) {
+class PulseNativeExport(private val context: Context, private val requestLegacySave: (String) -> Unit) {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private var session = ""
@@ -30,6 +30,7 @@ class PulseNativeExport(private val context: Context) {
     private var index = 0
     private var checksum = 0L
     private val crc = CRC32()
+    private var legacyPending = false
     private var deadline = 0L
     private var generation = 0L
     @Volatile private var closed = false
@@ -44,6 +45,7 @@ class PulseNativeExport(private val context: Context) {
     }
     private fun reset() {
         generation++
+        legacyPending = false
         runCatching { stream?.close() }
         stream = null
         temp?.delete()
@@ -128,7 +130,14 @@ class PulseNativeExport(private val context: Context) {
                             if (!result.valid) {
                                 reset(); error(proxy, id, "INVALID_WAV: ${result.reason}"); return@execute
                             }
-                            val uri = publish(file, data.optString("fileName", "PulseNova"))
+                            val name = data.optString("fileName", "PulseNova")
+                            if (android.os.Build.VERSION.SDK_INT < 29) {
+                                legacyPending = true
+                                deadline = 0
+                                main.post { if (!closed) requestLegacySave(name) }
+                                return@execute
+                            }
+                            val uri = publish(file, name)
                             reset()
                             if (uri != null) respond(proxy, id, "COMPLETED", JSONObject().put("uri", uri.toString()))
                             else error(proxy, id, "SAVE_FAILED")
@@ -144,6 +153,27 @@ class PulseNativeExport(private val context: Context) {
                 }
             }
         } catch (_: RejectedExecutionException) {}
+    }
+
+    fun finishLegacySave(uri: Uri?) {
+        if (closed) return
+        try { io.execute {
+            if (!legacyPending || session.isEmpty()) return@execute
+            val p = reply ?: return@execute
+            val id = session
+            if (uri == null) {
+                reset(); respond(p, id, "CANCELLED"); return@execute
+            }
+            val success = try {
+                val output = context.contentResolver.openOutputStream(uri, "w")
+                    ?: throw IllegalStateException("Cannot open selected document")
+                output.use { out -> temp!!.inputStream().use { it.copyTo(out) } }
+                true
+            } catch (_: Exception) { false }
+            reset()
+            if (success) respond(p, id, "COMPLETED", JSONObject().put("uri", uri.toString()))
+            else error(p, id, "SAF_WRITE_FAILED")
+        } } catch (_: RejectedExecutionException) {}
     }
 
     private fun publish(file: File, name: String): Uri? {
