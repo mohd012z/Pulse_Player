@@ -16,7 +16,9 @@ class AiPulseComposerTest {
             assertEquals("RIFF", String(bytes.copyOfRange(0, 4), Charsets.US_ASCII))
             assertEquals("WAVE", String(bytes.copyOfRange(8, 12), Charsets.US_ASCII))
             assertEquals("data", String(bytes.copyOfRange(36, 40), Charsets.US_ASCII))
-            assertEquals(44L + 22050L * 2 * 2, file.length())
+            val rate = java.nio.ByteBuffer.wrap(bytes, 24, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+            assertEquals(44100, rate)
+            assertEquals(44L + 44100L * 2 * 2, file.length())
             assertTrue(bytes.drop(44).any { it.toInt() != 0 })
         } finally { file.delete() }
     }
