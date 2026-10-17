@@ -13,6 +13,7 @@ import kotlin.math.roundToLong
  * band-limited conversion (high-frequency content may alias).
  */
 object AiPulseWavResampler {
+    enum class Quality { LINEAR, WINDOWED_SINC }
     private data class Source(val rate: Int, val channels: Int, val frames: Long)
 
     private fun header(input: RandomAccessFile): Source {
@@ -40,7 +41,9 @@ object AiPulseWavResampler {
         RandomAccessFile(input, "r").use { header(it).rate }
 
     fun convert(input: File, output: File, targetRate: Int = 44100,
+                quality: Quality = Quality.WINDOWED_SINC,
                 cancelled: () -> Boolean = { false }): File {
+
         require(targetRate in 8000..192000)
         require(input.canonicalPath != output.canonicalPath)
         require(output.extension.equals("wav", true))
@@ -85,8 +88,13 @@ object AiPulseWavResampler {
                         }
                         val fraction = original - index
                         for (c in 0 until format.channels) {
-                            val value = (a[c] + (b[c] - a[c]) * fraction).toInt().coerceIn(-32768, 32767)
-                            u16(value and 65535)
+                            val channel = c
+                            val value = if (quality == Quality.WINDOWED_SINC) {
+                                AiPulseResamplingKernel.interpolate(original, format.rate, targetRate) { position ->
+                                    frame(position)[channel].toDouble()
+                                }
+                            } else (a[c] + (b[c] - a[c]) * fraction)
+                            u16(value.toInt().coerceIn(-32768, 32767) and 65535)
                         }
                     }
                 }
