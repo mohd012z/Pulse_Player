@@ -494,17 +494,23 @@ class MainActivity : Activity() {
     }
 
     private fun selectMixPreset() {
-        val options = SoundPresets.names.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Sound mixer · EQ profile")
-            .setSingleChoiceItems(options, -1) { dialog, which ->
+        val groups = arrayOf("Everyday", "Music genres", "Bass & spatial", "Cinema & special", "All presets")
+        val selections = listOf(
+            listOf("Flat", "Warm", "Vocal", "Bright", "Night", "Airy", "Balanced Speaker"),
+            listOf("R&B", "Rock", "Classical", "Studio Punch", "Live Concert"),
+            listOf("Subwoofer", "3D Bass EQ", "Stereo Clarity", "Immersive", "Cinema Spatial EQ"),
+            listOf("Cinema", "NovaStream TV", "Studio Beats EQ", "Loudness EQ", "Noise Softening", "Custom"),
+            SoundPresets.names
+        )
+        showPicker("Sound mixer · Choose category", groups) { group ->
+            val options = selections[group].toTypedArray()
+            showPicker("EQ · ${groups[group]}", options) { which ->
                 val name = options[which]
                 customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
                     putString(PlaybackService.ARG_PRESET, name)
                 }) { _, ok -> status(if (ok) "Mixer EQ: $name" else "Device equalizer unavailable") }
-                dialog.dismiss()
             }
-            .setNegativeButton("Cancel", null).show()
+        }
     }
 
     private fun discoverMalaysiaRadio() {
