@@ -27,6 +27,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".OnlineMediaActivity" android:exported="false" />
+
         <activity android:name=".aipulse.AiPulseStudioActivity" android:exported="false" />
 
         <service
