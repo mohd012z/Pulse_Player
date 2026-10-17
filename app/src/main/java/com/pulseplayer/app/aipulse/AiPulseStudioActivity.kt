@@ -135,32 +135,27 @@ class AiPulseStudioActivity : Activity() {
             "Lagu gembira meraikan persahabatan"
         )
         var nextIdea = 0
+        var generateFromSection: () -> Unit = {}
         simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest song idea"
+            text = "AI PULSE · Suggest idea & generate"
             setOnClickListener {
                 quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
                 nextIdea++
+                generateFromSection()
             }
         })
         val suggestionStatus = TextView(this).apply {
             text = "Auto Style can suggest genre and BPM from your idea or lyrics."
             setTextColor(Color.LTGRAY)
         }
-        simple.addView(Button(this).apply {
-            text = "AUTO STYLE · Recommend for me"
-            setOnClickListener {
-                val (tags, description) = suggestStyle()
-                quickStyle.setText(tags)
-                suggestionStatus.text = description + " · editable"
-            }
-        })
         simple.addView(suggestionStatus)
         simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest style & mood"
+            text = "AI PULSE · Suggest style & generate"
             setOnClickListener {
                 val (tags, description) = suggestStyle()
                 quickStyle.setText(tags)
-                suggestionStatus.text = description + " · editable"
+                suggestionStatus.text = description + " · generating"
+                generateFromSection()
             }
         })
         val quickVocalPreview = android.widget.CheckBox(this).apply {
@@ -182,6 +177,12 @@ class AiPulseStudioActivity : Activity() {
                 putExtra("pulse_vocal_preview", quickVocalPreview.isChecked)
                 putExtra("pulse_auto_generate", autoGenerate)
             })
+        }
+        generateFromSection = {
+            val (tags, description) = suggestStyle()
+            quickStyle.setText(tags)
+            suggestionStatus.text = description
+            openComposer(true)
         }
         simpleLabel("3 · Preview & generate")
         simple.addView(Button(this).apply {
