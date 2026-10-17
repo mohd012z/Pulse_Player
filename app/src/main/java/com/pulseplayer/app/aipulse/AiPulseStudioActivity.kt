@@ -98,6 +98,41 @@ class AiPulseStudioActivity : Activity() {
             text = "Offline rule-based suggestions, not AI model recommendations. Tags influence genre and BPM; not every named instrument is synthesized."
             setTextColor(Color.LTGRAY)
         })
+        simpleLabel("Song idea (optional)")
+        val quickIdea = EditText(this).apply {
+            hint = "Example: A hopeful song about friendship"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            minLines = 2
+        }
+        simple.addView(quickIdea)
+        fun suggestStyle(): Pair<String, String> {
+            val text = (quickIdea.text.toString() + " " + quickLyrics.text.toString()).lowercase()
+            return when {
+                listOf("sad", "rindu", "sedih", "heartbreak", "miss you", "kehilangan").any { it in text } ->
+                    "pop, piano, mellow, 76 bpm" to "Suggested: reflective pop ballad"
+                listOf("rock", "semangat", "power", "fight", "energetic", "berani").any { it in text } ->
+                    "rock, electric guitar, energetic, 118 bpm" to "Suggested: energetic pop rock"
+                listOf("calm", "relax", "tidur", "tenang", "peace", "ambient").any { it in text } ->
+                    "ambient, atmospheric, soft synth, 82 bpm" to "Suggested: ambient chill"
+                listOf("dance", "party", "happy", "gembira", "celebrate", "fun").any { it in text } ->
+                    "pop, dance, bright, 124 bpm" to "Suggested: upbeat dance pop"
+                else -> "pop, acoustic guitar, warm pad, 100 bpm" to "Suggested: acoustic pop"
+            }
+        }
+        val suggestionStatus = TextView(this).apply {
+            text = "Auto Style can suggest genre and BPM from your idea or lyrics."
+            setTextColor(Color.LTGRAY)
+        }
+        simple.addView(Button(this).apply {
+            text = "AUTO STYLE · Recommend for me"
+            setOnClickListener {
+                val (tags, description) = suggestStyle()
+                quickStyle.setText(tags)
+                suggestionStatus.text = description + " · editable"
+            }
+        })
+        simple.addView(suggestionStatus)
         simpleLabel("Lyrics")
         val quickLyrics = EditText(this).apply {
             hint = "[Verse 1] Write your lyrics here"
@@ -111,7 +146,7 @@ class AiPulseStudioActivity : Activity() {
         simple.addView(Button(this).apply {
             text = "GENERATE MUSIC · OFFLINE"
             setOnClickListener {
-                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
+                if (quickStyle.text.isBlank()) {\n                    val (tags, _) = suggestStyle()\n                    quickStyle.setText(tags)\n                }\n                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
                     putExtra("pulse_style_tags", quickStyle.text.toString())
                     putExtra("pulse_lyrics", quickLyrics.text.toString())
                     putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
@@ -119,7 +154,7 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         simple.addView(TextView(this).apply {
-            text = "Lyric-guided instrumental generation. Sung vocals are not yet supported."
+            text = "Automatically recommends style and BPM. Generates offline instrumentals; experimental vowel Vocal Preview is available in the composer. Not full sung lyrics."
             setTextColor(Color.LTGRAY)
         })
         simple.addView(Button(this).apply {
