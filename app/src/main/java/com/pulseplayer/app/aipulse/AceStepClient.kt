@@ -59,7 +59,8 @@ internal class AceStepClient(private val context: Context) {
         val submission = post(URL(base, "release_task"), JSONObject().apply {
             put("caption", prompt)
             put("lyrics", lyrics)
-            put("use_format", "wav")
+            put("audio_format", "wav")
+            put("use_format", false)
             put("duration", request.seconds)
             put("vocal_language", when {
                 request.language.contains("English", true) && !request.language.contains("BM", true) -> "en"
