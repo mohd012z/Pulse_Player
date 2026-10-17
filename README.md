@@ -13,6 +13,32 @@ Native Android/Kotlin + AndroidX Media3 ExoPlayer app; Android 8.0+ (minSdk 26),
 - Malaysian radio directory discovery from **Radio Browser** public API (countrycode MY, recent working entries, HTTPS only). Imported results are cached on-device. Long-press a station to add/remove local favorites. Manual HTTPS stream bookmarks and selected sample internet radio streams remain available. The directory is third-party and is not guaranteed to be complete or always reachable.
 - Official app/browser destinations for YouTube, YouTube Music, JOOX and Spotify. This is not a license to extract protected media or mix service audio into ExoPlayer.
 
+## Pulse Sound Studio and video matching (feature branch)
+
+- **Sound Studio → Auto sound on/off:** Opt-in, conservative EQ recommendations. On Android 13+ the app queries anticipated media routing via `AudioManager.getAudioDevicesForAttributes`; on earlier Android versions it uses connected devices as a fallback. Auto mode does not force Bluetooth routing and does not guarantee the playback track's exact physical path.
+- **Sound Studio → Dynamic-range compressor:** Optional attenuation-only linked stereo 2:1 processing for decoded PCM16 stereo in Media3. **PCM safety limiter** is a separate optional sample-peak ceiling at 30000/32768. Neither repairs pre-existing clipping, performs true-peak reconstruction or prevents downstream hardware EQ from clipping. Both are off until enabled.
+- **Sound Studio → Device speaker / spatial / refresh scan:** Platform support checks for Android spatializer availability, enabled state, stereo/5.1 compatibility, head tracking, audio output, and display refresh modes. Android controls spatialization; Pulse Player does not bundle Dolby Atmos decoding, licensed sound brands or proprietary object-audio technology.
+- **Provider video → FPS:** Choose source frame rate (system automatic, 24/25/30/50/60). On provider fullscreen, request an integer-multiple refresh mode at the **same display resolution** when Android reports one; restore previous preference on exit. This is only a display hint. It does not change YouTube video FPS or eliminate advertisements.
+- **YouTube Live TV:** Category and custom searches plus saved favorite search terms. This is YouTube discovery, not a verified live-channel directory, program guide, or advertisement blocker.
+- Provider WebView audio is **not** available for Pulse Player's private Media3 EQ, compressor, or limiter, because its playback session belongs to the provider.
+
+## Persistent signed APK Releases
+
+The normal pull-request build uploads a **temporary 14-day artifact**. The installed APK itself never expires.
+
+The version-tag workflow `.github/workflows/publish-release.yml` publishes a signed release APK as a GitHub Release, subject to one-time setup by the repository owner:
+
+1. Create a secure Android signing keystore, backed up outside the repository. Never commit it or its passwords.
+2. Add repository Actions secrets: `PULSE_UPLOAD_KEYSTORE_BASE64` (base64-encoded keystore), `PULSE_UPLOAD_KEYSTORE_PASSWORD`, `PULSE_UPLOAD_KEY_ALIAS`, and `PULSE_UPLOAD_KEY_PASSWORD`.
+3. Merge verified code to the default branch and push a version tag (for example `v4.1.0`). CI runs JVM tests, `assembleRelease`, `apksigner verify`, and publishes the APK plus a SHA-256 checksum file.
+4. Install future updates using the **same signing key and application ID**. A key mismatch prevents normal in-place updates; losing the key can prevent distributing compatible updates.
+
+Signing secrets, a green release workflow, an actual pushed version tag, and a published GitHub Release are **not included** in source-code completion. They must be verified separately.
+
+## Additional on-device audio/video QA
+
+Use a phone and headphones to check auto sound on speaker → wired → Bluetooth, output switching during playback, EQ session recreation, quiet/loud transitions, no clicks, steady sound level, and graceful effects fallback. Compare compressor/limiter off vs on with authorized local audio. Test fullscreen video 24/30/60 fps on a device with multiple refresh modes and check the system's observed mode; then exit fullscreen and verify the previous mode returns. Test no-match mode, rotation and provider-controlled playback. Complete listening and display tests before declaring sound fidelity improved.
+
 ## Accuracy and limitations
 
 - The EQ curves are independent tunings. **No Dolby Atmos, Bose, Beats by Dr. Dre or Altec Lansing licensed algorithms** are bundled. Stereo Clarity and 3D Bass EQ alter tone, not channel geometry or object-based spatial audio.

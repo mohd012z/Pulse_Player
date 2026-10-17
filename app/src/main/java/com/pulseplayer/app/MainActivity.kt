@@ -1088,9 +1088,90 @@ class MainActivity : Activity() {
 
     private fun showVideoServices() = showPicker(
         "YouTube & Short Drama",
-        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")
+        arrayOf("YouTube videos", "YouTube Shorts", "Short Drama", "Live TV Dashboard", "YouTube Music")
     ) { index ->
-        openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Live TV", "YouTube Music")[index])
+        if (index == 3) showLiveTvDashboard() else openProvider(arrayOf("YouTube", "YouTube Shorts", "Short Drama", "YouTube Music")[if (index > 3) index - 1 else index])
+    }
+
+    private fun showLiveTvDashboard() {
+        val prefs = getSharedPreferences("live_tv_favorites", MODE_PRIVATE)
+        val categories = arrayOf("Malaysia", "News", "Sports", "Music", "Entertainment", "Education")
+        fun openLiveSearch(term: String) {
+            startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
+                putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, "YouTube Live TV")
+                putExtra(ProviderBrowserActivity.EXTRA_SEARCH, term)
+            })
+        }
+        val actions = arrayOf(
+            "▶ Live channels · Malaysia",
+            "◉ Live News",
+            "◉ Live Sports",
+            "♫ Live Music",
+            "▣ Live Entertainment",
+            "▣ Live Education",
+            "★ Saved favorite searches",
+            "★ Manage / remove favorites",
+            "＋ Add favorite search",
+            "⌕ Custom channel / live search",
+            "▶ Browse all YouTube Live"
+        )
+        showPicker("Live TV · channel discovery", actions) { index ->
+            when (index) {
+                in 0..5 -> openLiveSearch(categories[index] + " live tv")
+                6 -> {
+                    val favorites = prefs.all.keys.sorted()
+                    if (favorites.isEmpty()) {
+                        status("No saved Live TV searches yet")
+                    } else {
+                        showPicker("Favorite live searches", favorites.toTypedArray()) { selected ->
+                            openLiveSearch(favorites[selected])
+                        }
+                    }
+                }
+                7 -> {
+                    val favorites = prefs.all.keys.sorted()
+                    if (favorites.isEmpty()) {
+                        status("No saved Live TV searches to remove")
+                    } else {
+                        showPicker("Remove saved search", favorites.toTypedArray()) { selected ->
+                            val term = favorites[selected]
+                            AlertDialog.Builder(this)
+                                .setTitle("Remove favorite?")
+                                .setMessage(term)
+                                .setPositiveButton("Remove") { _, _ ->
+                                    prefs.edit().remove(term).apply()
+                                    status("Removed favorite: $term")
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
+                    }
+                }
+                8, 9 -> {
+                    val input = EditText(this).apply {
+                        hint = "Channel or live TV search"
+                        setSingleLine(true)
+                    }
+                    AlertDialog.Builder(this)
+                        .setTitle(if (index == 8) "Save Live TV search" else "Search YouTube Live")
+                        .setView(input)
+                        .setPositiveButton(if (index == 8) "Save" else "Search") { _, _ ->
+                            val query = input.text.toString().trim().take(100)
+                            if (query.isBlank()) {
+                                status("Enter a channel or search term")
+                            } else if (index == 8) {
+                                prefs.edit().putBoolean(query, true).apply()
+                                status("Saved favorite: $query")
+                            } else {
+                                openLiveSearch(query + " live")
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+                10 -> openProvider("YouTube Live TV")
+            }
+        }
     }
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
@@ -1102,7 +1183,7 @@ class MainActivity : Activity() {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
             1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "JOOX", "Spotify")[it])
+                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "Short Drama", "YouTube Live TV", "JOOX", "Spotify")[it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
@@ -1192,8 +1273,52 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null).show()
     }
 
+    private fun showSoundStudio() {
+        showPicker("PULSE SOUND STUDIO · local / radio", arrayOf(
+            "🎧 Headphone & Bluetooth output",
+            "◉ Auto device sound tuning",
+            "♫ Equalizer & audio presets",
+            "▥ Bass / custom EQ / limiter",
+            "◎ Speaker, spatial & refresh diagnostics",
+            "⚙ Android audio output settings"
+        )) { choice ->
+            when (choice) {
+                0 -> showPicker("Headphones & Bluetooth", arrayOf(
+                    "Select Android audio output",
+                    "Apply recommended headphone EQ",
+                    "Enable / disable automatic tuning",
+                    "Inspect audio device capabilities"
+                )) { selected ->
+                    when (selected) {
+                        0 -> chooseAudioOutput()
+                        1 -> applySuggestedOutputSound()
+                        2 -> showAutoSoundToggle()
+                        3 -> showDeviceSoundCapabilities()
+                    }
+                }
+                1 -> showAutoSoundToggle()
+                2 -> selectMixPreset()
+                3 -> showPicker("Audio processing", arrayOf(
+                    "Custom 3-band EQ", "Bass strength", "PCM peak limiter",
+                    "Dynamic-range compressor",
+                    "All sound effects and presets"
+                )) { selected ->
+                    when (selected) {
+                        0 -> showCustomEqualizer()
+                        1 -> showBassDialog()
+                        2 -> showSafetyLimiterToggle()
+                        3 -> showDynamicsToggle()
+                        4 -> showAudioMenu()
+                    }
+                }
+                4 -> showDeviceSoundCapabilities()
+                5 -> chooseAudioOutput()
+            }
+        }
+    }
+
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "PCM safety limiter on/off", "Dynamic range compression on/off", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1206,8 +1331,161 @@ class MainActivity : Activity() {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
             5 -> showAudioDiagnostics()
-            6 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            6 -> showDeviceSoundCapabilities()
+            7 -> applySuggestedOutputSound()
+            8 -> showAutoSoundToggle()
+            9 -> showSafetyLimiterToggle()
+            10 -> showDynamicsToggle()
+            11 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun showDynamicsToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("stereo_dynamics", false)
+        AlertDialog.Builder(this)
+            .setTitle("Stereo dynamic-range compressor")
+            .setMessage("Currently: ${if (enabled) "ON" else "OFF"}.\\n\\n" +
+                "Applies a gentle 2:1 linked stereo compressor above -18 dBFS " +
+                "to local/radio PCM16 stereo only. It reduces peaks rather than boosting " +
+                "quiet sounds. Keep the PCM safety limiter enabled if you need " +
+                "post-processor sample-peak protection. It does not process YouTube audio.")
+            .setPositiveButton(if (enabled) "Disable" else "Enable") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_DYNAMICS, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_DYNAMICS, next)
+                }) { _, ok ->
+                    if (ok) getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                        .putBoolean("stereo_dynamics", next).apply()
+                    status(if (ok) "Stereo dynamics: ${if (next) "ON" else "OFF"}" else "Compressor command failed")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showSafetyLimiterToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("safety_limiter", false)
+        AlertDialog.Builder(this)
+            .setTitle("PCM safety limiter")
+            .setMessage("Currently: ${if (enabled) "ON" else "OFF"}. Limits PCM16 stereo peaks in Pulse Player's audio processor. It cannot repair clipped recordings or control YouTube audio. Enable only if needed.")
+            .setPositiveButton(if (enabled) "Disable" else "Enable") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_LIMITER, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_LIMITER, next)
+                }) { _, ok ->
+                    if (ok) getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                        .putBoolean("safety_limiter", next).apply()
+                    status(if (ok) "PCM limiter: ${if (next) "ON" else "OFF"}" else "Limiter command failed")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAutoSoundToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("auto_sound", false)
+        AlertDialog.Builder(this)
+            .setTitle("Automatic sound profile")
+            .setMessage("Current setting: ${if (enabled) "ON" else "OFF"}.\\n\\n" +
+                "Opt-in EQ adjustments when audio devices connect or disconnect. " +
+                "This detects connected devices, not the exact active route. " +
+                "Applies only to Pulse Player local/radio audio, not YouTube. " +
+                "Bass boost is disabled in automatic mode.")
+            .setPositiveButton(if (enabled) "Turn off" else "Turn on") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_AUTO_SOUND, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_AUTO_SOUND, next)
+                }) { _, ok ->
+                    if (ok) {
+                        getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                            .putBoolean("auto_sound", next).apply()
+                    }
+                    status(if (ok) "Auto sound: ${if (next) "ON" else "OFF"}" else "Could not change auto sound")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applySuggestedOutputSound() {
+        val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val advice = OutputRouteAdvisor.inspect(manager)
+        val kind = if (advice.predictedMediaRoute) "Anticipated media route" else "Connected outputs"
+        val description = advice.devices.joinToString(", ") { it.productName.toString() }
+            .ifBlank { "None reported" }
+        AlertDialog.Builder(this)
+            .setTitle("Suggested sound profile")
+            .setMessage("$kind: $description\\n\\nSuggested: ${advice.profile}. " +
+                "This is conservative EQ tuning, not speaker calibration or Dolby Atmos. " +
+                "Apply only to local/radio playback?")
+            .setPositiveButton("Apply") { _, _ ->
+                customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                    putString(PlaybackService.ARG_PRESET, advice.profile)
+                }) { _, ok ->
+                    status(if (ok) "Applied EQ: ${advice.profile}" else "EQ unavailable for this route")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showDeviceSoundCapabilities() {
+        val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val advice = OutputRouteAdvisor.inspect(manager)
+        val outputs = advice.devices
+        val routeNames = outputs.map { device ->
+            val type = when (device.type) {
+                android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in speaker"
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth stereo"
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth call audio"
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"
+                android.media.AudioDeviceInfo.TYPE_USB_HEADSET -> "USB headset"
+                android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio"
+                android.media.AudioDeviceInfo.TYPE_HDMI -> "HDMI audio"
+                else -> "Other output (type ${device.type})"
+            }
+            "$type: ${device.productName}"
+        }
+        val spatial = PlatformSpatialAudio.query(manager)?.let {
+            "Platform spatial audio supported: ${it.supported}\\n" +
+                "Available for connected route: ${it.available}\\n" +
+                "Enabled by Android: ${it.enabled}\\n" +
+                "Stereo eligibility: ${it.stereoEligible}\\n" +
+                "5.1 eligibility: ${it.surround51Eligible}\\n" +
+                "Head tracking available: ${it.headTrackerAvailable}\\n" +
+                "These are hardware capabilities; Pulse Player does not decode Dolby Atmos."
+        } ?: "Android spatial-audio API requires Android 12L or newer."
+        val display = windowManager.defaultDisplay
+        val modes = display.supportedModes.map { it.refreshRate }.distinct().sorted()
+        val message = """
+            ${if (advice.predictedMediaRoute) "Anticipated media route (Android 13+):" else "Connected output devices (active route unknown):"}
+            ${routeNames.ifEmpty { listOf("No output reported") }.joinToString("\n")}
+
+            $spatial
+
+            Display refresh rate: ${display.refreshRate} Hz
+            Supported display modes: ${modes.joinToString(", ")} Hz
+
+            Audio recommendations:
+            • Built-in speakers: start with Flat; apply modest EQ, avoid extreme bass.
+            • Headphones: use supported Android spatial audio if available.
+            • Bluetooth: audio codec and device DSP affect quality.
+            • EQ/BassBoost only affect Pulse Player playback, not YouTube WebView audio.
+
+            Display refresh rate is separate from video FPS and audio quality.
+            The system decides whether to switch refresh rate.
+        """.trimIndent()
+        AlertDialog.Builder(this).setTitle("Sound engine · device capability scan")
+            .setMessage(message)
+            .setPositiveButton("Sound settings") { _, _ ->
+                openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun showBassDialog() {
@@ -1450,7 +1728,7 @@ class MainActivity : Activity() {
             "Radio" to { showMalaysiaRadioQuickMenu() },
             "Tuner" to { showRadioTuner() },
             "Video" to { showVideoServices() },
-            "FX" to { showAudioMenu() },
+            "Sound" to { showSoundStudio() },
             "Lyrics" to { showPicker("Lyrics & subtitles", arrayOf("Import LRC", "View lyrics", "Subtitle Studio")) {
                 when (it) {
                     0 -> lyricsForCurrent()

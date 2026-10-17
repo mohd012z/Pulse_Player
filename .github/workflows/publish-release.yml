@@ -1,0 +1,63 @@
+name: Publish Signed Pulse Player APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  signed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK and build tools
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Require protected signing secrets
+        env:
+          STORE: ${{ secrets.PULSE_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.PULSE_UPLOAD_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.PULSE_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PULSE_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$STORE" && test -n "$STORE_PASSWORD" && test -n "$ALIAS" && test -n "$KEY_PASSWORD" || {
+            echo "::error::Configure PULSE_UPLOAD_KEYSTORE_BASE64, PULSE_UPLOAD_KEYSTORE_PASSWORD, PULSE_UPLOAD_KEY_ALIAS and PULSE_UPLOAD_KEY_PASSWORD in repository secrets."
+            exit 1
+          }
+          printf '%s' "$STORE" | base64 --decode > "$RUNNER_TEMP/pulse-release.keystore"
+      - name: Unit tests and signed release APK
+        env:
+          PULSE_KEYSTORE_FILE: ${{ runner.temp }}/pulse-release.keystore
+          PULSE_KEYSTORE_PASSWORD: ${{ secrets.PULSE_UPLOAD_KEYSTORE_PASSWORD }}
+          PULSE_KEY_ALIAS: ${{ secrets.PULSE_UPLOAD_KEY_ALIAS }}
+          PULSE_KEY_PASSWORD: ${{ secrets.PULSE_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_source.py
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/PulsePlayer-${GITHUB_REF_NAME}.apk"
+          cd dist
+          sha256sum ./*.apk > SHA256SUMS.txt
+      - name: Publish persistent GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          fail_on_unmatched_files: true
