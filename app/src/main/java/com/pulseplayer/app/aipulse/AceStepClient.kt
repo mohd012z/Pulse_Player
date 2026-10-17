@@ -31,6 +31,23 @@ internal class AceStepClient(private val context: Context) {
         } finally { conn.disconnect() }
     }
 
+    fun checkHealth(baseUrl: String): String {
+        val base = URL(baseUrl.trim().trimEnd('/') + "/")
+        require(base.protocol == "https" && base.userInfo == null && base.ref == null) {
+            "Use an HTTPS ACE-Step server URL"
+        }
+        val conn = connection(URL(base, "health"), "GET")
+        try {
+            check(conn.responseCode == 200) { "Health check HTTP ${conn.responseCode}" }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(body)
+            check(json.optInt("code", 200) == 200) { "Server reported unhealthy status" }
+            return "ACE-Step server reachable · ${json.optJSONObject("data")?.optString("status", "OK") ?: "OK"}"
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     fun generate(baseUrl: String, request: AiPulseNeuralBridge.Request, cancelled: () -> Boolean): File {
         val base = URL(baseUrl.trim().trimEnd('/') + "/")
         require(base.protocol == "https" && base.userInfo == null && base.ref == null) {
@@ -40,10 +57,10 @@ internal class AceStepClient(private val context: Context) {
         val prompt = listOf(request.genre, request.description).filter { it.isNotBlank() }.joinToString(", ")
         val lyrics = if (request.instrumental) "[inst]" else request.lyrics
         val submission = post(URL(base, "release_task"), JSONObject().apply {
-            put("prompt", prompt)
+            put("caption", prompt)
             put("lyrics", lyrics)
-            put("audio_format", "wav")
-            put("audio_duration", request.seconds)
+            put("use_format", "wav")
+            put("duration", request.seconds)
             put("vocal_language", when {
                 request.language.contains("English", true) && !request.language.contains("BM", true) -> "en"
                 else -> "unknown"
