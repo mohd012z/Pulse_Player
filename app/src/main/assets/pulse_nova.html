@@ -7,10 +7,10 @@
 <label>Tempo (BPM) <input id="bpm" type="number" min="60" max="180" value="108"></label>
 <label>Bars <input id="bars" type="number" min="2" max="16" value="4"></label>
 <label>Seed <input id="seed" type="number" value="42"></label>
-<label>Lyrics language <select id="lyricLanguage"><option value="bm">Bahasa Melayu</option><option value="en">English</option></select></label><label>Lyrics arrangement <input id="lyricMode" type="checkbox"> Follow lyric sections</label><label>Lyrics <textarea id="lyrics" rows="7" style="width:100%;box-sizing:border-box" placeholder="[Verse 1]&#10;Walking down the silent street&#10;[Chorus]&#10;Feel the pulse inside the night"></textarea></label><button id="lrc" disabled>Export timed lyrics (.lrc)</button><p id="lyricNow" aria-live="polite"></p><button id="generate">Generate WAV</button><button id="play" disabled>Play</button><button id="save" disabled>Save WAV</button>
+<label>Lyrics language <select id="lyricLanguage"><option value="bm">Bahasa Melayu</option><option value="en">English</option></select></label><label>Lyrics arrangement <input id="lyricMode" type="checkbox"> Follow lyric sections</label><label>Lyrics <textarea id="lyrics" rows="7" style="width:100%;box-sizing:border-box" placeholder="[Verse 1]&#10;Walking down the silent street&#10;[Chorus]&#10;Feel the pulse inside the night"></textarea></label><button id="lrc" disabled>Export timed lyrics (.lrc)</button><p id="lyricNow" aria-live="polite"></p><label><input id="vocalPreview" type="checkbox"> Vocal Preview (experimental vowel tones)</label><button id="generate">Generate WAV</button><button id="play" disabled>Play</button><button id="save" disabled>Save WAV</button>
 <p id="status" role="status"></p><audio id="player" controls></audio>
 <small>Output: mono 16-bit PCM WAV, 22,050 Hz. Deterministic seed, chord progression, melody, bass and percussion. WAV is generated entirely in your browser.</small>
-<script src="./pulse_pronunciation.js"></script><script>
+<script src="./pulse_pronunciation.js"></script><script src="./pulse_vowel_formants.js"></script><script>
 "use strict";
 const RATE=22050, MAX_SECONDS=60;
 let currentUrl=null, currentWav=null;
@@ -168,6 +168,29 @@ function composeFromLyrics({style,bpm,lyricsText,seed}){
  if(peak>0){const scale=.88/Math.max(.88,peak);for(let i=0;i<data.length;i++)data[i]*=scale;}
  return {audio:wavBytes(data),timeline:plan,vocalNotes:PulsePronunciation.pronounceScore(vocalGuide(plan),$("lyricLanguage").value)};
 }
+
+// Mix timed vowel previews into an existing mono PCM16 instrumental WAV.
+function mixVocalPreview(instrumental,notes){
+ const view=new DataView(instrumental),length=view.getUint32(40,true)/2;
+ const samples=new Float32Array(length);
+ for(let i=0;i<length;i++)samples[i]=view.getInt16(44+i*2,true)/32768;
+ const vowels=new Set(["a","e","i","o","u"]);
+ for(const n of notes){
+  const phonemes=n.pronunciation?.phonemes||[];
+  const vowel=phonemes.find(p=>vowels.has(p.toLowerCase()));
+  if(!vowel)continue;
+  const start=Math.max(0,Math.floor(n.start*RATE));
+  if(start>=length)continue;
+  const duration=Math.min(n.duration,8,(length-start)/RATE);
+  if(duration<=0)continue;
+  const voice=PulseVowelFormants.renderVowel(vowel.toLowerCase(),n.midi,duration);
+  for(let i=0;i<voice.length&&start+i<length;i++)samples[start+i]+=.28*voice[i];
+ }
+ let peak=0;for(const s of samples)peak=Math.max(peak,Math.abs(s));
+ if(peak>.95){const gain=.95/peak;for(let i=0;i<samples.length;i++)samples[i]*=gain;}
+ return wavBytes(samples);
+}
+
 function formatLrc(plan){
  return plan.events.map(e=>{const cs=Math.floor(e.start*100),m=Math.floor(cs/6000),s=Math.floor(cs%6000/100),c=cs%100;
   return "["+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0")+"]"+e.line;
@@ -188,7 +211,7 @@ $("generate").onclick=()=>{
   const tagConfig=parseStyleTags($("tags").value,config.style,config.bpm);config.style=tagConfig.style;config.bpm=tagConfig.bpm;
   const lyricMode=$("lyricMode").checked;
   const result=lyricMode?composeFromLyrics({...config,lyricsText:$("lyrics").value}):null;
-  const bytes=result?result.audio:compose(config);currentTimeline=result?result.timeline:null;
+  const bytes=result?($("vocalPreview").checked?mixVocalPreview(result.audio,result.vocalNotes):result.audio):compose(config);currentTimeline=result?result.timeline:null;
   $("lrc").disabled=!currentTimeline;currentWav=bytes;
   if(currentUrl)URL.revokeObjectURL(currentUrl);
   currentUrl=URL.createObjectURL(new Blob([bytes],{type:"audio/wav"}));
