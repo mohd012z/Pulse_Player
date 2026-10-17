@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const code=fs.readFileSync(__dirname+'/../../app/src/main/assets/pulse_pronunciation.js','utf8');
+const ctx=vm.createContext({});
+vm.runInContext(code,ctx);
+const api=ctx.PulsePronunciation;
+assert.deepEqual(Array.from(api.tokenize('kaki','bm').phonemes),['k','a','k','i']);
+assert.equal(api.tokenize('sayang','bm').source,'dictionary');
+assert.equal(api.tokenize('cahaya','bm').source,'heuristic');
+assert.equal(api.tokenize('night','en').source,'dictionary');
+assert.equal(api.tokenize('unfamiliarword','en').source,'unknown');
+const score=api.pronounceScore([{word:'buku',start:0,duration:0.5,midi:60}], 'bm');
+assert.equal(score[0].pronunciation.source,'dictionary');
+console.log('PASS: local BM/EN pronunciation dictionary, heuristic and unknown handling');
