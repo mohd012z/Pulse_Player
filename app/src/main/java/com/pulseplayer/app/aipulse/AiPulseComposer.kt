@@ -15,20 +15,22 @@ object AiPulseComposer {
         val mood: String = "bright",
         val bpm: Int = 110,
         val seconds: Int = 16,
-        val seed: Int = 42
+        val seed: Int = 42,
+        val genre: String = "Pop Rock"
     )
 
     fun validate(request: Request) {
         require(request.title.isNotBlank() && request.title.length <= 100) { "Title must be 1–100 characters" }
         require(request.mood.length <= 40) { "Mood is too long" }
         require(request.bpm in 60..180) { "BPM must be 60–180" }
+        require(request.genre in setOf("Pop Rock", "Ballad", "R&B", "Acoustic", "EDM")) { "Unsupported genre" }
         require(request.seconds in 2..30) { "Duration must be 2–30 seconds" }
     }
 
     fun render(request: Request, output: File, cancelled: () -> Boolean = { false }): File {
         validate(request)
         require(output.extension.lowercase() == "wav") { "Output must be WAV" }
-        val sampleRate = 22050
+        val sampleRate = 44100
         val total = sampleRate * request.seconds
         val beatSeconds = 60.0 / request.bpm
         val cheerful = request.mood.lowercase() !in setOf("sad", "dark", "minor", "melancholy")
