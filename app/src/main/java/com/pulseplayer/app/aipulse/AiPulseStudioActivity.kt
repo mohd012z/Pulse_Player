@@ -63,7 +63,17 @@ class AiPulseStudioActivity : Activity() {
         }
         heading("AI PULSE · Offline Composer")
         heading("Original synthesized instrumentals — not neural text-to-music")
-        heading("Visual display presets · preview (not live audio FFT)")
+        heading("Visual preview · animated demo (not sound-reactive)")
+        root.addView(Button(this).apply {
+            text = "Open LIVE spectrum · FFT / Pixel Water"
+            contentDescription = "Open main music player to view the sound-reactive FFT or pixel-water waveform"
+            setOnClickListener {
+                startActivity(Intent(this@AiPulseStudioActivity, com.pulseplayer.app.MainActivity::class.java))
+                Toast.makeText(this@AiPulseStudioActivity,
+                    "Play a track, then select Live Audio Spectrum. Tap the live display to switch FFT and Pixel Water.",
+                    Toast.LENGTH_LONG).show()
+            }
+        })
         val visuals = AiPulseVisualView(this)
         root.addView(visuals, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
         val presets = arrayOf("Spectrum Bars", "Neon Wave", "Orbit", "Minimal")
