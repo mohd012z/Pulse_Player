@@ -27,6 +27,7 @@ object AiPulseStereoRenderer {
 
     fun render(request: AiPulseComposer.Request, output: File,
                stem: Stem = Stem.MIX, levels: Levels = Levels(),
+               arrangement: AiPulseBrain.Plan? = null,
                cancelled: () -> Boolean = { false }): File {
         AiPulseComposer.validate(request)
         levels.validate()
@@ -35,7 +36,14 @@ object AiPulseStereoRenderer {
         val frames = rate * request.seconds
         val secondsPerBeat = 60.0 / request.bpm
         val bars = maxOf(8, (((request.seconds / secondsPerBeat / 4).toInt() + 3) / 4) * 4)
-        val plan = AiPulseBrain.plan(AiPulseBrain.Input(request.genre, request.mood, request.bpm, bars, request.seed))
+        val plan = if (arrangement == null) {
+            AiPulseBrain.plan(AiPulseBrain.Input(request.genre, request.mood, request.bpm, bars, request.seed))
+        } else {
+            require(arrangement.bpm == request.bpm && arrangement.genre == request.genre) {
+                "Arrangement tempo and genre must match the current track"
+            }
+            AiPulseArrangementEditor.rebuild(arrangement)
+        }
         val root = 48 + Math.floorMod(request.seed, 12)
         val temp = File(output.absolutePath + ".part")
         output.parentFile?.mkdirs()
