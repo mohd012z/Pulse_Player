@@ -677,6 +677,8 @@ class AiPulseStudioActivity : Activity() {
                     if (cancelRequested) throw InterruptedException("Cancelled")
                     val report = AiPulseWaveInspector.inspect(tmp)
                     require(report.durationSeconds > 0.0) { "Empty output" }
+                    val containerCheck = AiPulseGeneratedAudioVerifier.inspect(tmp)
+                    require(containerCheck.valid) { "Generated WAV validation failed: ${containerCheck.reason}" }
                     val mastered = File(cacheDir, "master-${System.nanoTime()}.wav")
                     try {
                         AiPulseMastering.process(tmp, mastered, selectedMasteringPreset) { cancelRequested }
