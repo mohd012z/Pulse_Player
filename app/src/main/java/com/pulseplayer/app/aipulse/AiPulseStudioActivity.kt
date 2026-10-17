@@ -146,7 +146,11 @@ class AiPulseStudioActivity : Activity() {
         simple.addView(Button(this).apply {
             text = "GENERATE MUSIC · OFFLINE"
             setOnClickListener {
-                if (quickStyle.text.isBlank()) {\n                    val (tags, _) = suggestStyle()\n                    quickStyle.setText(tags)\n                }\n                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
+                if (quickStyle.text.isBlank()) {
+                    val (tags, _) = suggestStyle()
+                    quickStyle.setText(tags)
+                }
+                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
                     putExtra("pulse_style_tags", quickStyle.text.toString())
                     putExtra("pulse_lyrics", quickLyrics.text.toString())
                     putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
@@ -251,7 +255,14 @@ class AiPulseStudioActivity : Activity() {
                 )
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("Original songwriting advice")
-                    .setMessage("Style: ${advice.style}\\nVocal profile: ${advice.vocalProfile}\\nTempo: ${suggestion.bpm} BPM\\nChords: ${suggestion.chords}\\n\\n${suggestion.guidance}\\n\\nThis creates editable original lyrics, not sung audio.")
+                    .setMessage("Style: ${advice.style}\
+Vocal profile: ${advice.vocalProfile}\
+Tempo: ${suggestion.bpm} BPM\
+Chords: ${suggestion.chords}\
+\
+${suggestion.guidance}\
+\
+This creates editable original lyrics, not sung audio.")
                     .setNegativeButton("Cancel", null)
                     .setNeutralButton("Style only") { _, _ ->
                         bpm.progress = suggestion.bpm - 60
@@ -330,7 +341,8 @@ class AiPulseStudioActivity : Activity() {
                             discoveryResult.text = result.fold(
                                 onSuccess = { matches ->
                                     if (matches.isEmpty()) "No cached matches. Online search requires a connection."
-                                    else matches.joinToString("\\n") { "${it.title} — ${it.artist}" }
+                                    else matches.joinToString("\
+") { "${it.title} — ${it.artist}" }
                                 },
                                 onFailure = { "Lookup unavailable: ${it.message}. Offline creation still works." }
                             )
@@ -364,7 +376,8 @@ class AiPulseStudioActivity : Activity() {
                 editedArrangement = plan
                 timelineView.plan = plan
                 duration.setText(AiPulseRenderDuration.secondsFor(plan).toString())
-                val summary = plan.segments.joinToString("\\n") {
+                val summary = plan.segments.joinToString("\
+") {
                     "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
                 AlertDialog.Builder(this@AiPulseStudioActivity)
@@ -721,12 +734,16 @@ class AiPulseStudioActivity : Activity() {
             text = "Generation history · chronological summary"
             setOnClickListener {
                 val events = memory.recent(15)
-                val history = events.joinToString("\n") {
+                val history = events.joinToString("
+") {
                     "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it.timestampMs))} · ${it.backendId} · ${it.outcome} · ${it.promptSummary}"
                 }
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("AI Pulse generation memory")
-                    .setMessage(memory.summary() + if (history.isEmpty()) "\nNo attempts recorded yet." else "\n\n" + history)
+                    .setMessage(memory.summary() + if (history.isEmpty()) "
+No attempts recorded yet." else "
+
+" + history)
                     .setPositiveButton("Close", null)
                     .setNeutralButton("Clear history") { _, _ ->
                         AlertDialog.Builder(this@AiPulseStudioActivity)
