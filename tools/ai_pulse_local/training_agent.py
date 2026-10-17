@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from ace_training_gate import prepare
+from checkpoint_evidence import verify_checkpoints
 
 
 def digest(path):
@@ -71,14 +72,19 @@ def run(spec, *, execute=False):
         completed = subprocess.run(command, cwd=plan["training"]["cwd"],
                                    stdout=stream, stderr=subprocess.STDOUT,
                                    check=False, timeout=spec.get("timeout_seconds", 86400))
+    checkpoint_report = verify_checkpoints(out) if completed.returncode == 0 else None
+    verified = bool(checkpoint_report and checkpoint_report["valid_checkpoints"])
     evidence = {
-        "status": "TRAINING_EXITED_ZERO_CHECKPOINT_UNVERIFIED" if completed.returncode == 0 else "TRAINING_FAILED",
+        "status": ("TRAINING_CHECKPOINT_STRUCTURE_VERIFIED_INFERENCE_UNVERIFIED" if verified
+                   else "TRAINING_NO_VERIFIED_CHECKPOINT" if completed.returncode == 0
+                   else "TRAINING_FAILED"),
         "returncode": completed.returncode,
         "elapsed_seconds": round(time.monotonic() - started, 2),
         "training_log_sha256": digest(log),
         "source_revision": revision,
         "dataset_manifest_sha256": dataset_hash,
-        "checkpoint_verified": False,
+        "checkpoint_verified": verified,
+        "checkpoint_evidence": checkpoint_report,
         "audio_generated": False,
         "android_verified": False,
     }
