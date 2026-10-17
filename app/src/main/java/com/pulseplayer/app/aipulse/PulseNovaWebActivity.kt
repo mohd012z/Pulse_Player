@@ -50,6 +50,8 @@ class PulseNovaWebActivity : Activity() {
         val payload = org.json.JSONObject().put("style", intent.getStringExtra("pulse_style_tags").orEmpty())
             .put("lyrics", intent.getStringExtra("pulse_lyrics").orEmpty())
             .put("enabled", intent.getBooleanExtra("pulse_lyric_mode", false))
+            .put("vocalPreview", intent.getBooleanExtra("pulse_vocal_preview", false))
+            .put("autoGenerate", intent.getBooleanExtra("pulse_auto_generate", false))
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (url == "https://appassets.androidplatform.net/assets/pulse_nova.html") {
