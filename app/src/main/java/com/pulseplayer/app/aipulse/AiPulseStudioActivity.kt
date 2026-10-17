@@ -33,6 +33,8 @@ class AiPulseStudioActivity : Activity() {
     private var voiceFile: File? = null
     private var recording = false
     private var importedVoiceWav: File? = null
+    private var recordButton: Button? = null
+    private var recordStatus: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -308,6 +310,8 @@ class AiPulseStudioActivity : Activity() {
         val voiceStatus = heading("No voice recording · recordings stay on device")
         val voiceButton = Button(this).apply { text = "Record voice" }
         root.addView(voiceButton)
+        recordButton = voiceButton
+        recordStatus = voiceStatus
         voiceButton.setOnClickListener {
             if (recording) {
                 runCatching { recorder?.stop() }.onSuccess {
@@ -844,12 +848,26 @@ class AiPulseStudioActivity : Activity() {
         }
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != 300) return
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            recordStatus?.text = "Microphone access granted. Tap Record voice to start."
+        } else {
+            recordStatus?.text = "Microphone access denied. Recording is disabled until permission is granted."
+        }
+    }
+
     override fun onStop() {
         if (recording) {
             runCatching { recorder?.stop() }.onFailure { voiceFile?.delete() }
             recorder?.release()
             recorder = null
             recording = false
+            recordButton?.text = "Record voice"
+            recordStatus?.text = if (voiceFile?.isFile == true) "Recording saved on device" else "Recording stopped"
         }
         super.onStop()
     }
