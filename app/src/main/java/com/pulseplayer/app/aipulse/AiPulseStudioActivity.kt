@@ -149,6 +149,38 @@ class AiPulseStudioActivity : Activity() {
                     .setPositiveButton("OK", null).show()
             }
         })
+        heading("Creative generation controls · independent engine")
+        val creativeMode = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item, listOf("Simple", "Advanced", "Speech"))
+        }
+        root.addView(creativeMode)
+        val styleInput = field("Style instructions (genre / instruments / mood)", "")
+        val excludedInput = field("Exclude instruments or traits", "")
+        val instrumentalOnly = android.widget.CheckBox(this).apply {
+            text = "Instrumental only (current offline renderer)"
+            setTextColor(Color.WHITE)
+            isChecked = true
+        }
+        root.addView(instrumentalOnly)
+        fun creativeSlider(label: String, initial: Int): SeekBar {
+            val value = heading("$label: $initial")
+            return SeekBar(this).apply {
+                max = 100
+                progress = initial
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        value.text = "$label: $progress"
+                    }
+                    override fun onStartTrackingTouch(bar: SeekBar?) {}
+                    override fun onStopTrackingTouch(bar: SeekBar?) {}
+                })
+                root.addView(this)
+            }
+        }
+        val weirdness = creativeSlider("Variation / weirdness", 50)
+        val styleInfluence = creativeSlider("Style influence", 50)
+        val creativeStatus = heading("Creative settings ready · backend support is validated before rendering")
         heading("Hybrid online/offline · reference discovery")
         heading("Online metadata search is optional. It does not download songs or train on results.")
         val discoveryQuery = field("Reference song or artist", "")
@@ -538,6 +570,32 @@ class AiPulseStudioActivity : Activity() {
         }
         create.setOnClickListener {
             if (working) return@setOnClickListener
+            val creativePlan = try {
+                AiPulseCreativeSettings.plan(AiPulseCreativeSettings.Settings(
+                    mode = AiPulseCreativeSettings.Mode.entries[creativeMode.selectedItemPosition],
+                    description = idea.text.toString(),
+                    lyrics = lyrics.text.toString(),
+                    style = styleInput.text.toString(),
+                    exclusions = excludedInput.text.toString(),
+                    instrumental = instrumentalOnly.isChecked,
+                    weirdness = weirdness.progress,
+                    styleInfluence = styleInfluence.progress,
+                    bpm = bpm.progress + 60,
+                    durationSeconds = duration.text.toString().toIntOrNull() ?: 16
+                ))
+            } catch (error: IllegalArgumentException) {
+                creativeStatus.text = "Creative settings error: ${error.message}"
+                return@setOnClickListener
+            }
+            if (creativePlan.task != AiPulseGenerationRouter.Task.INSTRUMENTAL) {
+                creativeStatus.text = "This offline renderer supports instrumental only. Vocal song and speech require a separate installed backend."
+                return@setOnClickListener
+            }
+            if (excludedInput.text.isNotBlank() || weirdness.progress != 50 || styleInfluence.progress != 50) {
+                creativeStatus.text = "Variation, style influence and exclusions are stored as guidance only; the procedural renderer does not yet apply them."
+            } else {
+                creativeStatus.text = "Using offline instrumental composer"
+            }
             val request = try {
                 AiPulseComposer.Request(
                     title = title.text.toString().trim(),
