@@ -72,6 +72,32 @@ class AiPulseStudioActivity : Activity() {
             minLines = 2
         }
         simple.addView(quickStyle)
+        simpleLabel("Recommended styles · offline presets")
+        val suggestions = listOf(
+            "Malay Pop Ballad · piano, warm pad, 78 bpm" to "pop, piano, warm pad, 78 bpm",
+            "Acoustic Love Song · guitar, mellow, 92 bpm" to "pop, acoustic guitar, mellow, 92 bpm",
+            "Pop Rock · electric guitar, energetic, 112 bpm" to "rock, electric guitar, energetic, 112 bpm",
+            "Ambient Chill · soft synth, atmospheric, 80 bpm" to "ambient, atmospheric, soft synth, 80 bpm",
+            "Upbeat Dance Pop · bright, 125 bpm" to "pop, dance, bright, 125 bpm"
+        )
+        val presetNames = suggestions.map { it.first }
+        val stylePicker = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item, presetNames)
+        }
+        simple.addView(stylePicker)
+        simple.addView(Button(this).apply {
+            text = "Use recommended style"
+            setOnClickListener {
+                quickStyle.setText(suggestions[stylePicker.selectedItemPosition].second)
+                Toast.makeText(this@AiPulseStudioActivity,
+                    "Preset selected · editable style tags", Toast.LENGTH_SHORT).show()
+            }
+        })
+        simple.addView(TextView(this).apply {
+            text = "Offline rule-based suggestions, not AI model recommendations. Tags influence genre and BPM; not every named instrument is synthesized."
+            setTextColor(Color.LTGRAY)
+        })
         simpleLabel("Lyrics")
         val quickLyrics = EditText(this).apply {
             hint = "[Verse 1] Write your lyrics here"
@@ -97,7 +123,7 @@ class AiPulseStudioActivity : Activity() {
             setTextColor(Color.LTGRAY)
         })
         simple.addView(Button(this).apply {
-            text = "Advanced Studio · Voice, Mixing & Tools"
+            text = "Record voice (M4A) · Advanced Studio"
             setOnClickListener { setContentView(scroller) }
         })
         setContentView(landing)
@@ -414,6 +440,21 @@ class AiPulseStudioActivity : Activity() {
             isChecked = false
         }
         root.addView(useRecordedVoice)
+        root.addView(Button(this).apply {
+            text = "Export latest recorded voice (.m4a)"
+            setOnClickListener {
+                val latest = voiceFile?.takeIf { it.isFile && it.length() > 0 }
+                if (latest == null) {
+                    Toast.makeText(this@AiPulseStudioActivity, "Record a voice first", Toast.LENGTH_SHORT).show()
+                } else {
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "audio/mp4"
+                        putExtra(Intent.EXTRA_TITLE, latest.name)
+                    }, 302)
+                }
+            }
+        })
         heading("Vocal mixing · optional PCM WAV")
         val importedVoiceStatus = heading(importedVoiceWav?.let { "Imported vocal: ${it.name}" }
             ?: "No imported WAV vocal. Microphone AAC/M4A can be decoded for mixing.")
@@ -950,6 +991,24 @@ class AiPulseStudioActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 302) {
+            if (resultCode == RESULT_OK) {
+                val destination = data?.data
+                val latest = voiceFile?.takeIf { it.isFile && it.length() > 0 }
+                if (destination != null && latest != null) {
+                    runCatching {
+                        contentResolver.openOutputStream(destination, "w")?.use { out ->
+                            latest.inputStream().use { it.copyTo(out) }
+                        } ?: error("Unable to open export destination")
+                    }.onSuccess {
+                        Toast.makeText(this, "M4A voice exported", Toast.LENGTH_LONG).show()
+                    }.onFailure {
+                        Toast.makeText(this, "Export failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            return
+        }
         if (requestCode != 301 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         val target = File(filesDir, AiPulseVoiceFiles.IMPORTED_WAV)
