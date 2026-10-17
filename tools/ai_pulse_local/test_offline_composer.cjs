@@ -40,3 +40,29 @@ for(const style of ['pop','ambient','rock']){
  assert.ok(energy>0,'nonzero signal energy');
 }
 console.log('PASS: all three styles have valid RIFF/PCM metadata and non-silent samples');
+
+function magic(dv,offset){return String.fromCharCode(...Array.from({length:4},(_,i)=>dv.getUint8(offset+i)));}
+function verifyWav(buffer,frames){
+ const dv=new DataView(buffer);
+ assert.equal(magic(dv,0),'RIFF');
+ assert.equal(magic(dv,8),'WAVE');
+ assert.equal(magic(dv,12),'fmt ');
+ assert.equal(magic(dv,36),'data');
+ assert.equal(dv.getUint32(4,true),buffer.byteLength-8);
+ assert.equal(dv.getUint32(16,true),16);
+ assert.equal(dv.getUint16(20,true),1);
+ assert.equal(dv.getUint16(22,true),1);
+ assert.equal(dv.getUint32(24,true),22050);
+ assert.equal(dv.getUint32(28,true),44100);
+ assert.equal(dv.getUint16(32,true),2);
+ assert.equal(dv.getUint16(34,true),16);
+ assert.equal(dv.getUint32(40,true),frames*2);
+ assert.equal(buffer.byteLength,44+frames*2);
+}
+const oneSecond=vm.runInContext('wavBytes(new Float32Array(22050))',ctx);
+verifyWav(oneSecond,22050);
+for(const style of ['pop','ambient','rock']){
+ const output=vm.runInContext('compose({style:'+JSON.stringify(style)+',bpm:120,bars:2,seed:123})',ctx,{timeout:10000});
+ verifyWav(output,88200);
+}
+console.log('PASS: real wavBytes() produces exact one-second PCM payload and valid RIFF/WAVE/fmt/data magic bytes');
