@@ -778,6 +778,9 @@ class AiPulseStudioActivity : Activity() {
                     temporary.outputStream().use { destination -> source.copyTo(destination) }
                 } ?: error("Unable to open the selected recording")
                 require(temporary.length() in 44..(64L * 1024 * 1024)) { "Vocal must be a WAV below 64 MB" }
+                val checked = AiPulseGeneratedAudioVerifier.inspect(temporary)
+                require(checked.valid) { "Invalid vocal WAV: ${checked.reason}" }
+                require(checked.sampleRateHz in 8000L..192000L && checked.channels in 1..2) { "Vocal must be mono/stereo PCM WAV" }
                 if (!temporary.renameTo(target)) {
                     temporary.copyTo(target, overwrite = true)
                     temporary.delete()
@@ -791,6 +794,8 @@ class AiPulseStudioActivity : Activity() {
     }
 
     private fun saveToMusic(input: File, title: String): String {
+        val verified = AiPulseGeneratedAudioVerifier.inspect(input)
+        require(verified.valid) { "Refusing invalid WAV export: ${verified.reason}" }
         val safe = title.replace(Regex("[^a-zA-Z0-9 _-]"), "_").take(60).ifBlank { "Pulse" }
         val name = "${safe}-${System.currentTimeMillis()}.wav"
         // RELATIVE_PATH and IS_PENDING require Android 10. On Android 8–9,
@@ -805,6 +810,7 @@ class AiPulseStudioActivity : Activity() {
             try {
                 input.copyTo(target, overwrite = false)
                 require(target.length() == input.length()) { "Incomplete WAV export" }
+                require(AiPulseGeneratedAudioVerifier.inspect(target).valid) { "Corrupt WAV export" }
                 MediaScannerConnection.scanFile(applicationContext,
                     arrayOf(target.absolutePath), arrayOf("audio/wav"), null)
                 return target.absolutePath
@@ -825,6 +831,9 @@ class AiPulseStudioActivity : Activity() {
         try {
             resolver.openOutputStream(uri)?.use { out -> input.inputStream().use { it.copyTo(out) } }
                 ?: throw IllegalStateException("Unable to open output")
+            val exportedSize = resolver.openFileDescriptor(uri, "r")?.use { it.statSize }
+                ?: throw IllegalStateException("Unable to verify exported media")
+            require(exportedSize == input.length()) { "Incomplete MediaStore WAV export" }
             values.clear()
             values.put(MediaStore.Audio.Media.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
