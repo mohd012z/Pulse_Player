@@ -893,7 +893,22 @@ class MainActivity : Activity() {
         titleView.text = media?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
             ?: "Choose a track"
         artistView.text = media?.mediaMetadata?.artist?.toString()?.takeIf { it.isNotBlank() }
-            ?: "Local audio • ExoPlayer"
+            ?: if (source == "RADIO" || source == "MY RADIO") "Internet radio · Live" else "Local audio · Media3"
+        val mediaUri = media?.localConfiguration?.uri
+        val path = mediaUri?.path.orEmpty().lowercase(Locale.US)
+        val kind = when {
+            source == "RADIO" || source == "MY RADIO" -> "Internet radio"
+            path.endsWith(".flac") -> "FLAC"
+            path.endsWith(".wav") -> "WAV"
+            path.endsWith(".mp3") -> "MP3"
+            path.endsWith(".m4a") || path.endsWith(".aac") -> "AAC/M4A"
+            path.endsWith(".ogg") || path.endsWith(".opus") -> "Ogg/Opus"
+            else -> "Audio · format unknown"
+        }
+        val mode = if (c?.isCurrentMediaItemLive == true) "LIVE" else if (c?.isPlaying == true) "Playing" else "Paused"
+        val frequency = if ((source == "RADIO" || source == "MY RADIO") &&
+            media?.mediaMetadata?.title?.toString()?.contains("BFM 89.9") == true) " · 89.9 MHz (FM station)" else ""
+        artistView.text = "${artistView.text} · $kind · $mode$frequency"
         playButton.text = if (c?.isPlaying == true) "Ⅱ" else "▶"
         val duration = c?.duration ?: C.TIME_UNSET
         val current = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
