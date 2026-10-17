@@ -80,6 +80,9 @@ class MainActivity : Activity() {
     private var lyricLines: List<TimedLyrics.Line> = emptyList()
     private var lyricGeneration = 0
     private var spectrumView: SpectrumView? = null
+    private var waveformDock: LinearLayout? = null
+    private var activeSpectrumSession = -1
+    private var spectrumRequestPending = false
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -120,6 +123,9 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
+            if (controller?.isPlaying == true &&
+                spectrumPreferences().getBoolean("enabled", false) &&
+                spectrumView == null && !spectrumRequestPending) showSpectrum()
             clock.postDelayed(this, 750L)
         }
     }
@@ -142,7 +148,7 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
-        spectrumView?.stop()
+        stopSpectrum()
         clock.removeCallbacks(ticker)
         controller?.removeListener(playerListener)
         controller = null
@@ -153,7 +159,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         lyricGeneration++
-        spectrumView?.stop()
+        stopSpectrum()
         scanGeneration++
         folderScanGeneration++
         super.onDestroy()
@@ -612,73 +618,66 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancel", null).show()
     }
 
+    private fun spectrumPreferences() = getSharedPreferences("spectrum_ui", MODE_PRIVATE)
+
     private fun requestSpectrum() {
+        if (spectrumView != null) {
+            spectrumPreferences().edit().putBoolean("enabled", false).apply()
+            stopSpectrum()
+            status("Live waveform hidden")
+            return
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
-                .setTitle("Optional live audio visualizer")
-                .setMessage("Android requires audio-capture permission for FFT visualization. PulsePlayer uses this only to display the current song spectrum, does not record sound to disk, and stops capture when closed.")
+                .setTitle("Enable live pixel-water spectrum")
+                .setMessage("Android requires optional audio-capture permission to visualize playback. No captured sound is stored. Tap the spectrum control to disable it.")
                 .setPositiveButton("Allow") { _, _ ->
                     requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_SPECTRUM_PERMISSION)
                 }
                 .setNegativeButton("Cancel", null).show()
-        } else showSpectrum()
+        } else {
+            spectrumPreferences().edit().putBoolean("enabled", true).apply()
+            showSpectrum()
+        }
+    }
+
+    private fun stopSpectrum() {
+        spectrumView?.stop()
+        spectrumView = null
+        activeSpectrumSession = -1
+        waveformDock?.removeAllViews()
+        waveformDock?.visibility = android.view.View.GONE
     }
 
     private fun showSpectrum() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (spectrumRequestPending || controller?.isPlaying != true) {
+            status("Play a song to display the live pixel-water spectrum")
+            return
+        }
+        spectrumRequestPending = true
         customCommand(PlaybackService.CMD_STATUS) { extras, success ->
-            if (!success || isFinishing || isDestroyed) return@customCommand
+            spectrumRequestPending = false
+            if (!success || isFinishing || isDestroyed ||
+                controller?.isPlaying != true ||
+                !spectrumPreferences().getBoolean("enabled", false)) return@customCommand
             val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
             if (sessionId <= 0) {
-                status("Start playback before opening the audio spectrum")
+                status("Playback route does not expose a visualizer session")
                 return@customCommand
             }
-            spectrumView?.stop()
-            val view = SpectrumView(this).apply {
-                setBackgroundColor(COLOR_BG)
-                minimumHeight = dp(240)
-            }
+            if (spectrumView != null && activeSpectrumSession == sessionId) return@customCommand
+            val dock = waveformDock ?: return@customCommand
+            stopSpectrum()
+            val view = SpectrumView(this).apply { setBackgroundColor(COLOR_PANEL) }
             if (!view.start(sessionId)) {
-                status("Audio spectrum unsupported on this playback route")
+                status("Pixel-water spectrum unavailable on this audio output")
                 return@customCommand
             }
             spectrumView = view
-            val wrapper = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(8), dp(6), dp(8), dp(6))
-                setBackgroundColor(COLOR_BG)
-            }
-            val modes = arrayOf("Spectrum Bars", "Spectrum Wave", "Spectrum Orbit")
-            val switch = button("Visual preset: ${modes[view.mode.ordinal]}") {
-                val next = (view.mode.ordinal + 1) % SpectrumView.Mode.entries.size
-                view.mode = SpectrumView.Mode.entries[next]
-                getSharedPreferences("spectrum_ui", MODE_PRIVATE).edit()
-                    .putInt("mode", next).apply()
-                status("Live spectrum: ${modes[next]}")
-            }
-            val previous = getSharedPreferences("spectrum_ui", MODE_PRIVATE)
-                .getInt("mode", 0).coerceIn(0, SpectrumView.Mode.entries.lastIndex)
-            view.mode = SpectrumView.Mode.entries[previous]
-            switch.text = "Visual preset: ${modes[previous]}"
-            switch.setOnClickListener {
-                val next = (view.mode.ordinal + 1) % SpectrumView.Mode.entries.size
-                view.mode = SpectrumView.Mode.entries[next]
-                switch.text = "Visual preset: ${modes[next]}"
-                getSharedPreferences("spectrum_ui", MODE_PRIVATE).edit()
-                    .putInt("mode", next).apply()
-            }
-            wrapper.addView(switch, LinearLayout.LayoutParams(-1, dp(44)))
-            wrapper.addView(view, LinearLayout.LayoutParams(-1, dp(240)))
-            AlertDialog.Builder(this)
-                .setTitle("Live music spectrum · FFT (audio reactive)")
-                .setView(wrapper)
-                .setPositiveButton("Close", null)
-                .create().also { dialog ->
-                    dialog.setOnDismissListener {
-                        view.stop()
-                        if (spectrumView === view) spectrumView = null
-                    }
-                    dialog.show()
-                }
+            activeSpectrumSession = sessionId
+            dock.addView(view, LinearLayout.LayoutParams(-1, dp(88)))
+            dock.visibility = android.view.View.VISIBLE
         }
     }
 
@@ -1155,6 +1154,13 @@ class MainActivity : Activity() {
             background = panelBackground()
         }
         root.addView(dock)
+        val waveformRow = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
+        }
+        waveformDock = waveformRow
+        dock.addView(waveformRow, LinearLayout.LayoutParams(-1,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
