@@ -128,6 +128,20 @@ class AiPulseStudioActivity : Activity() {
                 else -> "pop, acoustic guitar, warm pad, 100 bpm" to "Suggested: acoustic pop"
             }
         }
+        val ideaSuggestions = listOf(
+            "Lagu tentang rindu dan kehilangan",
+            "Lagu semangat mengejar impian",
+            "Lagu tenang tentang alam dan kedamaian",
+            "Lagu gembira meraikan persahabatan"
+        )
+        var nextIdea = 0
+        simple.addView(Button(this).apply {
+            text = "AI PULSE · Suggest song idea"
+            setOnClickListener {
+                quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
+                nextIdea++
+            }
+        })
         val suggestionStatus = TextView(this).apply {
             text = "Auto Style can suggest genre and BPM from your idea or lyrics."
             setTextColor(Color.LTGRAY)
@@ -141,6 +155,14 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         simple.addView(suggestionStatus)
+        simple.addView(Button(this).apply {
+            text = "AI PULSE · Suggest style & mood"
+            setOnClickListener {
+                val (tags, description) = suggestStyle()
+                quickStyle.setText(tags)
+                suggestionStatus.text = description + " · editable"
+            }
+        })
         val quickVocalPreview = android.widget.CheckBox(this).apply {
             text = "Include experimental vocal tones in preview"
             setTextColor(Color.WHITE)
@@ -162,6 +184,20 @@ class AiPulseStudioActivity : Activity() {
             })
         }
         simpleLabel("3 · Preview & generate")
+        simple.addView(Button(this).apply {
+            text = "AI PULSE · Suggest & Generate"
+            setOnClickListener {
+                if (quickIdea.text.isBlank() && quickLyrics.text.isBlank()) {
+                    quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
+                    nextIdea++
+                }
+                val (tags, description) = suggestStyle()
+                quickStyle.setText(tags)
+                suggestionStatus.text = description
+                openComposer(true)
+            }
+        })
+
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         actions.addView(Button(this).apply {
             text = "PREVIEW"
