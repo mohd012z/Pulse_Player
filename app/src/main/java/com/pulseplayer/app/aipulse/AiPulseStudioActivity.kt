@@ -139,36 +139,6 @@ class AiPulseStudioActivity : Activity() {
                     .setPositiveButton("OK", null).show()
             }
         })
-        root.addView(Button(this).apply {
-            text = "Save editable project"
-            setOnClickListener {
-                runCatching {
-                    val project = AiPulseProject(title.text.toString().trim(), idea.text.toString(),
-                        genre.selectedItem.toString(), language.selectedItem.toString(),
-                        mood.text.toString(), instruments.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                        lyrics.text.toString(), bpm.progress + 60)
-                    val file = File(filesDir, "ai_pulse_project.json")
-                    file.writeText(project.toJson())
-                    Toast.makeText(this@AiPulseStudioActivity, "Project saved locally", Toast.LENGTH_SHORT).show()
-                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
-            }
-        })
-        root.addView(Button(this).apply {
-            text = "Load saved project"
-            setOnClickListener {
-                runCatching {
-                    val project = AiPulseProject.fromJson(File(filesDir, "ai_pulse_project.json").readText())
-                    title.setText(project.title)
-                    idea.setText(project.idea)
-                    mood.setText(project.mood)
-                    lyrics.setText(project.lyrics)
-                    instruments.setText(project.instruments.joinToString(", "))
-                    bpm.progress = project.bpm - 60
-                    (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
-                    (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
-                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
-            }
-        })
         heading("Hybrid online/offline · reference discovery")
         heading("Online metadata search is optional. It does not download songs or train on results.")
         val discoveryQuery = field("Reference song or artist", "")
@@ -404,6 +374,57 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure {
                     Toast.makeText(this@AiPulseStudioActivity, "Load failed: ${it.message}", Toast.LENGTH_LONG).show()
                 }
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Save editable project"
+            setOnClickListener {
+                runCatching {
+                    val project = AiPulseProject(title.text.toString().trim(), idea.text.toString(),
+                        genre.selectedItem.toString(), language.selectedItem.toString(),
+                        mood.text.toString(), instruments.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        lyrics.text.toString(), bpm.progress + 60,
+                        AiPulseMixPreset(
+                            lead = leadLevel.progress, bass = bassLevel.progress,
+                            pad = padLevel.progress, drums = drumsLevel.progress,
+                            muteLead = muteLead.isChecked, muteBass = muteBass.isChecked,
+                            mutePad = mutePad.isChecked, muteDrums = muteDrums.isChecked,
+                            solo = AiPulseTrackMixer.Track.entries[soloTrack.selectedItemPosition],
+                            musicGain = instrumentalGain.progress, vocalGain = recordedVoiceGain.progress,
+                            vocalDelayMs = vocalDelay.text.toString().toIntOrNull()
+                                ?: error("Invalid vocal delay"),
+                            exportStems = exportStems.isChecked
+                        ))
+                    val file = File(filesDir, "ai_pulse_project.json")
+                    file.writeText(project.toJson())
+                    Toast.makeText(this@AiPulseStudioActivity, "Project saved locally", Toast.LENGTH_SHORT).show()
+                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Load saved project"
+            setOnClickListener {
+                runCatching {
+                    val project = AiPulseProject.fromJson(File(filesDir, "ai_pulse_project.json").readText())
+                    title.setText(project.title)
+                    idea.setText(project.idea)
+                    mood.setText(project.mood)
+                    lyrics.setText(project.lyrics)
+                    instruments.setText(project.instruments.joinToString(", "))
+                    bpm.progress = project.bpm - 60
+                    val p = project.mixer
+                    leadLevel.progress = p.lead; bassLevel.progress = p.bass
+                    padLevel.progress = p.pad; drumsLevel.progress = p.drums
+                    muteLead.isChecked = p.muteLead; muteBass.isChecked = p.muteBass
+                    mutePad.isChecked = p.mutePad; muteDrums.isChecked = p.muteDrums
+                    soloTrack.setSelection(p.solo.ordinal)
+                    instrumentalGain.progress = p.musicGain
+                    recordedVoiceGain.progress = p.vocalGain
+                    vocalDelay.setText(p.vocalDelayMs.toString())
+                    exportStems.isChecked = p.exportStems
+                    (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
+                    (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
+                }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
             }
         })
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
