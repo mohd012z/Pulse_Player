@@ -58,18 +58,6 @@ class PulsePcmProcessor : BaseAudioProcessor() {
                     compress = dynamicsEnabled, limit = safetyLimiterEnabled)
             }
             for (sample in pcm) {
-                    val magnitude = kotlin.math.abs(sample.toInt())
-                    if (magnitude > peak) peak = magnitude
-                }
-                val target = kotlin.math.min(1f, 30000f / peak)
-                limiterGain = if (target < limiterGain) target
-                    else limiterGain + (target - limiterGain) * 0.015f
-                for (i in pcm.indices) {
-                    pcm[i] = (pcm[i].toInt() * limiterGain).toInt()
-                        .coerceIn(-30000, 30000).toShort()
-                }
-            }
-            for (sample in pcm) {
                 output.put((sample.toInt() and 255).toByte())
                 output.put(((sample.toInt() ushr 8) and 255).toByte())
             }
