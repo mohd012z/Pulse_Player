@@ -5,7 +5,7 @@ const html=fs.readFileSync(__dirname+'/pulse_nova_android_offline.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert.ok(match,'embedded offline synthesizer script exists');
 const elements={};
-const document={getElementById(id){return elements[id]??(elements[id]={value:'42',disabled:true,textContent:'',src:'',play:()=>Promise.resolve()});},createElement(){return {click(){}}}};
+const document={getElementById(id){return elements[id]??(elements[id]={value:'42',disabled:true,textContent:'',src:'',addEventListener(){},play:()=>Promise.resolve()});},createElement(){return {click(){}}}};
 const ctx=vm.createContext({document,console,Blob,URL,Math,ArrayBuffer,DataView,Float32Array,Number,Error});
 vm.runInContext(match[1],ctx,{timeout:1000});
 const render=vm.runInContext('compose({style:"pop",bpm:108,bars:4,seed:42})',ctx,{timeout:10000});
