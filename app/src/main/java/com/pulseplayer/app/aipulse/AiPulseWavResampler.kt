@@ -67,11 +67,24 @@ object AiPulseWavResampler {
                     u16(format.channels * 2); u16(16)
                     result.write("data".toByteArray(Charsets.US_ASCII)); u32(payload)
 
+                    // Cache contiguous input frames to avoid a seek for every sinc tap.
+                    val blockFrames = 4096
+                    var cachedStart = -1L
+                    var cachedCount = 0
+                    val cache = ByteArray(blockFrames * format.channels * 2)
                     fun frame(index: Long): IntArray {
                         val pos = index.coerceIn(0, format.frames - 1)
-                        source.seek(44 + pos * format.channels * 2)
-                        return IntArray(format.channels) {
-                            (source.readUnsignedByte() or (source.readUnsignedByte() shl 8)).toShort().toInt()
+                        if (cachedStart < 0 || pos < cachedStart || pos >= cachedStart + cachedCount) {
+                            cachedStart = (pos / blockFrames) * blockFrames
+                            cachedCount = min(blockFrames.toLong(), format.frames - cachedStart).toInt()
+                            source.seek(44 + cachedStart * format.channels * 2)
+                            source.readFully(cache, 0, cachedCount * format.channels * 2)
+                        }
+                        val offset = ((pos - cachedStart) * format.channels * 2).toInt()
+                        return IntArray(format.channels) { channel ->
+                            val j = offset + channel * 2
+                            ((cache[j].toInt() and 255) or
+                                ((cache[j + 1].toInt() and 255) shl 8)).toShort().toInt()
                         }
                     }
                     var lastIndex = -1L
