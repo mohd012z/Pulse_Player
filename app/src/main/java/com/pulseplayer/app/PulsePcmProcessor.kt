@@ -18,7 +18,8 @@ class PulsePcmProcessor : BaseAudioProcessor() {
     @Volatile var bassDb: Float = 0f
     @Volatile var clarityDb: Float = 0f
     @Volatile var safetyLimiterEnabled: Boolean = false
-    private var limiterGain = 1.0f
+    @Volatile var dynamicsEnabled: Boolean = false
+    private var dynamics: StereoDynamics? = null
     private var nativeHandle: Long = 0L
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -29,20 +30,20 @@ class PulsePcmProcessor : BaseAudioProcessor() {
 
     override fun onFlush() {
         releaseNative()
-        limiterGain = 1.0f
+        dynamics = inputAudioFormat.sampleRate.takeIf { it in 8000..384000 }?.let(::StereoDynamics)
         if (inputAudioFormat.sampleRate > 0) {
             nativeHandle = runCatching { nativeCreate(inputAudioFormat.sampleRate.toDouble()) }.getOrDefault(0L)
         }
     }
 
-    override fun onReset() { releaseNative(); limiterGain = 1.0f }
+    override fun onReset() { releaseNative(); dynamics = null }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val bytes = inputBuffer.remaining()
         if (bytes == 0) return
         val output = replaceOutputBuffer(bytes)
         // The input is normally frame-aligned; copy unaligned tails unchanged.
-        if ((!enabled || nativeHandle == 0L) && !safetyLimiterEnabled) {
+        if ((!enabled || nativeHandle == 0L) && !safetyLimiterEnabled && !dynamicsEnabled) {
             output.put(inputBuffer)
         } else {
             val sampleCount = bytes / 2
@@ -52,10 +53,11 @@ class PulsePcmProcessor : BaseAudioProcessor() {
             if (enabled && nativeHandle != 0L && sampleCount >= 2) {
                 nativeProcess(nativeHandle, pcm, sampleCount / 2, bassDb, clarityDb)
             }
-            if (safetyLimiterEnabled && sampleCount > 0) {
-                // Linked-channel peak attenuation; cannot repair pre-existing clipping.
-                var peak = 1
-                for (sample in pcm) {
+            if ((safetyLimiterEnabled || dynamicsEnabled) && sampleCount >= 2) {
+                dynamics?.process(pcm, sampleCount - sampleCount % 2,
+                    compress = dynamicsEnabled, limit = safetyLimiterEnabled)
+            }
+            for (sample in pcm) {
                     val magnitude = kotlin.math.abs(sample.toInt())
                     if (magnitude > peak) peak = magnitude
                 }
