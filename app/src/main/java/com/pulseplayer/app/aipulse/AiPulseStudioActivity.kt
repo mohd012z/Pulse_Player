@@ -225,7 +225,8 @@ class AiPulseStudioActivity : Activity() {
                     .setTitle("Select section to edit")
                     .setItems(descriptions) { _, index ->
                         val actions = arrayOf("Move earlier", "Move later", "Add 4 bars",
-                            "Remove 4 bars", "Change section type", "Quieter (-10%)", "Louder (+10%)")
+                            "Remove 4 bars", "Change section type", "Quieter (-10%)",
+                            "Louder (+10%)", "Insert chorus after", "Remove section")
                         AlertDialog.Builder(this@AiPulseStudioActivity)
                             .setTitle("Edit ${plan.segments[index].section}")
                             .setItems(actions) { _, action ->
@@ -243,8 +244,10 @@ class AiPulseStudioActivity : Activity() {
                                         }
                                         5 -> AiPulseArrangementEditor.update(plan, index,
                                             energy = (segment.energy - 0.10).coerceAtLeast(0.0))
-                                        else -> AiPulseArrangementEditor.update(plan, index,
+                                        6 -> AiPulseArrangementEditor.update(plan, index,
                                             energy = (segment.energy + 0.10).coerceAtMost(1.0))
+                                        7 -> AiPulseArrangementEditor.insert(plan, index)
+                                        else -> AiPulseArrangementEditor.remove(plan, index)
                                     }
                                     val updated = requireNotNull(editedArrangement)
                                     timelineView.plan = updated
