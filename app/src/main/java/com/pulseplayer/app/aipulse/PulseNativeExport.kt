@@ -133,6 +133,7 @@ class PulseNativeExport(private val context: Context, private val requestLegacyS
                             val name = data.optString("fileName", "PulseNova")
                             if (android.os.Build.VERSION.SDK_INT < 29) {
                                 legacyPending = true
+                                generation++ // Invalidate pending transfer timeout while SAF picker is open
                                 deadline = 0
                                 main.post { if (!closed) requestLegacySave(name) }
                                 return@execute
