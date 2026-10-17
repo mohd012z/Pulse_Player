@@ -235,6 +235,16 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Returning from Studio or Files automatically refreshes newly created/deleted tracks.
+        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO
+            else Manifest.permission.READ_EXTERNAL_STORAGE
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            scanLibrary()
+        }
+    }
+
     private fun scanLibrary() {
         if (scanning) return
         scanning = true
