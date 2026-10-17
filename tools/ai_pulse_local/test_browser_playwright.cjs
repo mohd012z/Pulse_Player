@@ -84,20 +84,14 @@ async function main() {
       await phone.locator("#generate").tap();
       await phone.waitForFunction(() => document.querySelector("#status").textContent.includes("WAV ready"), null, { timeout: 15000 });
       await phone.waitForFunction(() => document.querySelector("#player").readyState >= 1, null, { timeout: 15000 });
-      const playback = await phone.locator("#play").evaluate(async button => {
-        button.click();
+      await phone.locator("#play").tap();
+      await phone.waitForFunction(() => {
         const audio = document.querySelector("#player");
-        try {
-          await new Promise((resolve, reject) => {
-            if (!audio.paused) return resolve();
-            audio.addEventListener("playing", resolve, { once: true });
-            audio.addEventListener("error", () => reject(Error("audio error")), { once: true });
-            setTimeout(() => reject(Error("playback did not start")), 8000);
-          });
-          return { paused: audio.paused, error: audio.error?.code ?? null };
-        } catch (e) { return { failed: e.message }; }
-      });
-      assert.equal(playback.failed, undefined, "Mobile-emulated user-initiated playback failed");
+        return !audio.paused && audio.error === null;
+      }, null, { timeout: 10000 });
+      const playback = await phone.locator("#player").evaluate(audio => ({
+        paused: audio.paused, error: audio.error?.code ?? null
+      }));
       assert.equal(playback.paused, false);
       assert.equal(playback.error, null);
       const mobileDownload = phone.waitForEvent("download", { timeout: 15000 });
