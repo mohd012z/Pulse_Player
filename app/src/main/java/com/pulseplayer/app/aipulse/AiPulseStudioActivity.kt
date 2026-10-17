@@ -673,6 +673,26 @@ class AiPulseStudioActivity : Activity() {
     private fun saveToMusic(input: File, title: String): String {
         val safe = title.replace(Regex("[^a-zA-Z0-9 _-]"), "_").take(60).ifBlank { "Pulse" }
         val name = "${safe}-${System.currentTimeMillis()}.wav"
+        // RELATIVE_PATH and IS_PENDING require Android 10. On Android 8–9,
+        // use app-specific external Music storage without broad storage access.
+        // This location is private to the app and removed on uninstall.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val music = getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                ?: throw IllegalStateException("External Music storage unavailable")
+            val folder = File(music, "AI Pulse")
+            require(folder.isDirectory || folder.mkdirs()) { "Cannot create Music export directory" }
+            val target = File(folder, name)
+            try {
+                input.copyTo(target, overwrite = false)
+                require(target.length() == input.length()) { "Incomplete WAV export" }
+                MediaScannerConnection.scanFile(applicationContext,
+                    arrayOf(target.absolutePath), arrayOf("audio/wav"), null)
+                return target.absolutePath
+            } catch (error: Exception) {
+                target.delete()
+                throw error
+            }
+        }
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, name)
             put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
