@@ -49,7 +49,12 @@ class OnlineMediaActivity : Activity() {
             "Radio Malaysia (RTM)" to "https://radio.rtm.gov.my/"
         )
         val name = intent.getStringExtra("provider").orEmpty()
-        val url = providers[name] ?: run { finish(); return }
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val url = when (name) {
+            "YouTube Movies" -> "https://www.youtube.com/results?search_query=$year+new+full+movies+official"
+            "Public Domain Movies" -> "https://www.youtube.com/results?search_query=$year+public+domain+movies+new+uploads"
+            else -> providers[name]
+        } ?: run { finish(); return }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF10141F.toInt())
