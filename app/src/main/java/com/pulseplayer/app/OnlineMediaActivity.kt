@@ -1,12 +1,12 @@
 package com.pulseplayer.app
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.content.pm.ActivityInfo
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.net.Uri
 import android.os.Bundle
@@ -30,6 +30,8 @@ class OnlineMediaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Dedicated browser screen: avoid OEM edge-to-edge status icons obscuring controls.
+        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
             "YouTube" to "https://www.youtube.com/",
             "YouTube Music" to "https://music.youtube.com/",
@@ -117,12 +119,13 @@ class OnlineMediaActivity : Activity() {
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        AlertDialog.Builder(this)
-            .setTitle("Official $name website")
-            .setMessage("This service will open inside Pulse Player. Some playback, login or protected content may require its official app or browser.")
-            .setPositiveButton("Continue") { _, _ -> web.loadUrl(url) }
-            .setNegativeButton("Cancel") { _, _ -> finish() }
-            .show()
+        // Open embedded content directly; do not interrupt every launch with a warning dialog.
+        if (savedInstanceState == null) web.loadUrl(url) else web.restoreState(savedInstanceState)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        browser?.saveState(outState)
+        super.onSaveInstanceState(outState)
     }
 
     private fun exitFullscreen() {
