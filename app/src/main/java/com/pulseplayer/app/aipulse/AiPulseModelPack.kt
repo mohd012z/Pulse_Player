@@ -11,6 +11,7 @@ internal data class AiPulseModelPack(
     val consent: String,
     val language: String,
     val sampleRate: Int,
+    val frameRate: Int,
     val acoustic: File,
     val acousticSha256: String,
     val vocoder: File,
@@ -43,6 +44,8 @@ internal data class AiPulseModelPack(
             }
             val rate = json.optInt("sample_rate")
             require(rate in 8000..192000) { "Invalid sample rate" }
+            val frameRate = json.optInt("frame_rate", 100)
+            require(frameRate in 20..1000) { "Invalid frame rate" }
             val acoustic = model("acoustic")
             val vocoder = model("vocoder")
             val acousticHash = required("acoustic_sha256")
@@ -50,7 +53,7 @@ internal data class AiPulseModelPack(
             verify(acoustic, acousticHash)
             verify(vocoder, vocoderHash)
             return AiPulseModelPack(required("name"), license, consent,
-                required("language"), rate, acoustic, acousticHash, vocoder, vocoderHash)
+                required("language"), rate, frameRate, acoustic, acousticHash, vocoder, vocoderHash)
         }
 
         private fun verify(file: File, expected: String) {
