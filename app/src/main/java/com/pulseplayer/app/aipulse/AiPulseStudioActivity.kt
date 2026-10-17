@@ -114,85 +114,6 @@ class AiPulseStudioActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
         }
         simple.addView(quickLyrics)
-        fun suggestLyricsFromKeywords(): String {
-            val words = quickIdea.text.toString().trim().lowercase()
-            return when {
-                listOf("rindu", "kehilangan", "sedih", "miss", "lonely", "heartbreak").any { it in words } ->
-                    """[Verse 1]
-Di hujung malam ku terkenang
-Suara yang jauh masih terbayang
-Walau jarak memisahkan langkah
-Kenangan kita tetap bercahaya
-
-[Chorus]
-Rindu ini kubawa pulang
-Dalam doa yang tidak pernah hilang
-Biar waktu terus berlalu
-Ada harapan menunggu di situ""".trimIndent()
-                listOf("semangat", "impian", "berani", "power", "fight", "dream").any { it in words } ->
-                    """[Verse 1]
-Hari baru membuka jalan
-Kukumpul kuat dalam genggaman
-Walau langkah pernah terhenti
-Aku bangkit sekali lagi
-
-[Chorus]
-Terus melangkah, jangan menyerah
-Impian besar bermula di sini
-Dengan harapan dan usaha
-Kita mampu menggapai cahaya""".trimIndent()
-                listOf("tenang", "alam", "damai", "peace", "calm", "relax").any { it in words } ->
-                    """[Verse 1]
-Angin lembut menyapa pagi
-Cahaya turun ke bumi
-Di antara langit dan laut
-Hatiku kembali teduh
-
-[Chorus]
-Tenanglah jiwa, dengar dunia
-Setiap nafas membawa cerita
-Dalam sunyi kutemui arah
-Damai hadir perlahan-lahan""".trimIndent()
-                listOf("gembira", "sahabat", "happy", "friend", "party", "dance").any { it in words } ->
-                    """[Verse 1]
-Langkah kecil jadi kenangan
-Kita ketawa sepanjang jalan
-Hari cerah penuh cerita
-Bersama kita rasa bahagia
-
-[Chorus]
-Ayuh bernyanyi, raikan hari
-Sahabat sejati di sisi
-Walau musim silih berganti
-Cerita kita tetap berseri""".trimIndent()
-                else ->
-                    """[Verse 1]
-Hari ini kisah bermula
-Satu langkah membuka cerita
-Kucari makna di setiap waktu
-Dengan harapan yang baru
-
-[Chorus]
-Biar lagu ini bersuara
-Membawa mimpi dan cita
-Setiap detik jadi cerita
-Kita terus melangkah bersama""".trimIndent()
-            }
-        }
-        simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest lyrics from keywords"
-            setOnClickListener {
-                val proposed = suggestLyricsFromKeywords()
-                if (quickLyrics.text.isNotBlank()) {
-                    AlertDialog.Builder(this@AiPulseStudioActivity)
-                        .setTitle("Replace existing lyrics?")
-                        .setMessage("AI Pulse will replace the lyrics you entered with a keyword-based draft.")
-                        .setNegativeButton("Cancel", null)
-                        .setPositiveButton("Replace") { _, _ -> quickLyrics.setText(proposed) }
-                        .show()
-                } else quickLyrics.setText(proposed)
-            }
-        })
         simpleLabel("2 · Style & mood")
         val quickStyle = EditText(this).apply {
             hint = "Pop rock, acoustic guitar, 110 bpm"
@@ -237,36 +158,6 @@ Kita terus melangkah bersama""".trimIndent()
                 else -> "pop, acoustic guitar, warm pad, 100 bpm" to "Suggested: acoustic pop"
             }
         }
-        val ideaSuggestions = listOf(
-            "Lagu tentang rindu dan kehilangan",
-            "Lagu semangat mengejar impian",
-            "Lagu tenang tentang alam dan kedamaian",
-            "Lagu gembira meraikan persahabatan"
-        )
-        var nextIdea = 0
-        var generateFromSection: () -> Unit = {}
-        simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest idea & generate"
-            setOnClickListener {
-                quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
-                nextIdea++
-                generateFromSection()
-            }
-        })
-        val suggestionStatus = TextView(this).apply {
-            text = "Auto Style can suggest genre and BPM from your idea or lyrics."
-            setTextColor(Color.LTGRAY)
-        }
-        simple.addView(suggestionStatus)
-        simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest style & generate"
-            setOnClickListener {
-                val (tags, description) = suggestStyle()
-                quickStyle.setText(tags)
-                suggestionStatus.text = description + " · generating"
-                generateFromSection()
-            }
-        })
         val quickVocalPreview = android.widget.CheckBox(this).apply {
             text = "Include experimental vocal tones in preview"
             setTextColor(Color.WHITE)
@@ -277,7 +168,6 @@ Kita terus melangkah bersama""".trimIndent()
             if (quickStyle.text.isBlank()) {
                 val (tags, description) = suggestStyle()
                 quickStyle.setText(tags)
-                suggestionStatus.text = description
             }
             startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
                 putExtra("pulse_style_tags", quickStyle.text.toString())
@@ -287,27 +177,6 @@ Kita terus melangkah bersama""".trimIndent()
                 putExtra("pulse_auto_generate", autoGenerate)
             })
         }
-        generateFromSection = {
-            val (tags, description) = suggestStyle()
-            quickStyle.setText(tags)
-            suggestionStatus.text = description
-            openComposer(true)
-        }
-        simpleLabel("3 · Preview & generate")
-        simple.addView(Button(this).apply {
-            text = "✨ AI PULSE · CREATE FOR ME (ONE TAP)"
-            setOnClickListener {
-                if (quickIdea.text.isBlank() && quickLyrics.text.isBlank()) {
-                    quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
-                    nextIdea++
-                }
-                val (tags, description) = suggestStyle()
-                quickStyle.setText(tags)
-                suggestionStatus.text = description
-                openComposer(true)
-            }
-        })
-
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         actions.addView(Button(this).apply {
             text = "PREVIEW"
@@ -318,10 +187,6 @@ Kita terus melangkah bersama""".trimIndent()
             setOnClickListener { openComposer(true) }
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         simple.addView(actions)
-        simple.addView(TextView(this).apply {
-            text = "One tap: AI Pulse chooses an idea when empty, recommends the style and starts offline music generation. You can still edit everything manually."
-            setTextColor(Color.LTGRAY)
-        })
         simple.addView(TextView(this).apply {
             text = "Preview opens the composer without rendering; Generate renders the offline WAV. Vocal tones are experimental, not sung lyrics."
             setTextColor(Color.LTGRAY)
