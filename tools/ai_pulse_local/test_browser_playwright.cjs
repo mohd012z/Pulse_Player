@@ -102,7 +102,7 @@ async function main() {
       const mobileDownload = phone.waitForEvent("download", { timeout: 15000 });
       await phone.locator("#save").tap();
       const mobileSaved = await mobileDownload;
-      assert.match(mobileSaved.suggestedFilename(), /\\.wav$/);
+      assert.ok(mobileSaved.suggestedFilename().endsWith(".wav"), "mobile WAV filename");
       console.log("PASS: Chromium mobile viewport, touch controls, playback and WAV download");
     } finally {
       await mobile.close();
