@@ -117,6 +117,29 @@ function lyricTimeline(text,bpm){
  if(bar*4*beat>MAX_SECONDS)throw Error("Lyrics exceed 60 seconds. Shorten lyrics or raise tempo.");
  return {sections,events,bars:bar,seconds:bar*4*beat};
 }
+
+// Offline vocal score foundation: estimated vowel groups, not phoneme recognition or speech.
+function syllableHints(word){
+ const cleaned=String(word).normalize("NFKC").toLowerCase().replace(/[^a-z\u00c0-\u024f]/g,"");
+ const groups=cleaned.match(/[aeiouy\u00c0-\u024f]+/g)||[];
+ return Math.max(1,Math.min(8,groups.length));
+}
+function vocalGuide(plan){
+ const roots=[60,57,53,55],scale=[0,2,4,7,9];
+ const notes=[];
+ for(const event of plan.events){
+  const syllables=event.words.flatMap(w=>Array.from({length:syllableHints(w.text)},(_,i)=>({word:w.text,index:i})));
+  if(!syllables.length)continue;
+  const duration=event.duration/syllables.length;
+  for(let i=0;i<syllables.length;i++){
+   const start=event.start+i*duration,bar=Math.floor(start/(plan.seconds/plan.bars));
+   notes.push({word:syllables[i].word,syllable:syllables[i].index,start,duration,
+     midi:roots[bar%4]+scale[(i+(event.section==="chorus"?2:0))%scale.length]});
+  }
+ }
+ return notes;
+}
+
 function composeFromLyrics({style,bpm,lyricsText,seed}){
  if(!Number.isSafeInteger(seed))throw Error("Invalid seed");
  const plan=lyricTimeline(lyricsText,bpm),beat=60/bpm;
@@ -143,7 +166,7 @@ function composeFromLyrics({style,bpm,lyricsText,seed}){
  }
  let peak=0;for(let i=0;i<data.length;i++)peak=Math.max(peak,Math.abs(data[i]));
  if(peak>0){const scale=.88/Math.max(.88,peak);for(let i=0;i<data.length;i++)data[i]*=scale;}
- return {audio:wavBytes(data),timeline:plan};
+ return {audio:wavBytes(data),timeline:plan,vocalNotes:vocalGuide(plan)};
 }
 function formatLrc(plan){
  return plan.events.map(e=>{const cs=Math.floor(e.start*100),m=Math.floor(cs/6000),s=Math.floor(cs%6000/100),c=cs%100;
