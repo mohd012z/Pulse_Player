@@ -35,9 +35,12 @@ class AiPulseStudioActivity : Activity() {
     private var importedVoiceWav: File? = null
     private var recordButton: Button? = null
     private var recordStatus: TextView? = null
+    private var importedVoiceStatusView: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        voiceFile = AiPulseVoiceFiles.latestRecording(filesDir)
+        importedVoiceWav = AiPulseVoiceFiles.importedWav(filesDir)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 24, 24, 24)
@@ -307,7 +310,8 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         heading("Your voice · local microphone recording")
-        val voiceStatus = heading("No voice recording · recordings stay on device")
+        val voiceStatus = heading(voiceFile?.let { "Saved private recording: ${it.name}" }
+            ?: "No voice recording · recordings stay on device")
         val voiceButton = Button(this).apply { text = "Record voice" }
         root.addView(voiceButton)
         recordButton = voiceButton
@@ -355,7 +359,9 @@ class AiPulseStudioActivity : Activity() {
         }
         root.addView(useRecordedVoice)
         heading("Vocal mixing · optional PCM WAV")
-        val importedVoiceStatus = heading("No imported WAV vocal. Microphone AAC/M4A can be decoded for mixing.")
+        val importedVoiceStatus = heading(importedVoiceWav?.let { "Imported vocal: ${it.name}" }
+            ?: "No imported WAV vocal. Microphone AAC/M4A can be decoded for mixing.")
+        importedVoiceStatusView = importedVoiceStatus
         root.addView(Button(this).apply {
             text = "Import my authorized WAV vocal"
             setOnClickListener {
@@ -774,7 +780,7 @@ class AiPulseStudioActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != 301 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
-        val target = File(filesDir, "ai_pulse_authorized_voice.wav")
+        val target = File(filesDir, AiPulseVoiceFiles.IMPORTED_WAV)
         runCatching {
             val temporary = File(filesDir, "ai_pulse_voice_import.part")
             try {
@@ -790,6 +796,7 @@ class AiPulseStudioActivity : Activity() {
                     temporary.delete()
                 }
                 importedVoiceWav = target
+                importedVoiceStatusView?.text = "Imported vocal: ${target.name}"
                 Toast.makeText(this, "Vocal imported; select Generate music to mix", Toast.LENGTH_LONG).show()
             } finally { temporary.delete() }
         }.onFailure {
