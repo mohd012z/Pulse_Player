@@ -66,3 +66,12 @@ for(const style of ['pop','ambient','rock']){
  verifyWav(output,88200);
 }
 console.log('PASS: real wavBytes() produces exact one-second PCM payload and valid RIFF/WAVE/fmt/data magic bytes');
+
+
+const guidePlan=vm.runInContext('lyricTimeline("[Verse]\\nWalking down the street\\n[Chorus]\\nShine again",120)',ctx);
+const guide=vm.runInContext('vocalGuide(lyricTimeline("[Verse]\\nWalking down the street\\n[Chorus]\\nShine again",120))',ctx);
+assert.ok(guide.length>=6,'syllable note guide must contain pitched events');
+assert.ok(guide.every(n=>n.duration>0&&n.start>=0&&n.midi>=40&&n.midi<=90));
+assert.ok(guide.every((n,i)=>i===0||n.start>=guide[i-1].start),'guide must be chronological');
+assert.ok(guide[guide.length-1].start+guide[guide.length-1].duration<=guidePlan.seconds+0.0001);
+console.log('PASS: lyric syllable timing and pitch guide within offline song duration');
