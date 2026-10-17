@@ -184,7 +184,7 @@ class AiPulseStudioActivity : Activity() {
                 discoveryResult.text = "Searching public recording metadata…"
                 val button = this
                 thread(name = "AiPulseMetadataLookup") {
-                    val result = runCatching { AiPulseHybridDiscovery.searchRecording(query) }
+                    val result = runCatching { AiPulseDiscoveryGateway.search(query, true) }
                     runOnUiThread {
                         button.isEnabled = true
                         if (!isFinishing && !isDestroyed) {
