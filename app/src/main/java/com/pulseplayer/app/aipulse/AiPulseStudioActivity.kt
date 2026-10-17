@@ -270,7 +270,7 @@ class AiPulseStudioActivity : Activity() {
         }
         root.addView(useRecordedVoice)
         heading("Vocal mixing · optional PCM WAV")
-        val importedVoiceStatus = heading("No PCM WAV vocal selected. AAC/M4A recordings are not yet supported by the mixer.")
+        val importedVoiceStatus = heading("No imported WAV vocal. Microphone AAC/M4A can be decoded for mixing.")
         root.addView(Button(this).apply {
             text = "Import my authorized WAV vocal"
             setOnClickListener {
@@ -295,6 +295,31 @@ class AiPulseStudioActivity : Activity() {
                 importedVoiceStatus.text = "No vocal selected"
             }
         })
+        heading("Mix balance · adjust before generation")
+        fun mixerSlider(label: String, initial: Int): SeekBar {
+            val readout = heading("$label: $initial%")
+            return SeekBar(this).apply {
+                max = 100
+                progress = initial
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                        readout.text = "$label: $value%"
+                    }
+                    override fun onStartTrackingTouch(bar: SeekBar?) {}
+                    override fun onStopTrackingTouch(bar: SeekBar?) {}
+                })
+                root.addView(this)
+            }
+        }
+        val instrumentalGain = mixerSlider("Instrumental volume", 65)
+        val recordedVoiceGain = mixerSlider("Vocal volume", 75)
+        heading("Vocal delay · milliseconds")
+        val vocalDelay = EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText("0")
+            setTextColor(Color.WHITE)
+        }
+        root.addView(vocalDelay)
         heading("Duration")
         val duration = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -333,6 +358,17 @@ class AiPulseStudioActivity : Activity() {
                     .setPositiveButton("OK", null).show()
                 return@setOnClickListener
             }
+            val delayMs = vocalDelay.text.toString().toIntOrNull()
+            if (delayMs == null || delayMs !in 0..30000) {
+                Toast.makeText(this, "Vocal delay must be 0–30000 ms", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            val mixSettings = AiPulseWavMixer.Settings(
+                musicGain = instrumentalGain.progress / 100.0,
+                voiceGain = recordedVoiceGain.progress / 100.0,
+                voiceDelayMs = delayMs
+            )
+            val includeRecordedVoice = useRecordedVoice.isChecked
             val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
             working = true
             cancelRequested = false
@@ -350,7 +386,7 @@ class AiPulseStudioActivity : Activity() {
                     try {
                         AiPulseMastering.process(tmp, mastered, selectedMasteringPreset) { cancelRequested }
                         if (cancelRequested) throw InterruptedException("Cancelled")
-                        val decodedVoice = if (useRecordedVoice.isChecked) {
+                        val decodedVoice = if (includeRecordedVoice) {
                             val recordingFile = voiceFile
                             require(!recording && recordingFile != null && recordingFile.exists()) {
                                 "Finish recording before generation"
@@ -371,7 +407,7 @@ class AiPulseStudioActivity : Activity() {
                             if (compatibleVoice != null && compatibleVoice.exists()) {
                                 val combined = File(cacheDir, "vocal-mix-${System.nanoTime()}.wav")
                                 try {
-                                    AiPulseWavMixer.mix(mastered, compatibleVoice, combined, cancelled = { cancelRequested })
+                                    AiPulseWavMixer.mix(mastered, compatibleVoice, combined, mixSettings, cancelled = { cancelRequested })
                                     saveToMusic(combined, request.title)
                                 } finally { combined.delete() }
                             } else saveToMusic(mastered, request.title)
