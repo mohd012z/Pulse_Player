@@ -185,7 +185,7 @@ class AiPulseStudioActivity : Activity() {
         }
         simpleLabel("3 · Preview & generate")
         simple.addView(Button(this).apply {
-            text = "AI PULSE · Suggest & Generate"
+            text = "✨ AI PULSE · CREATE FOR ME (ONE TAP)"
             setOnClickListener {
                 if (quickIdea.text.isBlank() && quickLyrics.text.isBlank()) {
                     quickIdea.setText(ideaSuggestions[nextIdea % ideaSuggestions.size])
@@ -208,6 +208,10 @@ class AiPulseStudioActivity : Activity() {
             setOnClickListener { openComposer(true) }
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         simple.addView(actions)
+        simple.addView(TextView(this).apply {
+            text = "One tap: AI Pulse chooses an idea when empty, recommends the style and starts offline music generation. You can still edit everything manually."
+            setTextColor(Color.LTGRAY)
+        })
         simple.addView(TextView(this).apply {
             text = "Preview opens the composer without rendering; Generate renders the offline WAV. Vocal tones are experimental, not sung lyrics."
             setTextColor(Color.LTGRAY)
