@@ -216,6 +216,7 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                spectrumPreferences().edit().putBoolean("enabled", true).apply()
                 showSpectrum()
             } else {
                 status("FFT visualization requires optional audio capture permission")
