@@ -32,6 +32,7 @@ class AiPulseStudioActivity : Activity() {
     private var recorder: MediaRecorder? = null
     private var voiceFile: File? = null
     private var recording = false
+    private var importedVoiceWav: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -262,6 +263,32 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure { voiceStatus.text = "Microphone unavailable: ${it.message}" }
             }
         }
+        heading("Vocal mixing · optional PCM WAV")
+        val importedVoiceStatus = heading("No PCM WAV vocal selected. AAC/M4A recordings are not yet supported by the mixer.")
+        root.addView(Button(this).apply {
+            text = "Import my authorized WAV vocal"
+            setOnClickListener {
+                AlertDialog.Builder(this@AiPulseStudioActivity)
+                    .setTitle("Confirm media rights")
+                    .setMessage("Import only recordings you created or have permission to use. This will not train an AI model or upload audio.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("I confirm") { _, _ ->
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "audio/wav"
+                        }
+                        startActivityForResult(intent, 301)
+                    }.show()
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Remove imported vocal"
+            setOnClickListener {
+                importedVoiceWav?.delete()
+                importedVoiceWav = null
+                importedVoiceStatus.text = "No vocal selected"
+            }
+        })
         heading("Duration")
         val duration = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -317,7 +344,14 @@ class AiPulseStudioActivity : Activity() {
                     try {
                         AiPulseMastering.process(tmp, mastered, selectedMasteringPreset) { cancelRequested }
                         if (cancelRequested) throw InterruptedException("Cancelled")
-                        saveToMusic(mastered, request.title)
+                        val vocal = importedVoiceWav
+                        if (vocal != null && vocal.exists()) {
+                            val combined = File(cacheDir, "vocal-mix-${System.nanoTime()}.wav")
+                            try {
+                                AiPulseWavMixer.mix(mastered, vocal, combined, cancelled = { cancelRequested })
+                                saveToMusic(combined, request.title)
+                            } finally { combined.delete() }
+                        } else saveToMusic(mastered, request.title)
                     } finally { mastered.delete() }
                 }
                 tmp.delete()
@@ -336,6 +370,30 @@ class AiPulseStudioActivity : Activity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 301 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        val target = File(filesDir, "ai_pulse_authorized_voice.wav")
+        runCatching {
+            val temporary = File(filesDir, "ai_pulse_voice_import.part")
+            try {
+                contentResolver.openInputStream(uri)?.use { source ->
+                    temporary.outputStream().use { destination -> source.copyTo(destination) }
+                } ?: error("Unable to open the selected recording")
+                require(temporary.length() in 44..(64L * 1024 * 1024)) { "Vocal must be a WAV below 64 MB" }
+                if (!temporary.renameTo(target)) {
+                    temporary.copyTo(target, overwrite = true)
+                    temporary.delete()
+                }
+                importedVoiceWav = target
+                Toast.makeText(this, "Vocal imported; select Generate music to mix", Toast.LENGTH_LONG).show()
+            } finally { temporary.delete() }
+        }.onFailure {
+            Toast.makeText(this, "Import failed: ${it.message}", Toast.LENGTH_LONG).show()
         }
     }
 
