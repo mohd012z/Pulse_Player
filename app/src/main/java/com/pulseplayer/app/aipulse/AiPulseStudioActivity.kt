@@ -200,6 +200,24 @@ class AiPulseStudioActivity : Activity() {
                 }
             }
         })
+        root.addView(Button(this).apply {
+            text = "Brain: Generate song arrangement blueprint"
+            setOnClickListener {
+                val plan = AiPulseBrain.plan(AiPulseBrain.Input(
+                    genre = genre.selectedItem.toString(),
+                    mood = mood.text.toString(),
+                    bpm = bpm.progress + 60,
+                    bars = 16
+                ))
+                val summary = plan.segments.joinToString("\\n") {
+                    "${it.section}: ${it.bars} bars · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
+                }
+                AlertDialog.Builder(this@AiPulseStudioActivity)
+                    .setTitle("AI Pulse Brain · offline arrangement")
+                    .setMessage(summary)
+                    .setPositiveButton("OK", null).show()
+            }
+        })
         heading("Your voice · local microphone recording")
         val voiceStatus = heading("No voice recording · recordings stay on device")
         val voiceButton = Button(this).apply { text = "Record voice" }
