@@ -334,6 +334,11 @@ class AiPulseStudioActivity : Activity() {
                 AiPulseMastering.Preset.entries.map { it.name })
         }
         root.addView(masteringPreset)
+        heading("Instrument mixer · individual stem levels")
+        val leadLevel = mixerSlider("Lead", 100)
+        val bassLevel = mixerSlider("Bass", 100)
+        val padLevel = mixerSlider("Pad", 100)
+        val drumsLevel = mixerSlider("Drums", 100)
         val exportStems = android.widget.CheckBox(this).apply {
             text = "Also export separate lead, bass, pad and drum WAV stems"
             setTextColor(Color.WHITE)
@@ -376,6 +381,12 @@ class AiPulseStudioActivity : Activity() {
             )
             val includeRecordedVoice = useRecordedVoice.isChecked
             val saveStems = exportStems.isChecked
+            val instrumentLevels = AiPulseStereoRenderer.Levels(
+                lead = leadLevel.progress / 100.0,
+                bass = bassLevel.progress / 100.0,
+                pad = padLevel.progress / 100.0,
+                drums = drumsLevel.progress / 100.0
+            )
             val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
             working = true
             cancelRequested = false
@@ -385,7 +396,7 @@ class AiPulseStudioActivity : Activity() {
             thread(name = "AiPulseCompose") {
                 val tmp = File(cacheDir, "pulse-${System.nanoTime()}.wav")
                 val result = runCatching {
-                    AiPulseStereoRenderer.render(request, tmp) { cancelRequested }
+                    AiPulseStereoRenderer.render(request, tmp, levels = instrumentLevels) { cancelRequested }
                     if (cancelRequested) throw InterruptedException("Cancelled")
                     val report = AiPulseWaveInspector.inspect(tmp)
                     require(report.durationSeconds > 0.0) { "Empty output" }
@@ -428,7 +439,7 @@ class AiPulseStudioActivity : Activity() {
                     for (stem in AiPulseStereoRenderer.Stem.entries.filter { it != AiPulseStereoRenderer.Stem.MIX }) {
                         val stemFile = File(cacheDir, "stem-${stem.name.lowercase()}-${System.nanoTime()}.wav")
                         try {
-                            AiPulseStereoRenderer.render(request, stemFile, stem) { cancelRequested }
+                            AiPulseStereoRenderer.render(request, stemFile, stem, instrumentLevels) { cancelRequested }
                             if (cancelRequested) break
                             saveToMusic(stemFile, "${request.title}-${stem.name.lowercase()}")
                         } catch (error: Exception) {
