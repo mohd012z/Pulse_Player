@@ -92,6 +92,16 @@ class AiPulseStudioActivity : Activity() {
         root.addView(bpm)
         heading("Song Creator · offline assistant")
         val idea = field("Song idea / story", "Keeping promises and appreciating others")
+        var variationIndex = 0
+        val variationStatus = heading("Composition variation #1 · original offline engine")
+        root.addView(Button(this).apply {
+            text = "New variation · change melody and harmony"
+            setOnClickListener {
+                variationIndex = (variationIndex + 1) % 1000000
+                editedArrangement = null
+                variationStatus.text = "Composition variation #${variationIndex + 1} · new seed on next generation"
+            }
+        })
         val genre = android.widget.Spinner(this).apply {
             adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
                 android.R.layout.simple_spinner_dropdown_item,
@@ -714,7 +724,11 @@ class AiPulseStudioActivity : Activity() {
                         }
                         AiPulseRenderDuration.secondsFor(plan)
                     } ?: (duration.text.toString().toIntOrNull() ?: 0),
-                    genre = genre.selectedItem.toString()
+                    genre = genre.selectedItem.toString(),
+                    seed = AiPulseVariationEngine.seed(
+                        idea.text.toString(), lyrics.text.toString(), genre.selectedItem.toString(),
+                        mood.text.toString(), variationIndex
+                    )
                 ).also(AiPulseComposer::validate)
             } catch (e: IllegalArgumentException) {
                 AlertDialog.Builder(this).setMessage(e.message ?: "Invalid input")
