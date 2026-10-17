@@ -1,0 +1,15 @@
+name: AI Pulse vocal mixing tests
+on:
+  push:
+    branches: [feat/ai-pulse-studio-foundation]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  vocal-mixing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/ai_pulse_local/test_vocal_mixing.cjs
