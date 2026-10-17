@@ -1098,23 +1098,10 @@ class MainActivity : Activity() {
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
         root.addView(toolbar)
 
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
-        tabs.addView(button("MY Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
-        root.addView(tabs)
-        root.addView(button("▥ Live Audio Spectrum · FFT") { requestSpectrum() },
-            LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
-        root.addView(button("✦ AI Pulse Studio") {
-            startActivity(Intent(this, AiPulseStudioActivity::class.java))
-        }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
-
+        // Primary actions are intentionally placed in the fixed bottom navigation dock.
+        // The track list remains the only weighted scrollable view.
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         filterView = EditText(this).apply {
@@ -1260,6 +1247,34 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.END
         }
         dock.addView(progressView)
+
+        val bottomNav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, 0)
+        }
+        fun navButton(icon: String, label: String, action: () -> Unit): Button =
+            button("$icon\n$label", action).apply {
+                textSize = 10f
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(2), dp(4), dp(2), dp(4))
+                contentDescription = label
+                maxLines = 2
+            }
+        sourceButton = navButton("▣", "Device") { showPlaylistDialog() }
+        bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(54), 1f))
+        val radioButton = navButton("◉", "Radio") { switchPlaylist("MY RADIO") }
+        bottomNav.addView(radioButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        bottomNav.addView(navButton("♫", "FX") { selectMixPreset() },
+            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        bottomNav.addView(navButton("▥", "Spectrum") { requestSpectrum() },
+            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        bottomNav.addView(navButton("✦", "Studio") {
+            startActivity(Intent(this, AiPulseStudioActivity::class.java))
+        }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        bottomNav.addView(navButton("⋮", "More") { showMoreMenu() },
+            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        root.addView(bottomNav)
     }
 
     private fun seekRelative(delta: Long) {
