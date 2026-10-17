@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ActivityNotFoundException
 import android.media.MediaRouter2
 import android.provider.Settings
+import android.provider.MediaStore
 import android.widget.Toast
 import org.json.JSONArray
 import com.pulseplayer.app.aipulse.AiPulseStudioActivity
@@ -412,8 +413,42 @@ class MainActivity : Activity() {
                 val track = folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }.getOrNull(index)
                 track?.let { shareLocalUri(it.uri) }
             }
-            else -> visibleSongs.getOrNull(index)?.let { shareLocalUri(it.uri) }
+            else -> visibleSongs.getOrNull(index)?.let { song ->
+                AlertDialog.Builder(this)
+                    .setTitle(song.title)
+                    .setItems(arrayOf("Play", "Share", "Delete from device…")) { _, selected ->
+                        when (selected) {
+                            0 -> playSelection(index)
+                            1 -> shareLocalUri(song.uri)
+                            2 -> confirmDeleteSong(song)
+                        }
+                    }.show()
+            }
         }
+    }
+
+    private fun confirmDeleteSong(song: MusicRepository.Song) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete this audio file?")
+            .setMessage("Delete ${song.title} from device storage? This may be permanent. Other music files are unaffected.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    song.uri.scheme == "content" &&
+                    song.uri.authority == MediaStore.AUTHORITY) {
+                    try {
+                        val request = MediaStore.createDeleteRequest(contentResolver, listOf(song.uri))
+                        startIntentSenderForResult(request.intentSender, 106, null, 0, 0, 0)
+                    } catch (error: Exception) {
+                        status("Delete unavailable: ${error.message}")
+                    }
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Delete through Files")
+                        .setMessage("This file cannot be safely deleted in-app on this Android version or storage provider. Open Files or your music manager and delete it there.")
+                        .setPositiveButton("OK", null).show()
+                }
+            }.show()
     }
 
     private fun addRadioDialog() {
