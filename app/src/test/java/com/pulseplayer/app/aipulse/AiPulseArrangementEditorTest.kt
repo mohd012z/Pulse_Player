@@ -40,4 +40,21 @@ class AiPulseArrangementEditorTest {
         assertTrue(runCatching { AiPulseArrangementEditor.update(original, 0, energy = -0.1) }.isFailure)
     }
 
+    @Test fun insertAndRemoveSectionKeepsTimelineContiguous() {
+        val original = AiPulseBrain.plan(AiPulseBrain.Input("Pop Rock", "bright", 120, bars = 8))
+        val extended = AiPulseArrangementEditor.insert(original, 0)
+        assertEquals(12, extended.totalBars)
+        assertEquals(AiPulseBrain.Section.CHORUS, extended.segments[1].section)
+        assertEquals(8, extended.segments[2].startBar)
+        val restored = AiPulseArrangementEditor.remove(extended, 1)
+        assertEquals(original.segments, restored.segments)
+    }
+
+    @Test fun cannotRemoveBelowMinimumDurationOrExceedMaximumBars() {
+        val short = AiPulseBrain.plan(AiPulseBrain.Input("Ballad", "bright", 90, bars = 8))
+        assertTrue(runCatching { AiPulseArrangementEditor.remove(short, 0) }.isFailure)
+        val full = AiPulseBrain.plan(AiPulseBrain.Input("EDM", "bright", 125, bars = 128))
+        assertTrue(runCatching { AiPulseArrangementEditor.insert(full, 0) }.isFailure)
+    }
+
 }
