@@ -31,7 +31,14 @@ class OnlineMediaActivity : Activity() {
             "YouTube Movies" to "https://www.youtube.com/results?search_query=official+full+movies",
             "Public Domain Movies" to "https://www.youtube.com/results?search_query=public+domain+full+movies",
             "Live TV" to "https://www.youtube.com/results?search_query=official+live+tv+channel",
-            "Live Sports" to "https://www.youtube.com/results?search_query=official+live+sports"
+            "Live Sports" to "https://www.youtube.com/results?search_query=official+live+sports",
+            "Ceramah Agama" to "https://www.youtube.com/results?search_query=ceramah+agama+rasmi+Malaysia",
+            "Sidang Media Malaysia" to "https://www.youtube.com/results?search_query=sidang+media+Malaysia+BERNAMA+RTM",
+            "Sejarah Malaysia" to "https://www.youtube.com/results?search_query=dokumentari+sejarah+Malaysia+Arkib+Negara",
+            "5-Minute Crafts" to "https://www.youtube.com/channel/UC295-Dw_tDNtZXFeAPAW6Aw",
+            "Live Streaming" to "https://rtmklik.rtm.gov.my/",
+            "Drama China (Pelakon Sebenar)" to "https://www.youtube.com/results?search_query=Chinese+short+drama+live+action+official+-AI+-animated+-animation+-generated",
+            "Radio Malaysia (RTM)" to "https://radio.rtm.gov.my/"
         )
         val name = intent.getStringExtra("provider").orEmpty()
         val url = providers[name] ?: run { finish(); return }
