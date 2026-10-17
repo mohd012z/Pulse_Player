@@ -309,7 +309,7 @@ class AiPulseStudioActivity : Activity() {
             thread(name = "AiPulseCompose") {
                 val tmp = File(cacheDir, "pulse-${System.nanoTime()}.wav")
                 val result = runCatching {
-                    AiPulseComposer.render(request, tmp) { cancelRequested }
+                    AiPulseStereoRenderer.render(request, tmp) { cancelRequested }
                     if (cancelRequested) throw InterruptedException("Cancelled")
                     val report = AiPulseWaveInspector.inspect(tmp)
                     require(report.durationSeconds > 0.0) { "Empty output" }
