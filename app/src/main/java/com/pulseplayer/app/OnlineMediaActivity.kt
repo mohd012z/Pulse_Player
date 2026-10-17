@@ -53,6 +53,7 @@ class OnlineMediaActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF10141F.toInt())
+            fitsSystemWindows = true
         }
         val top = LinearLayout(this)
         val back = Button(this).apply { text = "← Back"; setOnClickListener { finish() } }
@@ -101,7 +102,8 @@ class OnlineMediaActivity : Activity() {
                 }
                 fullscreenContainer = container
                 addContentView(container, ViewGroup.LayoutParams(-1, -1))
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                // Allow both portrait short dramas and landscape movies without forcing a reload.
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
             }
 
             override fun onHideCustomView() {
