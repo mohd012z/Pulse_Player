@@ -7,7 +7,7 @@
 <label>Tempo (BPM) <input id="bpm" type="number" min="60" max="180" value="108"></label>
 <label>Bars <input id="bars" type="number" min="2" max="16" value="4"></label>
 <label>Seed <input id="seed" type="number" value="42"></label>
-<button id="generate">Generate WAV</button><button id="play" disabled>Play</button><button id="save" disabled>Save WAV</button>
+<label>Lyrics arrangement <input id="lyricMode" type="checkbox"> Follow lyric sections</label><label>Lyrics <textarea id="lyrics" rows="7" style="width:100%;box-sizing:border-box" placeholder="[Verse 1]&#10;Walking down the silent street&#10;[Chorus]&#10;Feel the pulse inside the night"></textarea></label><button id="lrc" disabled>Export timed lyrics (.lrc)</button><p id="lyricNow" aria-live="polite"></p><button id="generate">Generate WAV</button><button id="play" disabled>Play</button><button id="save" disabled>Save WAV</button>
 <p id="status" role="status"></p><audio id="player" controls></audio>
 <small>Output: mono 16-bit PCM WAV, 22,050 Hz. Deterministic seed, chord progression, melody, bass and percussion. WAV is generated entirely in your browser.</small>
 <script>
@@ -66,17 +66,89 @@ function compose({style,bpm,bars,seed}){
   if(peak>0){const scale=.88/Math.max(.88,peak);for(let i=0;i<data.length;i++)data[i]*=scale;}
   return wavBytes(data);
 }
+
+// Lyric-aware instrumental arrangement. Timing is estimated, not sung vocals.
+function parseLyricsAndStructure(text){
+ const sections=[];let current={type:"verse",lines:[]};
+ for(const raw of text.split(/\r?\n/)){
+  const line=raw.trim();if(!line)continue;
+  const header=line.match(/^\[([^\]]+)\]$/);
+  if(header){if(current.lines.length)sections.push(current);
+   const label=header[1].toLowerCase();
+   current={type:/chorus|refrain|hook/.test(label)?"chorus":/bridge/.test(label)?"bridge":/intro|outro/.test(label)?"intro":"verse",lines:[]};
+  }else current.lines.push(line);
+ }
+ if(current.lines.length)sections.push(current);
+ return sections;
+}
+function lyricTimeline(text,bpm){
+ if(!Number.isInteger(bpm)||bpm<60||bpm>180)throw Error("Invalid tempo");
+ const sections=parseLyricsAndStructure(text);if(!sections.length)throw Error("Add lyrics first");
+ const beat=60/bpm,events=[];let bar=0;
+ for(const section of sections){
+  const bars=Math.max(2,Math.ceil(section.lines.length/2)*2);
+  for(let i=0;i<section.lines.length;i++){
+   const words=section.lines[i].match(/[^\s]+/g)||[];
+   const start=(bar+i*bars/section.lines.length)*4*beat;
+   const duration=(bars/section.lines.length)*4*beat;
+   events.push({section:section.type,line:section.lines[i],start,duration,words:words.map((word,j)=>({text:word,start:start+j*duration/Math.max(1,words.length),duration:duration/Math.max(1,words.length)}))});
+  }
+  section.startBar=bar;section.bars=bars;bar+=bars;
+ }
+ if(bar*4*beat>MAX_SECONDS)throw Error("Lyrics exceed 60 seconds. Shorten lyrics or raise tempo.");
+ return {sections,events,bars:bar,seconds:bar*4*beat};
+}
+function composeFromLyrics({style,bpm,lyricsText,seed}){
+ if(!Number.isSafeInteger(seed))throw Error("Invalid seed");
+ const plan=lyricTimeline(lyricsText,bpm),beat=60/bpm;
+ const data=new Float32Array(Math.ceil(plan.seconds*RATE)),random=rng(seed);
+ const roots=[48,45,41,43];
+ for(const section of plan.sections){
+  const chorus=section.type==="chorus",bridge=section.type==="bridge";
+  const density=chorus?0.95:bridge?0.42:0.62;
+  const chord=chorus?[0,4,7,12]:bridge?[0,3,7]:[0,4,7];
+  for(let i=0;i<section.bars;i++){
+   const bar=section.startBar+i,root=roots[bar%4],start=bar*4*beat;
+   chord.forEach(n=>addTone(data,start,3.75*beat,root+n+12,chorus?.105:.07,"pad"));
+   for(let step=0;step<4;step++){
+    const at=start+step*beat;
+    addTone(data,at,.65*beat,root-12,chorus?.19:.13,"bass");
+    if(random()<density)addTone(data,at,.75*beat,root+24+chord[Math.floor(random()*chord.length)],chorus?.14:.09,"lead");
+    if(style!=="ambient"){
+     if(step===0||step===2)drum(data,at,"kick",random);
+     if(step===1||step===3)drum(data,at,"snare",random);
+     if(chorus&&random()<.6)drum(data,at+.5*beat,"hihat",random);
+    }
+   }
+  }
+ }
+ let peak=0;for(let i=0;i<data.length;i++)peak=Math.max(peak,Math.abs(data[i]));
+ if(peak>0){const scale=.88/Math.max(.88,peak);for(let i=0;i<data.length;i++)data[i]*=scale;}
+ return {audio:wavBytes(data),timeline:plan};
+}
+function formatLrc(plan){
+ return plan.events.map(e=>{const cs=Math.floor(e.start*100),m=Math.floor(cs/6000),s=Math.floor(cs%6000/100),c=cs%100;
+  return "["+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0")+"]"+e.line;
+ }).join("\n");
+}
+
+let currentTimeline=null;
 $("generate").onclick=()=>{
  try{
   const config={style:$("style").value,bpm:Number($("bpm").value),bars:Number($("bars").value),seed:Number($("seed").value)};
   $("status").textContent="Rendering locally...";
-  const bytes=compose(config); currentWav=bytes;
+  const lyricMode=$("lyricMode").checked;
+  const result=lyricMode?composeFromLyrics({...config,lyricsText:$("lyrics").value}):null;
+  const bytes=result?result.audio:compose(config);currentTimeline=result?result.timeline:null;
+  $("lrc").disabled=!currentTimeline;currentWav=bytes;
   if(currentUrl)URL.revokeObjectURL(currentUrl);
   currentUrl=URL.createObjectURL(new Blob([bytes],{type:"audio/wav"}));
   $("player").src=currentUrl;$("play").disabled=false;$("save").disabled=false;
   $("status").textContent="WAV ready ("+(bytes.byteLength/1024/1024).toFixed(2)+" MiB). No network used.";
  }catch(e){$("status").textContent="Error: "+e.message;}
 };
+$("player").addEventListener("timeupdate",()=>{const now=$("player").currentTime;const event=currentTimeline?.events.find(e=>now>=e.start&&now<e.start+e.duration);$("lyricNow").textContent=event?event.line:"";});
+$("lrc").onclick=()=>{if(!currentTimeline)return;const blob=new Blob([formatLrc(currentTimeline)],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="pulse-nova-lyrics.lrc";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 $("play").onclick=()=>{$("player").play().catch(e=>$("status").textContent=e.message);};
 $("save").onclick=async()=>{if(!currentWav)return;const name="pulse-nova-offline-"+$("seed").value;try{if(typeof AndroidBridge!=="undefined"){await exportNative(currentWav,name);$("status").textContent="Saved to Android Music library";}else{const a=document.createElement("a");a.href=currentUrl;a.download=name+".wav";a.click();}}catch(e){$("status").textContent="Save failed: "+e.message;}};
 const crcTable=Array.from({length:256},(_,n)=>{let c=n;for(let i=0;i<8;i++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);return c>>>0;});
