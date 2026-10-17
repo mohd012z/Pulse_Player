@@ -625,12 +625,12 @@ class MainActivity : Activity() {
         if (spectrumView != null) {
             spectrumPreferences().edit().putBoolean("enabled", false).apply()
             stopSpectrum()
-            status("Live waveform hidden")
+            status("Live spectrum hidden")
             return
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
-                .setTitle("Enable live pixel-water spectrum")
+                .setTitle("Enable live FFT audio spectrum")
                 .setMessage("Android requires optional audio-capture permission to visualize playback. No captured sound is stored. Tap the spectrum control to disable it.")
                 .setPositiveButton("Allow") { _, _ ->
                     requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_SPECTRUM_PERMISSION)
@@ -653,7 +653,7 @@ class MainActivity : Activity() {
     private fun showSpectrum() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         if (spectrumRequestPending || controller?.isPlaying != true) {
-            status("Play a song to display the live pixel-water spectrum")
+            status("Play a song to display the live FFT spectrum")
             return
         }
         spectrumRequestPending = true
@@ -670,9 +670,25 @@ class MainActivity : Activity() {
             if (spectrumView != null && activeSpectrumSession == sessionId) return@customCommand
             val dock = waveformDock ?: return@customCommand
             stopSpectrum()
-            val view = SpectrumView(this).apply { setBackgroundColor(COLOR_PANEL) }
+            val view = SpectrumView(this).apply {
+                setBackgroundColor(COLOR_PANEL)
+                displayMode = if (spectrumPreferences().getString("display_mode", "fft") == "wave")
+                    SpectrumView.DisplayMode.PIXEL_WATER
+                else SpectrumView.DisplayMode.FREQUENCY_BARS
+                setOnClickListener {
+                    displayMode = if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS)
+                        SpectrumView.DisplayMode.PIXEL_WATER
+                    else SpectrumView.DisplayMode.FREQUENCY_BARS
+                    spectrumPreferences().edit().putString("display_mode",
+                        if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS) "fft" else "wave"
+                    ).apply()
+                    status(if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS)
+                        "Live FFT frequency spectrum" else "Live pixel-water waveform")
+                }
+                contentDescription = "Live audio visualizer. Tap to switch between FFT frequency bars and pixel-water waveform."
+            }
             if (!view.start(sessionId)) {
-                status("Pixel-water spectrum unavailable on this audio output")
+                status("Live spectrum unavailable on this audio output")
                 return@customCommand
             }
             spectrumView = view
