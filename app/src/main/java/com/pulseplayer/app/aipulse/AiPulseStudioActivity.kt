@@ -143,8 +143,14 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         simple.addView(suggestionStatus)
+        val quickVocalPreview = android.widget.CheckBox(this).apply {
+            text = "Include experimental vocal tones in preview"
+            setTextColor(Color.WHITE)
+            isChecked = false
+        }
+        simple.addView(quickVocalPreview)
         simple.addView(Button(this).apply {
-            text = "GENERATE MUSIC · OFFLINE"
+            text = "GENERATE & PREVIEW · OFFLINE"
             setOnClickListener {
                 if (quickStyle.text.isBlank()) {
                     val (tags, _) = suggestStyle()
@@ -154,6 +160,8 @@ class AiPulseStudioActivity : Activity() {
                     putExtra("pulse_style_tags", quickStyle.text.toString())
                     putExtra("pulse_lyrics", quickLyrics.text.toString())
                     putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
+                    putExtra("pulse_vocal_preview", quickVocalPreview.isChecked)
+                    putExtra("pulse_auto_generate", true)
                 })
             }
         })
