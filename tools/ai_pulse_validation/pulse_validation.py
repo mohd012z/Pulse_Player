@@ -41,6 +41,10 @@ def compare(a,b):
             "rms_difference":round(abs(left["rms"]-right["rms"]),6),
             "duration_difference":round(abs(left["duration_seconds"]-right["duration_seconds"]),3),
             "a":left,"b":right}
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("Redirects are forbidden for API and audio requests")
+
 class AceStepAPI:
     def __init__(self,base_url,token=""):
         parsed=urllib.parse.urlsplit(base_url)
@@ -58,7 +62,7 @@ class AceStepAPI:
             headers["Content-Type"]="application/json"
             data=json.dumps(body).encode()
         request=urllib.request.Request(self.base+path,data=data,headers=headers)
-        with urllib.request.urlopen(request,timeout=30) as response:
+        with urllib.request.build_opener(_NoRedirect).open(request,timeout=30) as response:
             if urllib.parse.urlsplit(response.url).netloc!=urllib.parse.urlsplit(self.base).netloc:
                 raise ValueError("Cross-origin redirect blocked")
             payload=response.read(200000001 if binary else 2000000)
@@ -71,6 +75,7 @@ class AceStepAPI:
     def health(self):return self._request("/health")
     def generate(self,prompt,lyrics="",duration=30,timeout=120):
         if not 10<=duration<=600:raise ValueError("Duration out of range")
+        if not prompt.strip():raise ValueError("Song prompt required")
         job=self._request("/release_task",{"prompt":prompt,"lyrics":lyrics,
             "duration":duration,"audio_format":"wav","use_format":False,"thinking":True})
         task_id=job["task_id"]
