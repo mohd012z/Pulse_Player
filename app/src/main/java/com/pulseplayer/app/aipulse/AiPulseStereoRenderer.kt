@@ -13,7 +13,9 @@ import kotlin.math.sin
  * No third-party samples, proprietary soundfonts or neural weights.
  */
 object AiPulseStereoRenderer {
-    fun render(request: AiPulseComposer.Request, output: File, cancelled: () -> Boolean = { false }): File {
+    enum class Stem { MIX, LEAD, BASS, PAD, DRUMS }
+    fun render(request: AiPulseComposer.Request, output: File,
+               stem: Stem = Stem.MIX, cancelled: () -> Boolean = { false }): File {
         AiPulseComposer.validate(request)
         require(output.extension.equals("wav", true))
         val rate = 44100
@@ -56,8 +58,22 @@ object AiPulseStereoRenderer {
                         val kick = sin(2 * PI * 62.0 * t) * exp(-18.0 * beatPhase) * 0.16
                         val fade = min(1.0, min(t / 0.35, (request.seconds - t) / 0.5)).coerceAtLeast(0.0)
                         val energy = segment.energy * fade
-                        val left = ((lead * 0.90 + bass * 0.72 + pad * 1.05 + kick) * energy).coerceIn(-0.92, 0.92)
-                        val right = ((lead * 1.05 + bass * 0.72 + pad * 0.90 + kick) * energy).coerceIn(-0.92, 0.92)
+                        val leftVoice = when (stem) {
+                            Stem.MIX -> lead * 0.90 + bass * 0.72 + pad * 1.05 + kick
+                            Stem.LEAD -> lead * 0.90
+                            Stem.BASS -> bass * 0.72
+                            Stem.PAD -> pad * 1.05
+                            Stem.DRUMS -> kick
+                        }
+                        val rightVoice = when (stem) {
+                            Stem.MIX -> lead * 1.05 + bass * 0.72 + pad * 0.90 + kick
+                            Stem.LEAD -> lead * 1.05
+                            Stem.BASS -> bass * 0.72
+                            Stem.PAD -> pad * 0.90
+                            Stem.DRUMS -> kick
+                        }
+                        val left = (leftVoice * energy).coerceIn(-0.92, 0.92)
+                        val right = (rightVoice * energy).coerceIn(-0.92, 0.92)
                         val l = (left * 32767).toInt()
                         val r = (right * 32767).toInt()
                         val p = i * 4
