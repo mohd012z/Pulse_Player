@@ -32,6 +32,14 @@ def _safe_file(root, name, *, model=False):
     return path
 
 
+def _hash_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def inspect(folder):
     folder = Path(folder).resolve()
     config = _safe_file(folder, "dsconfig.yaml").read_text(encoding="utf-8")
@@ -46,18 +54,19 @@ def inspect(folder):
     report = {
         "status": "STRUCTURAL_ONLY_NOT_INFERENCE_PROVEN",
         "acoustic": acoustic.name,
-        "acoustic_sha256": hashlib.sha256(acoustic.read_bytes()).hexdigest(),
+        "acoustic_sha256": _hash_file(acoustic),
         "phoneme_count": len(tokens),
         "vocoder_reference": vocoder_name,
-        "requires_external_vocoder": not (folder / "dsvocoder" / "vocoder.onnx").is_file(),
+        "requires_external_vocoder": not (folder / "dsvocoder" / "vocoder.yaml").is_file(),
         "optional_models": [x for x in ("dsdur", "dspitch", "dsvariance") if (folder / x).is_dir()],
     }
     voc = folder / "dsvocoder"
-    if voc.is_dir():
-        model = _safe_file(voc, "vocoder.onnx", model=True)
+    if voc.is_dir() and (voc / "vocoder.yaml").is_file():
         config_path = _safe_file(voc, "vocoder.yaml")
         voc_config = config_path.read_text(encoding="utf-8")
-        report["vocoder_sha256"] = hashlib.sha256(model.read_bytes()).hexdigest()
+        model = _safe_file(voc, _field(voc_config, "model") or "vocoder.onnx", model=True)
+        report["vocoder_model"] = model.name
+        report["vocoder_sha256"] = _hash_file(model)
         for key in ("sample_rate", "hop_size", "num_mel_bins"):
             val = _field(voc_config, key)
             if not val.isdigit() or int(val) <= 0:
