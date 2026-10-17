@@ -26,6 +26,36 @@ object AiPulseArrangementEditor {
         return rebuild(plan.copy(segments = reordered))
     }
 
+    fun insert(
+        plan: AiPulseBrain.Plan,
+        afterIndex: Int,
+        section: AiPulseBrain.Section = AiPulseBrain.Section.CHORUS,
+        bars: Int = 4
+    ): AiPulseBrain.Plan {
+        require(afterIndex in plan.segments.indices)
+        require(bars in 4..32 && bars % 4 == 0)
+        val template = plan.segments[afterIndex]
+        val level = when (section) {
+            AiPulseBrain.Section.INTRO -> 0.40
+            AiPulseBrain.Section.VERSE -> 0.65
+            AiPulseBrain.Section.CHORUS -> 0.95
+            AiPulseBrain.Section.BRIDGE -> 0.55
+            AiPulseBrain.Section.OUTRO -> 0.35
+        }
+        val sections = plan.segments.toMutableList()
+        sections.add(afterIndex + 1, template.copy(
+            section = section, bars = bars, energy = level
+        ))
+        return rebuild(plan.copy(segments = sections))
+    }
+
+    fun remove(plan: AiPulseBrain.Plan, index: Int): AiPulseBrain.Plan {
+        require(index in plan.segments.indices)
+        val sections = plan.segments.toMutableList()
+        sections.removeAt(index)
+        return rebuild(plan.copy(segments = sections))
+    }
+
     fun rebuild(plan: AiPulseBrain.Plan): AiPulseBrain.Plan {
         require(plan.segments.isNotEmpty())
         require(plan.segments.all { it.bars > 0 && it.bars % 4 == 0 && it.energy.isFinite() && it.energy in 0.0..1.0 })
