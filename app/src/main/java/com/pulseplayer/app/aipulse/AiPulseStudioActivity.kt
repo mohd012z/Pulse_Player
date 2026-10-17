@@ -740,16 +740,12 @@ This creates editable original lyrics, not sung audio.""".trimIndent())
             text = "Generation history · chronological summary"
             setOnClickListener {
                 val events = memory.recent(15)
-                val history = events.joinToString("
-") {
+                val history = events.joinToString("\n") {
                     "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it.timestampMs))} · ${it.backendId} · ${it.outcome} · ${it.promptSummary}"
                 }
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("AI Pulse generation memory")
-                    .setMessage(memory.summary() + if (history.isEmpty()) "
-No attempts recorded yet." else "
-
-" + history)
+                    .setMessage(memory.summary() + if (history.isEmpty()) "\nNo attempts recorded yet." else "\n\n" + history)
                     .setPositiveButton("Close", null)
                     .setNeutralButton("Clear history") { _, _ ->
                         AlertDialog.Builder(this@AiPulseStudioActivity)
