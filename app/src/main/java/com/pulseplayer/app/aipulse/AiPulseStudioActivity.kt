@@ -192,6 +192,7 @@ class AiPulseStudioActivity : Activity() {
                 ))
                 editedArrangement = plan
                 timelineView.plan = plan
+                duration.setText(AiPulseRenderDuration.secondsFor(plan).toString())
                 val summary = plan.segments.joinToString("\\n") {
                     "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
@@ -240,6 +241,7 @@ class AiPulseStudioActivity : Activity() {
                                     }
                                     val updated = requireNotNull(editedArrangement)
                                     timelineView.plan = updated
+                                    duration.setText(AiPulseRenderDuration.secondsFor(updated).toString())
                                     Toast.makeText(this@AiPulseStudioActivity,
                                         "Timeline updated: ${updated.totalBars} bars", Toast.LENGTH_SHORT).show()
                                 }.onFailure {
@@ -484,6 +486,7 @@ class AiPulseStudioActivity : Activity() {
                     exportStems.isChecked = p.exportStems
                     editedArrangement = project.arrangement
                     timelineView.plan = project.arrangement
+                    project.arrangement?.let { duration.setText(AiPulseRenderDuration.secondsFor(it).toString()) }
                     (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
                     (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
@@ -505,7 +508,13 @@ class AiPulseStudioActivity : Activity() {
                     title = title.text.toString().trim(),
                     mood = mood.text.toString().trim(),
                     bpm = bpm.progress + 60,
-                    seconds = duration.text.toString().toIntOrNull() ?: 0,
+                    seconds = editedArrangement?.let { plan ->
+                        require(AiPulseRenderDuration.compatible(plan,
+                            genre.selectedItem.toString(), bpm.progress + 60)) {
+                            "Your arrangement uses a different tempo or genre. Regenerate it or restore its original settings."
+                        }
+                        AiPulseRenderDuration.secondsFor(plan)
+                    } ?: (duration.text.toString().toIntOrNull() ?: 0),
                     genre = genre.selectedItem.toString()
                 ).also(AiPulseComposer::validate)
             } catch (e: IllegalArgumentException) {
@@ -525,7 +534,7 @@ class AiPulseStudioActivity : Activity() {
             )
             val includeRecordedVoice = useRecordedVoice.isChecked
             val saveStems = exportStems.isChecked
-            val chosenArrangement = editedArrangement?.takeIf { it.genre == request.genre && it.bpm == request.bpm }
+            val chosenArrangement = editedArrangement
             val instrumentLevels = AiPulseTrackMixer.apply(
                 AiPulseStereoRenderer.Levels(
                     lead = leadLevel.progress / 100.0,
