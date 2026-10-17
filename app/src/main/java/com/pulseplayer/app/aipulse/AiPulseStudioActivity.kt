@@ -832,6 +832,11 @@ class AiPulseStudioActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Studio remains usable without reloading; generated-song list is queried fresh when opened.
+    }
+
     private fun showGeneratedSongs() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             val directory = File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "AI Pulse")
