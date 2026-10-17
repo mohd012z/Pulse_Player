@@ -255,14 +255,14 @@ class AiPulseStudioActivity : Activity() {
                 )
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("Original songwriting advice")
-                    .setMessage("Style: ${advice.style}\
-Vocal profile: ${advice.vocalProfile}\
-Tempo: ${suggestion.bpm} BPM\
-Chords: ${suggestion.chords}\
-\
-${suggestion.guidance}\
-\
-This creates editable original lyrics, not sung audio.")
+                    .setMessage("""Style: ${advice.style}
+Vocal profile: ${advice.vocalProfile}
+Tempo: ${suggestion.bpm} BPM
+Chords: ${suggestion.chords}
+
+${suggestion.guidance}
+
+This creates editable original lyrics, not sung audio.""".trimIndent())
                     .setNegativeButton("Cancel", null)
                     .setNeutralButton("Style only") { _, _ ->
                         bpm.progress = suggestion.bpm - 60
