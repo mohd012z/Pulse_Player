@@ -182,10 +182,10 @@ class AiPulseStudioActivity : Activity() {
                     genre = genre.selectedItem.toString(),
                     mood = mood.text.toString(),
                     bpm = bpm.progress + 60,
-                    bars = 16
+                    bars = 32
                 ))
                 val summary = plan.segments.joinToString("\\n") {
-                    "${it.section}: ${it.bars} bars · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
+                    "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("AI Pulse Brain · offline arrangement")
