@@ -176,6 +176,11 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         var editedArrangement: AiPulseBrain.Plan? = null
+        heading("Arrangement timeline · bar order and section energy")
+        val timelineView = AiPulseTimelineView(this)
+        root.addView(timelineView, LinearLayout.LayoutParams(
+            -1, (120 * resources.displayMetrics.density).toInt()
+        ))
         root.addView(Button(this).apply {
             text = "Brain: Generate song arrangement blueprint"
             setOnClickListener {
@@ -186,6 +191,7 @@ class AiPulseStudioActivity : Activity() {
                     bars = 8
                 ))
                 editedArrangement = plan
+                timelineView.plan = plan
                 val summary = plan.segments.joinToString("\\n") {
                     "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
@@ -233,6 +239,7 @@ class AiPulseStudioActivity : Activity() {
                                             energy = (segment.energy + 0.10).coerceAtMost(1.0))
                                     }
                                     val updated = requireNotNull(editedArrangement)
+                                    timelineView.plan = updated
                                     Toast.makeText(this@AiPulseStudioActivity,
                                         "Timeline updated: ${updated.totalBars} bars", Toast.LENGTH_SHORT).show()
                                 }.onFailure {
@@ -476,6 +483,7 @@ class AiPulseStudioActivity : Activity() {
                     vocalDelay.setText(p.vocalDelayMs.toString())
                     exportStems.isChecked = p.exportStems
                     editedArrangement = project.arrangement
+                    timelineView.plan = project.arrangement
                     (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
                     (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
