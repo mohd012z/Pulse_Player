@@ -597,6 +597,50 @@ class AiPulseStudioActivity : Activity() {
                     }.show()
             }
         })
+        heading("Neural song generation · optional connected engine")
+        val neuralEndpoint = field("HTTPS neural WAV endpoint (POST)", "")
+        neuralEndpoint.setText(getPreferences(MODE_PRIVATE).getString("neural_endpoint", ""))
+        val neuralStatus = heading("No neural model bundled. Connect a compatible model server to enable sung vocals.")
+        root.addView(Button(this).apply {
+            text = "Generate neural song"
+            setOnClickListener {
+                if (working) return@setOnClickListener
+                val endpoint = neuralEndpoint.text.toString().trim()
+                if (!endpoint.startsWith("https://", true)) {
+                    neuralStatus.text = "Enter an HTTPS neural music server endpoint"
+                    return@setOnClickListener
+                }
+                val seconds = duration.text.toString().toIntOrNull() ?: 30
+                val task = AiPulseNeuralBridge.Request(
+                    title.text.toString(), idea.text.toString(), lyrics.text.toString(),
+                    genre.selectedItem.toString(), language.selectedItem.toString(),
+                    instrumentalOnly.isChecked, seconds
+                )
+                getPreferences(MODE_PRIVATE).edit().putString("neural_endpoint", endpoint).apply()
+                working = true
+                cancelRequested = false
+                neuralStatus.text = "Generating neural song…"
+                thread(name = "AiPulseNeural") {
+                    val result = runCatching {
+                        val generated = AiPulseNeuralBridge(applicationContext)
+                            .generate(endpoint, task) { cancelRequested }
+                        try {
+                            if (cancelRequested) throw InterruptedException("Cancelled")
+                            saveToMusic(generated, task.title)
+                        } finally {
+                            generated.delete()
+                        }
+                    }
+                    runOnUiThread {
+                        working = false
+                        neuralStatus.text = result.fold(
+                            { "Neural WAV saved to Music/AI Pulse · open My generated songs" },
+                            { "Neural generation failed: ${it.message}" }
+                        )
+                    }
+                }
+            }
+        })
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
         val create = Button(this).apply { text = "Generate music" }
         val cancel = Button(this).apply { text = "Cancel"; isEnabled = false }
