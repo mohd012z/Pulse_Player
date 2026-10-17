@@ -106,6 +106,16 @@ class AiPulseStudioActivity : Activity() {
             minLines = 2
         }
         simple.addView(quickIdea)
+        simpleLabel("Lyrics")
+        val quickLyrics = EditText(this).apply {
+            hint = "[Verse 1] Write your lyrics here"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            gravity = Gravity.TOP
+            minLines = 8
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        simple.addView(quickLyrics)
         fun suggestStyle(): Pair<String, String> {
             val text = (quickIdea.text.toString() + " " + quickLyrics.text.toString()).lowercase()
             return when {
@@ -133,16 +143,6 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         simple.addView(suggestionStatus)
-        simpleLabel("Lyrics")
-        val quickLyrics = EditText(this).apply {
-            hint = "[Verse 1] Write your lyrics here"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.LTGRAY)
-            gravity = Gravity.TOP
-            minLines = 8
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        }
-        simple.addView(quickLyrics)
         simple.addView(Button(this).apply {
             text = "GENERATE MUSIC · OFFLINE"
             setOnClickListener {
