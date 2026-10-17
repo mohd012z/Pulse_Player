@@ -25,4 +25,19 @@ class AiPulseArrangementEditorTest {
         assertTrue(runCatching { AiPulseArrangementEditor.update(edited, 1, bars = 3) }.isFailure)
         assertTrue(runCatching { AiPulseArrangementEditor.move(original, 0, -1) }.isFailure)
     }
+    @Test fun sectionEnergyCanBeAdjustedWithoutMovingBars() {
+        val original = AiPulseBrain.plan(AiPulseBrain.Input("Pop Rock", "bright", 110, bars = 16))
+        val updated = AiPulseArrangementEditor.update(original, 1, energy = 0.25)
+        assertEquals(0.25, updated.segments[1].energy, 0.00001)
+        assertEquals(original.segments.map { it.startBar }, updated.segments.map { it.startBar })
+        assertEquals(original.totalBars, updated.totalBars)
+    }
+
+    @Test fun nonFiniteEnergyIsRejected() {
+        val original = AiPulseBrain.plan(AiPulseBrain.Input("Acoustic", "bright", 100, bars = 8))
+        assertTrue(runCatching { AiPulseArrangementEditor.update(original, 0, energy = Double.NaN) }.isFailure)
+        assertTrue(runCatching { AiPulseArrangementEditor.update(original, 0, energy = Double.POSITIVE_INFINITY) }.isFailure)
+        assertTrue(runCatching { AiPulseArrangementEditor.update(original, 0, energy = -0.1) }.isFailure)
+    }
+
 }
