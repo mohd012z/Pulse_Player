@@ -6,7 +6,7 @@ Weights are never deserialized by this utility.
 import argparse
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 APPROVED = {
     "ace_step": "ACE-Step/Ace-Step1.5",
@@ -46,8 +46,8 @@ def acquire(name, revision, output, *, license_reviewed=False, max_gib=32):
     total = 0
     for item in info.siblings:
         filename = item.rfilename
-        path = Path(filename)
-        if path.is_absolute() or ".." in path.parts or path.suffix.lower() not in ALLOWED_SUFFIXES:
+        path = PurePosixPath(filename)
+        if path.is_absolute() or ".." in path.parts or "\\" in filename or path.suffix.lower() not in ALLOWED_SUFFIXES:
             continue
         if filename.endswith(".py"):
             continue
@@ -61,16 +61,16 @@ def acquire(name, revision, output, *, license_reviewed=False, max_gib=32):
     output = Path(output).resolve()
     if output.exists():
         raise FileExistsError("Destination must be new")
-    downloaded = snapshot_download(
+    snapshot_download(
         repo_id=repo, revision=revision, local_dir=str(output),
         allow_patterns=selected, ignore_patterns=list(EXCLUDED),
     )
     records = []
-    for name in selected:
-        path = output / name
-        if not path.is_file() or path.is_symlink():
+    for filename in selected:
+        path = output / filename
+        if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(output):
             raise ValueError("Missing or symlinked downloaded file")
-        records.append({"path": name, "bytes": path.stat().st_size, "sha256": sha256(path)})
+        records.append({"path": filename, "bytes": path.stat().st_size, "sha256": sha256(path)})
     manifest = {"repository": repo, "revision": revision, "files": records,
                 "license_reviewed_by_operator": True,
                 "status": "DOWNLOADED_NOT_INFERENCE_VERIFIED"}
