@@ -58,6 +58,8 @@ class OnlineMediaActivity : Activity() {
         web.settings.mediaPlaybackRequiresUserGesture = true
         web.settings.allowFileAccess = false
         web.settings.allowContentAccess = false
+        web.settings.javaScriptCanOpenWindowsAutomatically = false
+        web.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         web.settings.setSupportMultipleWindows(false)
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
@@ -79,6 +81,16 @@ class OnlineMediaActivity : Activity() {
     override fun onBackPressed() {
         val web = browser
         if (web?.canGoBack() == true) web.goBack() else super.onBackPressed()
+    }
+
+    override fun onPause() {
+        browser?.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        browser?.onResume()
     }
 
     override fun onDestroy() {
