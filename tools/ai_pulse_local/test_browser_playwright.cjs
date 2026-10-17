@@ -68,6 +68,46 @@ async function main() {
     const saved = fs.readFileSync(downloadPath);
     assert.equal(saved.subarray(0, 4).toString("ascii"), "RIFF");
     assert.equal(saved.length, details.bytes);
+    // Simulate Android Chrome viewport and touch interaction in Chromium.
+    // This is NOT a physical Android WebView or device test.
+    const mobile = await browser.newContext({
+      viewport: { width: 393, height: 851 },
+      deviceScaleFactor: 2.75,
+      isMobile: true, hasTouch: true, acceptDownloads: true
+    });
+    try {
+      const phone = await mobile.newPage();
+      phone.on("pageerror", e => errors.push("mobile: " + e.message));
+      await phone.goto("http://127.0.0.1:" + server.address().port + "/");
+      await phone.locator("#bars").fill("2");
+      await phone.locator("#bpm").fill("120");
+      await phone.locator("#generate").tap();
+      await phone.waitForFunction(() => document.querySelector("#status").textContent.includes("WAV ready"), null, { timeout: 15000 });
+      await phone.waitForFunction(() => document.querySelector("#player").readyState >= 1, null, { timeout: 15000 });
+      const playback = await phone.locator("#play").evaluate(async button => {
+        button.click();
+        const audio = document.querySelector("#player");
+        try {
+          await new Promise((resolve, reject) => {
+            if (!audio.paused) return resolve();
+            audio.addEventListener("playing", resolve, { once: true });
+            audio.addEventListener("error", () => reject(Error("audio error")), { once: true });
+            setTimeout(() => reject(Error("playback did not start")), 8000);
+          });
+          return { paused: audio.paused, error: audio.error?.code ?? null };
+        } catch (e) { return { failed: e.message }; }
+      });
+      assert.equal(playback.failed, undefined, "Mobile-emulated user-initiated playback failed");
+      assert.equal(playback.paused, false);
+      assert.equal(playback.error, null);
+      const mobileDownload = phone.waitForEvent("download", { timeout: 15000 });
+      await phone.locator("#save").tap();
+      const mobileSaved = await mobileDownload;
+      assert.match(mobileSaved.suggestedFilename(), /\\.wav$/);
+      console.log("PASS: Chromium mobile viewport, touch controls, playback and WAV download");
+    } finally {
+      await mobile.close();
+    }
     assert.deepEqual(errors, []);
     console.log("PASS: real Chromium UI, Blob WAV, audio metadata and browser download");
     console.log("NOTE: Headless Chromium does not verify physical Android speaker output or WebView export.");
