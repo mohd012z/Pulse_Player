@@ -66,12 +66,30 @@ class AiPulseStudioActivity : Activity() {
             })
         }
         simpleLabel("AI PULSE · Create Music")
-        simpleLabel("Style")
+        simpleLabel("1 · Song idea")
+        val quickIdea = EditText(this).apply {
+            hint = "Example: A hopeful song about friendship"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            setSingleLine(true)
+        }
+        simple.addView(quickIdea)
+        simpleLabel("Lyrics · optional")
+        val quickLyrics = EditText(this).apply {
+            hint = "[Verse 1] Write your lyrics here"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            gravity = Gravity.TOP
+            minLines = 3
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        simple.addView(quickLyrics)
+        simpleLabel("2 · Style & mood")
         val quickStyle = EditText(this).apply {
             hint = "Pop rock, acoustic guitar, 110 bpm"
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
-            minLines = 2
+            setSingleLine(true)
         }
         simple.addView(quickStyle)
         simpleLabel("Recommended styles · offline presets")
@@ -96,28 +114,6 @@ class AiPulseStudioActivity : Activity() {
                     "Preset selected · editable style tags", Toast.LENGTH_SHORT).show()
             }
         })
-        simple.addView(TextView(this).apply {
-            text = "Offline rule-based suggestions, not AI model recommendations. Tags influence genre and BPM; not every named instrument is synthesized."
-            setTextColor(Color.LTGRAY)
-        })
-        simpleLabel("Song idea (optional)")
-        val quickIdea = EditText(this).apply {
-            hint = "Example: A hopeful song about friendship"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.LTGRAY)
-            minLines = 2
-        }
-        simple.addView(quickIdea)
-        simpleLabel("Lyrics")
-        val quickLyrics = EditText(this).apply {
-            hint = "[Verse 1] Write your lyrics here"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.LTGRAY)
-            gravity = Gravity.TOP
-            minLines = 8
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        }
-        simple.addView(quickLyrics)
         fun suggestStyle(): Pair<String, String> {
             val text = (quickIdea.text.toString() + " " + quickLyrics.text.toString()).lowercase()
             return when {
@@ -151,24 +147,33 @@ class AiPulseStudioActivity : Activity() {
             isChecked = false
         }
         simple.addView(quickVocalPreview)
-        simple.addView(Button(this).apply {
-            text = "GENERATE & PREVIEW · OFFLINE"
-            setOnClickListener {
-                if (quickStyle.text.isBlank()) {
-                    val (tags, _) = suggestStyle()
-                    quickStyle.setText(tags)
-                }
-                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
-                    putExtra("pulse_style_tags", quickStyle.text.toString())
-                    putExtra("pulse_lyrics", quickLyrics.text.toString())
-                    putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
-                    putExtra("pulse_vocal_preview", quickVocalPreview.isChecked)
-                    putExtra("pulse_auto_generate", true)
-                })
+        fun openComposer(autoGenerate: Boolean) {
+            if (quickStyle.text.isBlank()) {
+                val (tags, description) = suggestStyle()
+                quickStyle.setText(tags)
+                suggestionStatus.text = description
             }
-        })
+            startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
+                putExtra("pulse_style_tags", quickStyle.text.toString())
+                putExtra("pulse_lyrics", quickLyrics.text.toString())
+                putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
+                putExtra("pulse_vocal_preview", quickVocalPreview.isChecked)
+                putExtra("pulse_auto_generate", autoGenerate)
+            })
+        }
+        simpleLabel("3 · Preview & generate")
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actions.addView(Button(this).apply {
+            text = "PREVIEW"
+            setOnClickListener { openComposer(false) }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        actions.addView(Button(this).apply {
+            text = "GENERATE"
+            setOnClickListener { openComposer(true) }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        simple.addView(actions)
         simple.addView(TextView(this).apply {
-            text = "Automatically recommends style and BPM. Generates offline instrumentals; experimental vowel Vocal Preview is available in the composer. Not full sung lyrics."
+            text = "Preview opens the composer without rendering; Generate renders the offline WAV. Vocal tones are experimental, not sung lyrics."
             setTextColor(Color.LTGRAY)
         })
         simple.addView(Button(this).apply {
