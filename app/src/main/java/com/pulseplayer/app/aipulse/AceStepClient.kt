@@ -90,79 +90,87 @@ internal class AceStepClient(private val context: Context) {
         }
     }
 
+    /**
+     * ACE-Step v1.5 current /v1 asynchronous API.
+     * No GPU server is owned by the Android app: users can supply a hosted HTTPS endpoint.
+     */
     fun generate(baseUrl: String, request: AiPulseNeuralBridge.Request, cancelled: () -> Boolean): File {
         val base = URL(baseUrl.trim().trimEnd('/') + "/")
         require(base.protocol == "https" && base.userInfo == null && base.ref == null) {
-            "ACE-Step server requires an HTTPS base URL"
+            "Use a trusted HTTPS inference endpoint"
         }
-        require(request.seconds in 10..600) { "ACE-Step duration must be 10–600 seconds" }
-        val prompt = listOf(request.genre, request.description).filter { it.isNotBlank() }.joinToString(", ")
-        val lyrics = if (request.instrumental) "[inst]" else request.lyrics
-        val submission = post(URL(base, "release_task"), JSONObject().apply {
+        require(request.seconds in 10..600) { "Duration must be 10–600 seconds" }
+        val prompt = listOf(request.genre, request.description)
+            .filter { it.isNotBlank() }.joinToString(", ")
+        require(prompt.isNotBlank()) { "Music description required" }
+        val submission = post(URL(base, "v1/music/generate"), JSONObject().apply {
             put("caption", prompt)
-            put("lyrics", lyrics)
+            put("lyrics", if (request.instrumental) "[inst]" else request.lyrics)
             put("audio_format", "wav")
-            put("use_format", false)
             put("duration", request.seconds)
-            put("vocal_language", when {
-                request.language.contains("English", true) && !request.language.contains("BM", true) -> "en"
-                else -> "unknown"
-            })
             put("thinking", true)
         })
-        val data = submission.optJSONObject("data")
-        val taskId = data?.optString("task_id").orEmpty().ifBlank {
-            submission.optString("task_id")
-        }
-        require(taskId.isNotBlank()) { "ACE-Step returned no task_id" }
+        val jobId = submission.optString("job_id")
+        require(jobId.isNotBlank()) { "Server returned no job_id" }
         val deadline = System.currentTimeMillis() + 12 * 60 * 1000L
         while (System.currentTimeMillis() < deadline) {
             if (cancelled()) throw InterruptedException("Cancelled")
-            val status = post(URL(base, "query_result"), JSONObject().apply {
-                put("task_id_list", JSONArray().put(taskId))
-            }).optJSONArray("data")?.optJSONObject(0)
-                ?: error("ACE-Step returned no task status")
-            when (status.optInt("status", 0)) {
-                2 -> error("ACE-Step generation failed: ${status.optString("error")}")
-                1 -> {
-                    val raw = status.optString("result")
-                    val files = JSONArray(raw)
-                    val path = files.getJSONObject(0).getString("file")
-                    val audioUrl = URL(base, path)
-                    require(audioUrl.protocol == "https" && audioUrl.host == base.host &&
-                        audioUrl.port == base.port) { "Untrusted audio download location" }
+            val conn = connection(URL(base, "v1/jobs/" + java.net.URLEncoder.encode(jobId, "UTF-8")), "GET")
+            val job = try {
+                check(conn.responseCode == 200) { "Job polling HTTP ${conn.responseCode}" }
+                JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            } finally { conn.disconnect() }
+            when (job.optString("status")) {
+                "failed" -> error("Generation failed: ${job.optString("error", "unknown")}")
+                "succeeded" -> {
+                    val result = job.optJSONObject("result") ?: error("Missing generation result")
+                    val files = result.optJSONArray("audio_files")
+                        ?: result.optJSONArray("files")
+                        ?: error("No audio files in result")
+                    require(files.length() > 0) { "Empty generated audio list" }
+                    val item = files.getJSONObject(0)
+                    val rawPath = item.optString("url").ifBlank {
+                        item.optString("file").ifBlank { item.optString("path") }
+                    }
+                    require(rawPath.isNotBlank()) { "No generated audio path" }
+                    val audioUrl = URL(base, rawPath)
+                    require(audioUrl.protocol == base.protocol && audioUrl.host == base.host &&
+                        audioUrl.port == base.port && audioUrl.userInfo == null) {
+                        "Untrusted audio download URL"
+                    }
                     val output = File.createTempFile("ace-step-", ".wav", context.cacheDir)
                     try {
-                        val conn = connection(audioUrl, "GET")
+                        val download = connection(audioUrl, "GET")
                         try {
-                            check(conn.responseCode == 200) { "Audio download HTTP ${conn.responseCode}" }
-                            conn.inputStream.use { input ->
+                            download.setRequestProperty("Accept", "audio/wav")
+                            check(download.responseCode == 200) { "Download HTTP ${download.responseCode}" }
+                            download.inputStream.use { input ->
                                 output.outputStream().use { sink ->
                                     val buffer = ByteArray(32768)
-                                    var total = 0L
+                                    var size = 0L
                                     while (true) {
                                         if (cancelled()) throw InterruptedException("Cancelled")
-                                        val count = input.read(buffer)
-                                        if (count < 0) break
-                                        total += count
-                                        require(total <= 200L * 1024 * 1024) { "Audio exceeds 200 MB" }
-                                        sink.write(buffer, 0, count)
+                                        val n = input.read(buffer)
+                                        if (n < 0) break
+                                        size += n
+                                        require(size <= 200L * 1024 * 1024) { "Audio exceeds 200 MB" }
+                                        sink.write(buffer, 0, n)
                                     }
                                 }
                             }
-                        } finally { conn.disconnect() }
+                        } finally { download.disconnect() }
                         require(AiPulseGeneratedAudioVerifier.inspect(output).valid) {
-                            "ACE-Step output failed WAV verification"
+                            "Generated file is not a valid WAV"
                         }
                         return output
-                    } catch (error: Exception) {
+                    } catch (e: Exception) {
                         output.delete()
-                        throw error
+                        throw e
                     }
                 }
             }
             Thread.sleep(2500)
         }
-        error("ACE-Step timed out after 12 minutes")
+        error("Neural generation timed out")
     }
 }
