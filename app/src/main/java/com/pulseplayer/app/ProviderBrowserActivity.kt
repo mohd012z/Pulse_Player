@@ -1,6 +1,7 @@
 package com.pulseplayer.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
@@ -62,6 +63,8 @@ class ProviderBrowserActivity : Activity() {
     private var controlsVisible = true
     private var home = ""
     private var privacyFilterEnabled = true
+    private var requestedVideoFps = 0f
+    private var originalDisplayModeId: Int? = null
 
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable {
@@ -159,6 +162,7 @@ class ProviderBrowserActivity : Activity() {
                     videoHost.addView(view, videoHost.indexOfChild(exitCinemaButton), FrameLayout.LayoutParams(-1, -1))
                     browser.visibility = View.GONE
                     enterPortraitCinema(providerFullscreen = true)
+                    applyFrameRateHint()
                 }
                 override fun onHideCustomView() { leaveFullscreenVideo() }
             }
@@ -228,6 +232,7 @@ class ProviderBrowserActivity : Activity() {
             button("Shorts") { browser.loadUrl("https://www.youtube.com/shorts") }
             button("Drama") { browser.loadUrl("https://www.youtube.com/results?search_query=short+drama") }
         }
+        button("FPS") { showFrameRatePicker() }
         button("CC") { status.text = "Use the video player's CC control for available subtitles." }
         button("Privacy") {
             privacyFilterEnabled = !privacyFilterEnabled
@@ -254,6 +259,64 @@ class ProviderBrowserActivity : Activity() {
         setContentView(root)
         if (savedInstanceState == null || browser.restoreState(savedInstanceState) == null) browser.loadUrl(home)
         scheduleAutoHide()
+    }
+
+    private fun showFrameRatePicker() {
+        val choices = arrayOf(
+            "System automatic (recommended)", "23.976 / 24 fps",
+            "25 fps", "29.97 / 30 fps", "50 fps", "59.94 / 60 fps"
+        )
+        val fps = floatArrayOf(0f, 24f, 25f, 30f, 50f, 60f)
+        AlertDialog.Builder(this)
+            .setTitle("Video frame rate · display matching")
+            .setMessage("Choose only if you know the video's frame rate. " +
+                "This suggests a compatible display refresh mode; it does not " +
+                "change YouTube source FPS or force the device to switch.")
+            .setItems(choices) { _, which ->
+                requestedVideoFps = fps[which]
+                if (fullscreenView != null) applyFrameRateHint()
+                else status.text = if (requestedVideoFps == 0f)
+                    "System automatic refresh rate selected."
+                else "Frame-rate hint: ${choices[which]}. Open video fullscreen to apply, if supported."
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun applyFrameRateHint() {
+        if (originalDisplayModeId == null) {
+            originalDisplayModeId = window.attributes.preferredDisplayModeId
+        }
+        val params = window.attributes
+        if (requestedVideoFps <= 0f) {
+            params.preferredDisplayModeId = originalDisplayModeId ?: 0
+            window.attributes = params
+            return
+        }
+        val display = windowManager.defaultDisplay
+        val current = display.mode
+        val modes = display.supportedModes.map {
+            FrameRateSelector.Mode(it.modeId, it.physicalWidth, it.physicalHeight, it.refreshRate)
+        }
+        val candidate = FrameRateSelector.choose(modes, current.physicalWidth,
+            current.physicalHeight, requestedVideoFps)
+        if (candidate != null) {
+            params.preferredDisplayModeId = candidate.id
+            window.attributes = params
+            status.text = "Requested ${candidate.hz} Hz for ${requestedVideoFps} fps; Android controls final mode."
+        } else {
+            params.preferredDisplayModeId = originalDisplayModeId ?: 0
+            window.attributes = params
+            status.text = "No compatible display refresh mode; system automatic retained."
+        }
+    }
+
+    private fun restoreFrameRateHint() {
+        val previous = originalDisplayModeId ?: return
+        val params = window.attributes
+        params.preferredDisplayModeId = previous
+        window.attributes = params
+        originalDisplayModeId = null
     }
 
     private fun enterPortraitCinema(providerFullscreen: Boolean = false) {
@@ -292,6 +355,7 @@ class ProviderBrowserActivity : Activity() {
 
     private fun leavePortraitCinema() {
         if (fullscreenView != null) { leaveFullscreenVideo(); return }
+        restoreFrameRateHint()
         portraitCinema = false
         videoFullscreenMode = false
         exitCinemaButton.visibility = View.GONE
@@ -349,6 +413,7 @@ class ProviderBrowserActivity : Activity() {
 
     override fun onDestroy() {
         hideHandler.removeCallbacks(hideControls)
+        restoreFrameRateHint()
         if (fullscreenView != null) leaveFullscreenVideo()
         if (::browser.isInitialized) {
             (browser.parent as? ViewGroup)?.removeView(browser)
