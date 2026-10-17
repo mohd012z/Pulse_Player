@@ -49,6 +49,58 @@ class AiPulseStudioActivity : Activity() {
         val scroller = ScrollView(this)
         scroller.addView(root)
         setContentView(scroller)
+        val simple = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+            setBackgroundColor(0xFF10141F.toInt())
+        }
+        val landing = ScrollView(this).apply { addView(simple) }
+        fun simpleLabel(value: String) {
+            simple.addView(TextView(this).apply {
+                text = value
+                textSize = 18f
+                setTextColor(Color.WHITE)
+                setPadding(0, 14, 0, 8)
+            })
+        }
+        simpleLabel("AI PULSE · Create Music")
+        simpleLabel("Style")
+        val quickStyle = EditText(this).apply {
+            hint = "Pop rock, acoustic guitar, 110 bpm"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            minLines = 2
+        }
+        simple.addView(quickStyle)
+        simpleLabel("Lyrics")
+        val quickLyrics = EditText(this).apply {
+            hint = "[Verse 1] Write your lyrics here"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            gravity = Gravity.TOP
+            minLines = 8
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        simple.addView(quickLyrics)
+        simple.addView(Button(this).apply {
+            text = "GENERATE MUSIC · OFFLINE"
+            setOnClickListener {
+                startActivity(Intent(this@AiPulseStudioActivity, PulseNovaWebActivity::class.java).apply {
+                    putExtra("pulse_style_tags", quickStyle.text.toString())
+                    putExtra("pulse_lyrics", quickLyrics.text.toString())
+                    putExtra("pulse_lyric_mode", quickLyrics.text.isNotBlank())
+                })
+            }
+        })
+        simple.addView(TextView(this).apply {
+            text = "Lyric-guided instrumental generation. Sung vocals are not yet supported."
+            setTextColor(Color.LTGRAY)
+        })
+        simple.addView(Button(this).apply {
+            text = "Advanced Studio · Voice, Mixing & Tools"
+            setOnClickListener { setContentView(scroller) }
+        })
+        setContentView(landing)
         fun heading(text: String): TextView = TextView(this).apply {
             this.text = text
             textSize = 18f
