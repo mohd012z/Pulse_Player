@@ -27,7 +27,9 @@ def inspect_wav(path):
             raise ValueError("Output must be uncompressed PCM16 WAV")
         if audio.getnchannels() not in (1, 2) or not 16000 <= audio.getframerate() <= 96000:
             raise ValueError("Unsupported output channel count or sample rate")
-        seconds = audio.getnframes() / audio.getframerate()
+        sample_rate = audio.getframerate()
+        channels = audio.getnchannels()
+        seconds = audio.getnframes() / sample_rate
         if seconds < 0.1 or seconds > 360:
             raise ValueError("Output duration outside bounds")
         peak = 0
@@ -49,8 +51,8 @@ def inspect_wav(path):
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
-    return {"duration_seconds": round(seconds, 3), "sample_rate": audio.getframerate(),
-            "channels": audio.getnchannels(), "peak_pcm16": peak,
+    return {"duration_seconds": round(seconds, 3), "sample_rate": sample_rate,
+            "channels": channels, "peak_pcm16": peak,
             "sha256": digest.hexdigest()}
 
 
