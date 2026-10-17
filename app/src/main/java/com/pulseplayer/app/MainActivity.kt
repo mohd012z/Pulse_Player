@@ -1450,12 +1450,15 @@ class MainActivity : Activity() {
             }
             "$type: ${device.productName}"
         }
-        val spatial = if (android.os.Build.VERSION.SDK_INT >= 32) {
-            val spatializer = manager.spatializer
-            "Spatial audio supported: ${spatializer.immersiveAudioLevel != android.media.Spatializer.SPATIALIZER_IMMERSIVE_LEVEL_NONE}\n" +
-                "Available for current route: ${spatializer.isAvailable}\n" +
-                "Enabled in Android: ${spatializer.isEnabled}"
-        } else "Spatial audio capability check requires Android 12L or newer."
+        val spatial = PlatformSpatialAudio.query(manager)?.let {
+            "Platform spatial audio supported: ${it.supported}\\n" +
+                "Available for connected route: ${it.available}\\n" +
+                "Enabled by Android: ${it.enabled}\\n" +
+                "Stereo eligibility: ${it.stereoEligible}\\n" +
+                "5.1 eligibility: ${it.surround51Eligible}\\n" +
+                "Head tracking available: ${it.headTrackerAvailable}\\n" +
+                "These are hardware capabilities; Pulse Player does not decode Dolby Atmos."
+        } ?: "Android spatial-audio API requires Android 12L or newer."
         val display = windowManager.defaultDisplay
         val modes = display.supportedModes.map { it.refreshRate }.distinct().sorted()
         val message = """
