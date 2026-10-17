@@ -175,22 +175,26 @@ class AiPulseStudioActivity : Activity() {
         root.addView(Button(this).apply {
             text = "Search public music metadata"
             setOnClickListener {
-                if (!AiPulseHybridDiscovery.isOnline(this@AiPulseStudioActivity)) {
-                    discoveryResult.text = "Offline · continue composing without internet"
-                    return@setOnClickListener
-                }
                 val query = discoveryQuery.text.toString()
+                val online = AiPulseHybridDiscovery.isOnline(this@AiPulseStudioActivity)
                 isEnabled = false
                 discoveryResult.text = "Searching public recording metadata…"
                 val button = this
                 thread(name = "AiPulseMetadataLookup") {
-                    val result = runCatching { AiPulseDiscoveryGateway.search(query, true) }
+                    val result = runCatching {
+                        val stored = AiPulsePersistentCache.get(applicationContext, query)
+                        if (stored != null) stored else {
+                            val found = AiPulseDiscoveryGateway.search(query, online)
+                            if (online) AiPulsePersistentCache.put(applicationContext, query, found)
+                            found
+                        }
+                    }
                     runOnUiThread {
                         button.isEnabled = true
                         if (!isFinishing && !isDestroyed) {
                             discoveryResult.text = result.fold(
                                 onSuccess = { matches ->
-                                    if (matches.isEmpty()) "No matching metadata found"
+                                    if (matches.isEmpty()) "No cached matches. Online search requires a connection."
                                     else matches.joinToString("\\n") { "${it.title} — ${it.artist}" }
                                 },
                                 onFailure = { "Lookup unavailable: ${it.message}. Offline creation still works." }
