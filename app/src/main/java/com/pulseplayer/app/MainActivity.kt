@@ -713,20 +713,16 @@ class MainActivity : Activity() {
             stopSpectrum()
             val view = SpectrumView(this).apply {
                 setBackgroundColor(COLOR_PANEL)
-                displayMode = if (spectrumPreferences().getString("display_mode", "fft") == "wave")
-                    SpectrumView.DisplayMode.PIXEL_WATER
-                else SpectrumView.DisplayMode.FREQUENCY_BARS
+                val savedMode = spectrumPreferences().getString("display_mode", "FREQUENCY_BARS")
+                displayMode = SpectrumView.DisplayMode.entries.firstOrNull { it.name == savedMode }
+                    ?: SpectrumView.DisplayMode.FREQUENCY_BARS
                 setOnClickListener {
-                    displayMode = if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS)
-                        SpectrumView.DisplayMode.PIXEL_WATER
-                    else SpectrumView.DisplayMode.FREQUENCY_BARS
-                    spectrumPreferences().edit().putString("display_mode",
-                        if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS) "fft" else "wave"
-                    ).apply()
-                    status(if (displayMode == SpectrumView.DisplayMode.FREQUENCY_BARS)
-                        "Live FFT frequency spectrum" else "Live pixel-water waveform")
+                    val modes = SpectrumView.DisplayMode.entries
+                    displayMode = modes[(modes.indexOf(displayMode) + 1) % modes.size]
+                    spectrumPreferences().edit().putString("display_mode", displayMode.name).apply()
+                    status("Spectrum: ${displayMode.name.replace('_', ' ')} · tap to change")
                 }
-                contentDescription = "Live audio visualizer. Tap to switch between FFT frequency bars and pixel-water waveform."
+                contentDescription = "Live audio spectrum. Tap to cycle frequency bars, pixel water, mirrored bars and oscilloscope."
             }
             if (!view.start(sessionId)) {
                 status("Live spectrum unavailable on this audio output")
