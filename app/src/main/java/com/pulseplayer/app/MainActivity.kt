@@ -89,6 +89,8 @@ class MainActivity : Activity() {
     private var customHigh = 0
     private val folderPrefs by lazy { getSharedPreferences("selected_folders", MODE_PRIVATE) }
     private var source = "DEVICE"
+    private var originFilter = "All songs"
+    private var formatFilter = "All formats"
     private var folderScanGeneration = 0
     private var currentDisplaySize = 0
     private var scanGeneration = 0
@@ -272,9 +274,19 @@ class MainActivity : Activity() {
     private fun filterLibrary() {
         val query = filterView.text?.toString()?.trim().orEmpty()
         visibleSongs.clear()
-        visibleSongs.addAll(if (query.isEmpty()) songs else songs.filter {
-            it.title.contains(query, ignoreCase = true) ||
-                it.artist.contains(query, ignoreCase = true)
+        visibleSongs.addAll(songs.filter { song ->
+            val matchesSearch = query.isEmpty() || song.title.contains(query, true) ||
+                song.artist.contains(query, true) || song.fileName.contains(query, true)
+            val isStudio = song.relativePath.replace('\\', '/')
+                .contains("Music/AI Pulse", ignoreCase = true)
+            val matchesOrigin = when (originFilter) {
+                "Studio songs" -> isStudio
+                "Local songs" -> !isStudio
+                else -> true
+            }
+            val extension = song.fileName.substringAfterLast('.', "").uppercase(Locale.US)
+            val matchesFormat = formatFilter == "All formats" || extension == formatFilter
+            matchesSearch && matchesOrigin && matchesFormat
         })
         val lines: List<String> = when (source) {
             "FOLDERS" -> folderTracks.filter { it.name.contains(query, true) || it.folder.contains(query, true) }
@@ -287,11 +299,23 @@ class MainActivity : Activity() {
         trackAdapter.clear()
         trackAdapter.addAll(lines)
         trackAdapter.notifyDataSetChanged()
-        libraryView.text = "${source}  ·  $currentDisplaySize tracks / stations"
+        libraryView.text = "${source} · $currentDisplaySize items · $originFilter · $formatFilter"
         if (::sourceView.isInitialized) sourceView.text = "${source.replace('_', ' ')} · ${currentDisplaySize} items"
         if (::sourceButton.isInitialized) {
             sourceButton.text = "♫\nLibrary"
             sourceButton.contentDescription = "Music source: $source. Tap to change source"
+        }
+    }
+
+    private fun showMusicFilters() {
+        val origins = arrayOf("All songs", "Studio songs", "Local songs")
+        val formats = arrayOf("All formats", "MP3", "WAV", "FLAC", "M4A", "AAC", "OGG", "OPUS", "WMA")
+        showPicker("Music filter · ${originFilter} · ${formatFilter}", arrayOf("Source: ${originFilter}", "Type: ${formatFilter}", "Clear filters")) { option ->
+            when (option) {
+                0 -> showPicker("Song source", origins) { originFilter = origins[it]; switchPlaylist("DEVICE"); filterLibrary() }
+                1 -> showPicker("Audio file type", formats) { formatFilter = formats[it]; switchPlaylist("DEVICE"); filterLibrary() }
+                2 -> { originFilter = "All songs"; formatFilter = "All formats"; filterLibrary() }
+            }
         }
     }
 
@@ -1244,6 +1268,12 @@ class MainActivity : Activity() {
             })
         }
         root.addView(filterView, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(7) })
+        val filtersButton = Button(this).apply {
+            text = "FILTER  ·  SOURCE / MP3 / WAV / FLAC"
+            textSize = 12f
+            setOnClickListener { showMusicFilters() }
+        }
+        root.addView(filtersButton, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
         libraryView = label("Music library", 12f, COLOR_MUTED)
         root.addView(libraryView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
         trackAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, arrayListOf<String>()) {
