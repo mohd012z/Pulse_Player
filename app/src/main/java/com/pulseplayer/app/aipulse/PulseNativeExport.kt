@@ -159,10 +159,10 @@ class PulseNativeExport(private val context: Context) {
         val resolver = context.contentResolver
         val uri = resolver.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values) ?: return null
         return try {
-            val output = resolver.openOutputStream(uri) ?: error("Cannot open MediaStore output")
+            val output = resolver.openOutputStream(uri) ?: throw IllegalStateException("Cannot open MediaStore output")
             output.use { out -> file.inputStream().use { it.copyTo(out) } }
             val done = ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }
-            if (resolver.update(uri, done, null, null) != 1) error("Cannot publish pending media")
+            if (resolver.update(uri, done, null, null) != 1) throw IllegalStateException("Cannot publish pending media")
             uri
         } catch (_: Exception) {
             runCatching { resolver.delete(uri, null, null) }
