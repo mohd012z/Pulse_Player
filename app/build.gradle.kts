@@ -4,6 +4,25 @@ plugins {
 }
 
 android {
+    // Release signing is configured only when CI/local credentials are explicitly supplied.
+    // Never embed a keystore or passwords in the repository.
+    val pulseKeystore = System.getenv("PULSE_KEYSTORE_FILE")
+    val pulseStorePassword = System.getenv("PULSE_KEYSTORE_PASSWORD")
+    val pulseAlias = System.getenv("PULSE_KEY_ALIAS")
+    val pulseKeyPassword = System.getenv("PULSE_KEY_PASSWORD")
+    val pulseSigningReady = listOf(pulseKeystore, pulseStorePassword, pulseAlias, pulseKeyPassword)
+        .all { !it.isNullOrBlank() }
+    signingConfigs {
+        if (pulseSigningReady) {
+            create("pulseRelease") {
+                storeFile = file(pulseKeystore!!)
+                storePassword = pulseStorePassword
+                keyAlias = pulseAlias
+                keyPassword = pulseKeyPassword
+            }
+        }
+    }
+
     namespace = "com.pulseplayer.app"
     compileSdk = 36
 
@@ -21,6 +40,7 @@ android {
 
     buildTypes {
         release {
+            if (pulseSigningReady) signingConfig = signingConfigs.getByName("pulseRelease")
             isMinifyEnabled = false
         }
     }
