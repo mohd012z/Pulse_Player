@@ -35,7 +35,7 @@ object AiPulseStereoRenderer {
         val rate = 44100
         val frames = rate * request.seconds
         val secondsPerBeat = 60.0 / request.bpm
-        val bars = maxOf(8, (((request.seconds / secondsPerBeat / 4).toInt() + 3) / 4) * 4)
+        val bars = minOf(128, maxOf(8, (((request.seconds / secondsPerBeat / 4).toInt() + 3) / 4) * 4))
         val plan = if (arrangement == null) {
             AiPulseBrain.plan(AiPulseBrain.Input(request.genre, request.mood, request.bpm, bars, request.seed))
         } else {
