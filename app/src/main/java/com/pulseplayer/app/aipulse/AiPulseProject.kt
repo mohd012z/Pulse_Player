@@ -12,10 +12,11 @@ data class AiPulseProject(
     val mood: String,
     val instruments: List<String>,
     val lyrics: String,
-    val bpm: Int
+    val bpm: Int,
+    val mixer: AiPulseMixPreset = AiPulseMixPreset()
 ) {
     fun toJson(): String = JSONObject().apply {
-        put("version", 1)
+        put("version", 2)
         put("title", title)
         put("idea", idea)
         put("genre", genre)
@@ -24,19 +25,23 @@ data class AiPulseProject(
         put("instruments", JSONArray(instruments))
         put("lyrics", lyrics)
         put("bpm", bpm)
+        put("mixer", JSONObject(mixer.toJson()))
     }.toString(2)
 
     companion object {
         fun fromJson(json: String): AiPulseProject {
             val o = JSONObject(json)
-            require(o.getInt("version") == 1) { "Unsupported project version" }
+            val version = o.getInt("version")
+            require(version in 1..2) { "Unsupported project version" }
             val array = o.getJSONArray("instruments")
             require(array.length() <= 32) { "Too many instruments" }
             val project = AiPulseProject(
                 o.getString("title"), o.getString("idea"), o.getString("genre"),
                 o.getString("language"), o.getString("mood"),
                 (0 until array.length()).map { array.getString(it) },
-                o.getString("lyrics"), o.getInt("bpm")
+                o.getString("lyrics"), o.getInt("bpm"),
+                if (version >= 2) AiPulseMixPreset.fromJson(o.getJSONObject("mixer").toString())
+                else AiPulseMixPreset()
             )
             require(project.title.isNotBlank() && project.title.length <= 100)
             require(project.lyrics.length <= 12000)
