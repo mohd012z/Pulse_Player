@@ -60,7 +60,21 @@ object AiPulseComposer {
                         val kickPhase = beat % 1.0
                         val kick = sin(2 * PI * (55.0 + 75.0 * exp(-25.0 * kickPhase)) * t) *
                             exp(-18.0 * kickPhase) * 0.23
-                        val sample = (lead + harmony + kick).coerceIn(-0.9, 0.9)
+                        val intro = (t / 1.5).coerceIn(0.0, 1.0)
+                        val outro = ((request.seconds - t) / 1.0).coerceIn(0.0, 1.0)
+                        val genreGain = when (request.genre) {
+                            "Ballad" -> 0.60
+                            "Acoustic" -> 0.72
+                            "R&B" -> 0.82
+                            "EDM" -> if ((beat / 4.0).toInt() % 8 < 2) 0.55 else 1.0
+                            else -> 0.90
+                        }
+                        val syncopation = if (request.genre == "R&B")
+                            sin(2 * PI * 2.0 * beat) * 0.025 else 0.0
+                        val shimmer = if (request.genre == "EDM")
+                            sin(2 * PI * freq * 2.0 * t) * 0.055 * envelope else 0.0
+                        val sample = ((lead + harmony + kick + syncopation + shimmer) *
+                            genreGain * intro * outro).coerceIn(-0.9, 0.9)
                         val pcm = (sample * 32767).toInt()
                         buffer[j * 2] = (pcm and 255).toByte()
                         buffer[j * 2 + 1] = ((pcm ushr 8) and 255).toByte()
