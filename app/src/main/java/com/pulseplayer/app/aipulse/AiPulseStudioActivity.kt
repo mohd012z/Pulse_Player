@@ -168,6 +168,38 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
             }
         })
+        heading("Hybrid online/offline · reference discovery")
+        heading("Online metadata search is optional. It does not download songs or train on results.")
+        val discoveryQuery = field("Reference song or artist", "")
+        val discoveryResult = heading("Offline composer is always available")
+        root.addView(Button(this).apply {
+            text = "Search public music metadata"
+            setOnClickListener {
+                if (!AiPulseHybridDiscovery.isOnline(this@AiPulseStudioActivity)) {
+                    discoveryResult.text = "Offline · continue composing without internet"
+                    return@setOnClickListener
+                }
+                val query = discoveryQuery.text.toString()
+                isEnabled = false
+                discoveryResult.text = "Searching public recording metadata…"
+                val button = this
+                thread(name = "AiPulseMetadataLookup") {
+                    val result = runCatching { AiPulseHybridDiscovery.searchRecording(query) }
+                    runOnUiThread {
+                        button.isEnabled = true
+                        if (!isFinishing && !isDestroyed) {
+                            discoveryResult.text = result.fold(
+                                onSuccess = { matches ->
+                                    if (matches.isEmpty()) "No matching metadata found"
+                                    else matches.joinToString("\\n") { "${it.title} — ${it.artist}" }
+                                },
+                                onFailure = { "Lookup unavailable: ${it.message}. Offline creation still works." }
+                            )
+                        }
+                    }
+                }
+            }
+        })
         heading("Your voice · local microphone recording")
         val voiceStatus = heading("No voice recording · recordings stay on device")
         val voiceButton = Button(this).apply { text = "Record voice" }
