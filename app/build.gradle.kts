@@ -37,5 +37,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("com.google.guava:guava:33.4.8-android")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     testImplementation("junit:junit:4.13.2")
 }
