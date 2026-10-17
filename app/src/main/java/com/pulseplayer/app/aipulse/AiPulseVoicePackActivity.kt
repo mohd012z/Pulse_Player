@@ -43,6 +43,21 @@ class AiPulseVoicePackActivity : Activity() {
                 status.text = "Validated: ${pack.name} (${pack.language}); voice license: ${pack.license}. Model inference not yet tested."
             } catch (e: Exception) { status.text = "Validation failed: ${e.message}" }
         }
+        button("Inspect ONNX model signatures (P0)") {
+            status.text = "Inspecting acoustic and vocoder graphs…"
+            Thread {
+                val report = runCatching {
+                    val pack = AiPulseModelPack.load(packDir)
+                    AiPulseOnnxInspector.inspect(pack).toString(2)
+                }
+                runOnUiThread {
+                    status.text = report.fold(
+                        onSuccess = { it },
+                        onFailure = { "Model inspection failed: ${it.message}" }
+                    )
+                }
+            }.start()
+        }
         val tokenInput = EditText(this).apply { hint = "Phoneme IDs (comma-separated), e.g. 1,2,3"; setSingleLine() }
         val framesInput = EditText(this).apply { hint = "Durations in frames, e.g. 40,40,40"; setSingleLine() }
         val midiInput = EditText(this).apply { hint = "MIDI pitches per frame, e.g. 60x40,62x40,64x40"; setSingleLine() }
