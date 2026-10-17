@@ -8,8 +8,10 @@ const { chromium } = require("playwright");
 async function main() {
   const htmlPath = path.join(__dirname, "pulse_nova_android_offline.html");
   const html = fs.readFileSync(htmlPath);
+  const sw = fs.readFileSync(path.join(__dirname, "sw.js"));
   const server = http.createServer((req, res) => {
-    if (req.url !== "/") { res.writeHead(404); return res.end(); }
+    if (req.url === "/sw.js") { res.writeHead(200, { "content-type": "text/javascript" }); return res.end(sw); }
+    if (req.url !== "/" && req.url !== "/pulse_nova_android_offline.html") { res.writeHead(404); return res.end(); }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8",
                          "cache-control": "no-store" });
     res.end(html);
@@ -24,7 +26,10 @@ async function main() {
     const page = await browser.newPage({ acceptDownloads: true });
     const errors = [];
     page.on("pageerror", e => errors.push(e.message));
-    await page.goto("http://127.0.0.1:" + server.address().port + "/", { waitUntil: "load" });
+    await page.goto("http://127.0.0.1:" + server.address().port + "/pulse_nova_android_offline.html", { waitUntil: "load" });
+    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     assert.equal(await page.locator("#play").isDisabled(), true);
     assert.equal(await page.locator("#save").isDisabled(), true);
     await page.locator("#generate").click();
@@ -103,7 +108,13 @@ async function main() {
       await mobile.close();
     }
     assert.deepEqual(errors, []);
-    console.log("PASS: real Chromium UI, Blob WAV, audio metadata and browser download");
+    await page.context().setOffline(true);
+    await page.reload({ waitUntil: "load" });
+    await page.locator("#generate").click();
+    await page.waitForFunction(() => document.querySelector("#status").textContent.includes("WAV ready"), null, { timeout: 15000 });
+    assert.equal(await page.locator("#play").isEnabled(), true);
+    await page.context().setOffline(false);
+    console.log("PASS: real Chromium UI, Blob WAV, audio metadata, browser download and offline reload");
     console.log("NOTE: Headless Chromium does not verify physical Android speaker output or WebView export.");
   } finally {
     if (browser) await browser.close();
