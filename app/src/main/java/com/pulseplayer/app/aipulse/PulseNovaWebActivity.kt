@@ -37,9 +37,10 @@ class PulseNovaWebActivity : Activity() {
         setContentView(web)
         web.settings.apply {
             javaScriptEnabled = true
-            domStorageEnabled = true
+            domStorageEnabled = false
             allowFileAccess = false
             allowContentAccess = false
+            blockNetworkLoads = true
             javaScriptCanOpenWindowsAutomatically = false
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
