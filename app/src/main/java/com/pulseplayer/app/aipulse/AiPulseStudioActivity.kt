@@ -205,13 +205,13 @@ class AiPulseStudioActivity : Activity() {
                     bars = 8
                 )).also { editedArrangement = it }
                 val descriptions = plan.segments.map {
-                    "${it.section} · bars ${it.startBar + 1}–${it.startBar + it.bars}"
+                    "${it.section} · bars ${it.startBar + 1}–${it.startBar + it.bars} · energy ${(it.energy * 100).toInt()}%"
                 }.toTypedArray()
                 AlertDialog.Builder(this@AiPulseStudioActivity)
                     .setTitle("Select section to edit")
                     .setItems(descriptions) { _, index ->
                         val actions = arrayOf("Move earlier", "Move later", "Add 4 bars",
-                            "Remove 4 bars", "Change section type")
+                            "Remove 4 bars", "Change section type", "Quieter (-10%)", "Louder (+10%)")
                         AlertDialog.Builder(this@AiPulseStudioActivity)
                             .setTitle("Edit ${plan.segments[index].section}")
                             .setItems(actions) { _, action ->
@@ -222,11 +222,15 @@ class AiPulseStudioActivity : Activity() {
                                         1 -> AiPulseArrangementEditor.move(plan, index, index + 1)
                                         2 -> AiPulseArrangementEditor.update(plan, index, bars = segment.bars + 4)
                                         3 -> AiPulseArrangementEditor.update(plan, index, bars = segment.bars - 4)
-                                        else -> {
+                                        4 -> {
                                             val types = AiPulseBrain.Section.entries
                                             val next = types[(segment.section.ordinal + 1) % types.size]
                                             AiPulseArrangementEditor.update(plan, index, section = next)
                                         }
+                                        5 -> AiPulseArrangementEditor.update(plan, index,
+                                            energy = (segment.energy - 0.10).coerceAtLeast(0.0))
+                                        else -> AiPulseArrangementEditor.update(plan, index,
+                                            energy = (segment.energy + 0.10).coerceAtMost(1.0))
                                     }
                                     val updated = requireNotNull(editedArrangement)
                                     Toast.makeText(this@AiPulseStudioActivity,
