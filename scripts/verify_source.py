@@ -64,7 +64,20 @@ assert "android.permission.RECORD_AUDIO" in permissions
 for feature in ("REQUEST_LYRICS", "TimedLyrics.activeIndex", "discoverMalaysiaRadio", "showCustomEqualizer", "requestSpectrum", "Spotify", "Lyrics / subtitles"):
     assert feature in activity_text, f"Missing v4 feature: {feature}"
 assert "bycountrycodeexact/MY" in (source / "MalaysiaRadioDirectory.kt").read_text()
-assert "onFftDataCapture" in (source / "SpectrumView.kt").read_text()
+spectrum_source = (source / "SpectrumView.kt").read_text()
+assert "onFftDataCapture" in spectrum_source
+assert "enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER, MIRROR_BARS, OSCILLOSCOPE }" in spectrum_source, "Expected four supported spectrum modes"
+for mode in ("FREQUENCY_BARS", "PIXEL_WATER", "MIRROR_BARS", "OSCILLOSCOPE"):
+    assert mode in spectrum_source, f"Missing spectrum mode: {mode}"
+assert "SpectrumView.DisplayMode.entries" in activity_text, (
+    "Main player must cycle the available spectrum modes"
+)
+assert 'getString("display_mode", "FREQUENCY_BARS")' in activity_text, (
+    "Frequency bars must remain the default visualization"
+)
+assert 'putString("display_mode"' in activity_text, "Visualization selection must persist"
+assert "true, true)" in spectrum_source, "Both waveform and FFT captures must be enabled"
+assert "spectrum[i] = maxOf(next[i]" in spectrum_source, "FFT data must update visible spectrum"
 assert "CMD_SET_CUSTOM" in service_text
 assert "PlaybackService.CMD_SET_CUSTOM" in activity_text
 assert (ROOT / "app/src/test/java/com/pulseplayer/app/TimedLyricsTest.kt").is_file()

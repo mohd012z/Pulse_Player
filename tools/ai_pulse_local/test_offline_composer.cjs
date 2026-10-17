@@ -1,0 +1,68 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const html=fs.readFileSync(__dirname+'/pulse_nova_android_offline.html','utf8');
+const match=html.match(/<script>([\s\S]*?)<\/script>/);
+assert.ok(match,'embedded offline synthesizer script exists');
+const elements={};
+const document={getElementById(id){return elements[id]??(elements[id]={value:'42',disabled:true,textContent:'',src:'',play:()=>Promise.resolve()});},createElement(){return {click(){}}}};
+const ctx=vm.createContext({document,console,Blob,URL,Math,ArrayBuffer,DataView,Float32Array,Number,Error});
+vm.runInContext(match[1],ctx,{timeout:1000});
+const render=vm.runInContext('compose({style:"pop",bpm:108,bars:4,seed:42})',ctx,{timeout:10000});
+assert.equal(render.byteLength>44,true);
+const view=new DataView(render);
+assert.equal(view.getUint32(24,true),22050);
+assert.equal(view.getUint16(34,true),16);
+assert.equal(view.getUint32(40,true),render.byteLength-44);
+const same=vm.runInContext('compose({style:"pop",bpm:108,bars:4,seed:42})',ctx,{timeout:10000});
+assert.deepEqual(Buffer.from(render),Buffer.from(same),'same seed must yield identical PCM');
+const different=vm.runInContext('compose({style:"pop",bpm:108,bars:4,seed:43})',ctx,{timeout:10000});
+assert.notDeepEqual(Buffer.from(render),Buffer.from(different),'different seed should change melody');
+assert.throws(()=>vm.runInContext('compose({style:"pop",bpm:0,bars:4,seed:42})',ctx));
+console.log('PASS: offline composer renders valid deterministic PCM16 WAV, seed variation, bounds validation');
+for(const style of ['pop','ambient','rock']){
+ const buf=vm.runInContext('compose({style:"'+style+'",bpm:120,bars:2,seed:123})',ctx,{timeout:10000});
+ const dv=new DataView(buf);
+ const expectedFrames=Math.ceil(4*22050);
+ assert.equal(dv.getUint32(4,true),buf.byteLength-8,'RIFF chunk size');
+ assert.equal(dv.getUint32(16,true),16,'PCM fmt chunk size');
+ assert.equal(dv.getUint16(20,true),1,'PCM encoding');
+ assert.equal(dv.getUint16(22,true),1,'mono');
+ assert.equal(dv.getUint32(24,true),22050,'sample rate');
+ assert.equal(dv.getUint32(28,true),44100,'byte rate');
+ assert.equal(dv.getUint16(32,true),2,'block align');
+ assert.equal(dv.getUint16(34,true),16,'bits per sample');
+ assert.equal(dv.getUint32(40,true),expectedFrames*2,'data chunk size');
+ assert.equal(buf.byteLength,44+expectedFrames*2,'payload length');
+ let peak=0,energy=0;
+ for(let i=44;i<buf.byteLength;i+=2){const n=dv.getInt16(i,true);peak=Math.max(peak,Math.abs(n));energy+=n*n;}
+ assert.ok(peak>0 && peak<=32767,'valid non-silent PCM');
+ assert.ok(energy>0,'nonzero signal energy');
+}
+console.log('PASS: all three styles have valid RIFF/PCM metadata and non-silent samples');
+
+function magic(dv,offset){return String.fromCharCode(...Array.from({length:4},(_,i)=>dv.getUint8(offset+i)));}
+function verifyWav(buffer,frames){
+ const dv=new DataView(buffer);
+ assert.equal(magic(dv,0),'RIFF');
+ assert.equal(magic(dv,8),'WAVE');
+ assert.equal(magic(dv,12),'fmt ');
+ assert.equal(magic(dv,36),'data');
+ assert.equal(dv.getUint32(4,true),buffer.byteLength-8);
+ assert.equal(dv.getUint32(16,true),16);
+ assert.equal(dv.getUint16(20,true),1);
+ assert.equal(dv.getUint16(22,true),1);
+ assert.equal(dv.getUint32(24,true),22050);
+ assert.equal(dv.getUint32(28,true),44100);
+ assert.equal(dv.getUint16(32,true),2);
+ assert.equal(dv.getUint16(34,true),16);
+ assert.equal(dv.getUint32(40,true),frames*2);
+ assert.equal(buffer.byteLength,44+frames*2);
+}
+const oneSecond=vm.runInContext('wavBytes(new Float32Array(22050))',ctx);
+verifyWav(oneSecond,22050);
+for(const style of ['pop','ambient','rock']){
+ const output=vm.runInContext('compose({style:'+JSON.stringify(style)+',bpm:120,bars:2,seed:123})',ctx,{timeout:10000});
+ verifyWav(output,88200);
+}
+console.log('PASS: real wavBytes() produces exact one-second PCM payload and valid RIFF/WAVE/fmt/data magic bytes');

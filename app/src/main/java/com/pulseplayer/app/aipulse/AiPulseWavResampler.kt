@@ -1,0 +1,162 @@
+package com.pulseplayer.app.aipulse
+
+import java.io.File
+import java.io.RandomAccessFile
+import kotlin.math.floor
+import kotlin.math.min
+import kotlin.math.roundToLong
+
+/**
+ * Offline linear PCM16 resampler for locally owned vocal tracks.
+ * Accepts canonical 44-byte PCM WAV, mono/stereo; retains channel count.
+ * Linear interpolation is a compatibility fallback, not studio-quality
+ * band-limited conversion (high-frequency content may alias).
+ */
+object AiPulseWavResampler {
+    enum class Quality { LINEAR, WINDOWED_SINC }
+    private data class Source(
+        val rate: Int,
+        val channels: Int,
+        val frames: Long,
+        val dataOffset: Long
+    )
+
+    /**
+     * RIFF/WAVE is chunk-based: metadata and extended fmt chunks may appear
+     * before PCM data. Validate every chunk against the declared RIFF boundary
+     * before seeking, and retain the actual data offset for block reads.
+     */
+    private fun header(input: RandomAccessFile): Source {
+        require(input.length() >= 44) { "Short WAV file" }
+        fun four() = ByteArray(4).also { input.readFully(it) }.toString(Charsets.US_ASCII)
+        fun u16(): Int = input.readUnsignedByte() or (input.readUnsignedByte() shl 8)
+        fun u32(): Long = u16().toLong() or (u16().toLong() shl 16)
+        require(four() == "RIFF") { "Not a RIFF WAV file" }
+        val riffSize = u32()
+        require(riffSize >= 36 && riffSize <= input.length() - 8) { "Invalid RIFF length" }
+        require(four() == "WAVE") { "Not WAVE audio" }
+        val riffEnd = 8L + riffSize
+        var rate = 0
+        var channels = 0
+        var alignment = 0
+        var dataOffset = -1L
+        var dataBytes = -1L
+        while (input.filePointer + 8 <= riffEnd) {
+            val chunk = four()
+            val chunkBytes = u32()
+            val chunkStart = input.filePointer
+            require(chunkBytes <= riffEnd - chunkStart) { "WAV chunk exceeds RIFF boundary" }
+            when (chunk) {
+                "fmt " -> {
+                    require(chunkBytes >= 16) { "Invalid WAV format chunk" }
+                    require(u16() == 1) { "Only PCM WAV supported" }
+                    channels = u16()
+                    rate = u32().toInt()
+                    val byteRate = u32()
+                    alignment = u16()
+                    val bits = u16()
+                    require(bits == 16 && channels in 1..2 && rate in 8000..192000) {
+                        "Only mono/stereo PCM16 WAV at 8–192 kHz is supported"
+                    }
+                    require(alignment == channels * 2 &&
+                        byteRate == rate.toLong() * alignment) { "Invalid PCM block alignment" }
+                }
+                "data" -> if (dataOffset < 0) {
+                    dataOffset = chunkStart
+                    dataBytes = chunkBytes
+                }
+            }
+            val paddedEnd = chunkStart + chunkBytes + (chunkBytes and 1L)
+            require(paddedEnd <= riffEnd) { "Invalid WAV chunk padding" }
+            input.seek(paddedEnd)
+        }
+        require(rate > 0 && dataOffset >= 0 && dataBytes > 0) {
+            "WAV must contain PCM format and nonempty data chunks"
+        }
+        require(dataBytes % alignment == 0L) { "Incomplete PCM frame" }
+        return Source(rate, channels, dataBytes / alignment, dataOffset)
+    }
+
+    fun sampleRate(input: File): Int =
+        RandomAccessFile(input, "r").use { header(it).rate }
+
+    fun convert(input: File, output: File, targetRate: Int = 44100,
+                quality: Quality = Quality.WINDOWED_SINC,
+                cancelled: () -> Boolean = { false }): File {
+
+        require(targetRate in 8000..192000)
+        require(input.canonicalPath != output.canonicalPath)
+        require(output.extension.equals("wav", true))
+        val part = File(output.absolutePath + ".part")
+        try {
+            RandomAccessFile(input, "r").use { source ->
+                val format = header(source)
+                val frames = (format.frames.toDouble() * targetRate / format.rate).roundToLong()
+                val payload = frames * format.channels * 2L
+                require(frames > 0 && payload <= Int.MAX_VALUE - 44L) { "Converted WAV too large" }
+                output.parentFile?.mkdirs()
+                RandomAccessFile(part, "rw").use { result ->
+                    result.setLength(0)
+                    fun u16(n: Int) { result.write(n and 255); result.write((n ushr 8) and 255) }
+                    fun u32(n: Long) { u16((n and 65535).toInt()); u16(((n ushr 16) and 65535).toInt()) }
+                    result.write("RIFF".toByteArray(Charsets.US_ASCII))
+                    u32(36 + payload)
+                    result.write("WAVEfmt ".toByteArray(Charsets.US_ASCII))
+                    u32(16); u16(1); u16(format.channels); u32(targetRate.toLong())
+                    u32(targetRate.toLong() * format.channels * 2)
+                    u16(format.channels * 2); u16(16)
+                    result.write("data".toByteArray(Charsets.US_ASCII)); u32(payload)
+
+                    // Cache contiguous input frames to avoid a seek for every sinc tap.
+                    val blockFrames = 4096
+                    var cachedStart = -1L
+                    var cachedCount = 0
+                    val cache = ByteArray(blockFrames * format.channels * 2)
+                    fun frame(index: Long): IntArray {
+                        val pos = index.coerceIn(0, format.frames - 1)
+                        if (cachedStart < 0 || pos < cachedStart || pos >= cachedStart + cachedCount) {
+                            cachedStart = (pos / blockFrames) * blockFrames
+                            cachedCount = min(blockFrames.toLong(), format.frames - cachedStart).toInt()
+                            source.seek(format.dataOffset + cachedStart * format.channels * 2)
+                            source.readFully(cache, 0, cachedCount * format.channels * 2)
+                        }
+                        val offset = ((pos - cachedStart) * format.channels * 2).toInt()
+                        return IntArray(format.channels) { channel ->
+                            val j = offset + channel * 2
+                            ((cache[j].toInt() and 255) or
+                                ((cache[j + 1].toInt() and 255) shl 8)).toShort().toInt()
+                        }
+                    }
+                    var lastIndex = -1L
+                    var a = IntArray(format.channels)
+                    var b = IntArray(format.channels)
+                    for (i in 0 until frames) {
+                        if (i % 4096L == 0L && cancelled()) throw InterruptedException("Resampling cancelled")
+                        val original = i.toDouble() * format.rate / targetRate
+                        val index = min(format.frames - 1, floor(original).toLong())
+                        if (index != lastIndex) {
+                            a = frame(index)
+                            b = frame(min(index + 1, format.frames - 1))
+                            lastIndex = index
+                        }
+                        val fraction = original - index
+                        for (c in 0 until format.channels) {
+                            val channel = c
+                            val value = if (quality == Quality.WINDOWED_SINC) {
+                                AiPulseResamplingKernel.interpolate(original, format.rate, targetRate) { position ->
+                                    frame(position)[channel].toDouble()
+                                }
+                            } else (a[c] + (b[c] - a[c]) * fraction)
+                            u16(value.toInt().coerceIn(-32768, 32767) and 65535)
+                        }
+                    }
+                }
+            }
+            if (!part.renameTo(output)) { part.copyTo(output, overwrite = true); part.delete() }
+            return output
+        } catch (e: Exception) {
+            part.delete()
+            throw e
+        }
+    }
+}

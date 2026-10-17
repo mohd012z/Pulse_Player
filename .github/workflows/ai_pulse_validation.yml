@@ -1,0 +1,42 @@
+name: AI Pulse validation
+on:
+  push:
+    paths:
+      - 'tools/ai_pulse_validation/**'
+      - 'tools/ai_pulse_local/**'
+      - '.github/workflows/ai_pulse_validation.yml'
+  pull_request:
+    paths:
+      - 'tools/ai_pulse_validation/**'
+      - 'tools/ai_pulse_local/**'
+      - '.github/workflows/ai_pulse_validation.yml'
+  workflow_dispatch:
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run P0-P3 mock contract and WAV validation
+        run: |
+          python -m unittest discover -s tools/ai_pulse_validation -p 'test_*.py' -v
+          python -m unittest discover -s tools/ai_pulse_local -p 'test_*.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify offline Android browser composer produces PCM WAV
+        run: node tools/ai_pulse_local/test_offline_composer.cjs
+      - name: Install Playwright Chromium (ephemeral CI dependency)
+        run: |
+          mkdir -p /tmp/pulse-playwright
+          cd /tmp/pulse-playwright
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run Chromium audio Blob and download integration
+        env:
+          NODE_PATH: /tmp/pulse-playwright/node_modules
+        run: node tools/ai_pulse_local/test_browser_playwright.cjs
