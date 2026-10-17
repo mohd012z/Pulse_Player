@@ -175,6 +175,13 @@ class AiPulseStudioActivity : Activity() {
                 }
             }
         })
+        heading("Duration")
+        val duration = EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText("16")
+            setTextColor(Color.WHITE)
+        }
+        root.addView(duration)
         var editedArrangement: AiPulseBrain.Plan? = null
         heading("Arrangement timeline · bar order and section energy")
         val timelineView = AiPulseTimelineView(this)
@@ -349,13 +356,6 @@ class AiPulseStudioActivity : Activity() {
             setTextColor(Color.WHITE)
         }
         root.addView(vocalDelay)
-        heading("Duration")
-        val duration = EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText("16")
-            setTextColor(Color.WHITE)
-        }
-        root.addView(duration)
         heading("Audio mastering · WAV")
         val masteringPreset = android.widget.Spinner(this).apply {
             adapter = android.widget.ArrayAdapter(this@AiPulseStudioActivity,
