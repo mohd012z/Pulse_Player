@@ -14,9 +14,22 @@ import kotlin.math.sin
  */
 object AiPulseStereoRenderer {
     enum class Stem { MIX, LEAD, BASS, PAD, DRUMS }
+    data class Levels(
+        val lead: Double = 1.0,
+        val bass: Double = 1.0,
+        val pad: Double = 1.0,
+        val drums: Double = 1.0
+    ) {
+        fun validate() = require(listOf(lead, bass, pad, drums).all { it.isFinite() && it in 0.0..1.0 }) {
+            "Stem levels must be between 0.0 and 1.0"
+        }
+    }
+
     fun render(request: AiPulseComposer.Request, output: File,
-               stem: Stem = Stem.MIX, cancelled: () -> Boolean = { false }): File {
+               stem: Stem = Stem.MIX, levels: Levels = Levels(),
+               cancelled: () -> Boolean = { false }): File {
         AiPulseComposer.validate(request)
+        levels.validate()
         require(output.extension.equals("wav", true))
         val rate = 44100
         val frames = rate * request.seconds
@@ -52,10 +65,10 @@ object AiPulseStereoRenderer {
                         val chord = segment.chordRoots[bar % segment.chordRoots.size]
                         val hz = 440.0 * Math.pow(2.0, (root + chord - 69) / 12.0)
                         val beatPhase = beat % 1.0
-                        val lead = sin(2 * PI * hz * 2 * t) * exp(-2.0 * beatPhase) * 0.17
-                        val bass = sin(2 * PI * hz * 0.5 * t) * 0.17
-                        val pad = (sin(2 * PI * hz * t) + sin(2 * PI * hz * 1.5 * t)) * 0.055
-                        val kick = sin(2 * PI * 62.0 * t) * exp(-18.0 * beatPhase) * 0.16
+                        val lead = sin(2 * PI * hz * 2 * t) * exp(-2.0 * beatPhase) * 0.17 * levels.lead
+                        val bass = sin(2 * PI * hz * 0.5 * t) * 0.17 * levels.bass
+                        val pad = (sin(2 * PI * hz * t) + sin(2 * PI * hz * 1.5 * t)) * 0.055 * levels.pad
+                        val kick = sin(2 * PI * 62.0 * t) * exp(-18.0 * beatPhase) * 0.16 * levels.drums
                         val fade = min(1.0, min(t / 0.35, (request.seconds - t) / 0.5)).coerceAtLeast(0.0)
                         val energy = segment.energy * fade
                         val leftVoice = when (stem) {
