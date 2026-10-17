@@ -71,17 +71,8 @@ class PlaybackService : MediaSessionService() {
 
     private fun updateAutomaticSound() {
         if (!autoSound) return
-        // Connected outputs are not necessarily the active media route.
-        val types = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.type }.toSet()
-        val profile = when {
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP in types ||
-                AudioDeviceInfo.TYPE_WIRED_HEADPHONES in types ||
-                AudioDeviceInfo.TYPE_WIRED_HEADSET in types ||
-                AudioDeviceInfo.TYPE_USB_HEADSET in types -> "Stereo Clarity"
-            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER in types -> "Balanced Speaker"
-            else -> "Flat"
-        }
-        effects.setPreset(profile)
+        val advice = OutputRouteAdvisor.inspect(audioManager)
+        effects.setPreset(advice.profile)
         effects.setBass(0)
     }
 
