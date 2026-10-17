@@ -98,7 +98,6 @@ class AiPulseStudioActivity : Activity() {
             text = "New variation · change melody and harmony"
             setOnClickListener {
                 variationIndex = (variationIndex + 1) % 1000000
-                editedArrangement = null
                 variationStatus.text = "Composition variation #${variationIndex + 1} · new seed on next generation"
             }
         })
