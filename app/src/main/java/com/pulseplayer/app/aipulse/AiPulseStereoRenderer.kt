@@ -78,7 +78,7 @@ object AiPulseStereoRenderer {
                         val pad = (sin(2 * PI * hz * t) + sin(2 * PI * hz * 1.5 * t)) * 0.055 * levels.pad
                         val kick = sin(2 * PI * 62.0 * t) * exp(-18.0 * beatPhase) * 0.16 * levels.drums
                         val fade = min(1.0, min(t / 0.35, (request.seconds - t) / 0.5)).coerceAtLeast(0.0)
-                        val energy = segment.energy * fade
+                        val energy = AiPulseSectionEnvelope.energyAt(plan, beat) * fade
                         val leftVoice = when (stem) {
                             Stem.MIX -> lead * 0.90 + bass * 0.72 + pad * 1.05 + kick
                             Stem.LEAD -> lead * 0.90
