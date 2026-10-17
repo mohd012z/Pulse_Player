@@ -339,6 +339,25 @@ class AiPulseStudioActivity : Activity() {
         val bassLevel = mixerSlider("Bass", 100)
         val padLevel = mixerSlider("Pad", 100)
         val drumsLevel = mixerSlider("Drums", 100)
+        heading("Track mute / solo")
+        fun muteBox(label: String) = android.widget.CheckBox(this).apply {
+            text = "Mute $label"
+            setTextColor(Color.WHITE)
+            root.addView(this)
+        }
+        val muteLead = muteBox("Lead")
+        val muteBass = muteBox("Bass")
+        val mutePad = muteBox("Pad")
+        val muteDrums = muteBox("Drums")
+        val soloTrack = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(
+                this@AiPulseStudioActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                AiPulseTrackMixer.Track.entries.map { it.name }
+            )
+        }
+        heading("Solo instrument (NONE = full mix)")
+        root.addView(soloTrack)
         val exportStems = android.widget.CheckBox(this).apply {
             text = "Also export separate lead, bass, pad and drum WAV stems"
             setTextColor(Color.WHITE)
@@ -381,11 +400,20 @@ class AiPulseStudioActivity : Activity() {
             )
             val includeRecordedVoice = useRecordedVoice.isChecked
             val saveStems = exportStems.isChecked
-            val instrumentLevels = AiPulseStereoRenderer.Levels(
-                lead = leadLevel.progress / 100.0,
-                bass = bassLevel.progress / 100.0,
-                pad = padLevel.progress / 100.0,
-                drums = drumsLevel.progress / 100.0
+            val instrumentLevels = AiPulseTrackMixer.apply(
+                AiPulseStereoRenderer.Levels(
+                    lead = leadLevel.progress / 100.0,
+                    bass = bassLevel.progress / 100.0,
+                    pad = padLevel.progress / 100.0,
+                    drums = drumsLevel.progress / 100.0
+                ),
+                AiPulseTrackMixer.Settings(
+                    leadMuted = muteLead.isChecked,
+                    bassMuted = muteBass.isChecked,
+                    padMuted = mutePad.isChecked,
+                    drumsMuted = muteDrums.isChecked,
+                    solo = AiPulseTrackMixer.Track.entries[soloTrack.selectedItemPosition]
+                )
             )
             val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
             working = true
