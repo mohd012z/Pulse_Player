@@ -59,6 +59,11 @@ class TestPulse(unittest.TestCase):
         self.assertEqual(EditRequest("repaint","edit","owned.wav",4,8).params()["repainting_end"],8)
         for task in ("cover","lego","extract","complete"):
             self.assertEqual(EditRequest(task,"original","owned.wav").validate().task,task)
+    def test_p1_repaint_boundary_cases(self):
+        for start,end in ((0,0),(-1,2),(10,5)):
+            with self.assertRaises(ValueError):
+                EditRequest("repaint","edit","owned.wav",start,end).validate()
+        self.assertEqual(EditRequest("repaint","edit","owned.wav",0,4).params()["repainting_start"],0)
     def test_p2_audio_quality_and_p3_reproducible_comparison(self):
         with tempfile.TemporaryDirectory() as tmp:
             a,b=Path(tmp)/"a.wav",Path(tmp)/"b.wav"
