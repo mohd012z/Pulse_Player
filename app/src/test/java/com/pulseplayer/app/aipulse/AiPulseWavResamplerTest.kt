@@ -19,6 +19,51 @@ class AiPulseWavResamplerTest {
         } finally { original.delete(); converted.delete() }
     }
 
+    @Test fun acceptsMetadataChunkBeforePcmData() {
+        val original = File.createTempFile("pulse-original-", ".wav")
+        val tagged = File.createTempFile("pulse-tagged-", ".wav")
+        val converted = File.createTempFile("pulse-converted-", ".wav")
+        try {
+            AiPulseStereoRenderer.render(AiPulseComposer.Request("Tagged", seconds = 2), original)
+            val bytes = original.readBytes()
+            // Insert an odd-length LIST metadata chunk between fmt and data.
+            val metadata = byteArrayOf(
+                'L'.code.toByte(), 'I'.code.toByte(), 'S'.code.toByte(), 'T'.code.toByte(),
+                5, 0, 0, 0, 1, 2, 3, 4, 5, 0
+            )
+            val taggedBytes = bytes.copyOfRange(0, 36) + metadata +
+                bytes.copyOfRange(36, bytes.size)
+            val riffSize = taggedBytes.size - 8
+            for (i in 0..3) taggedBytes[4 + i] = (riffSize ushr (8 * i)).toByte()
+            tagged.writeBytes(taggedBytes)
+
+            assertEquals(44100, AiPulseWavResampler.sampleRate(tagged))
+            AiPulseWavResampler.convert(tagged, converted, 22050)
+            assertEquals(22050, AiPulseWavResampler.sampleRate(converted))
+            assertEquals(44L + 22050L * 2 * 4, converted.length())
+        } finally {
+            original.delete()
+            tagged.delete()
+            converted.delete()
+        }
+    }
+
+    @Test fun rejectsWavChunkThatExceedsRiffBoundary() {
+        val original = File.createTempFile("pulse-original-", ".wav")
+        val corrupt = File.createTempFile("pulse-corrupt-", ".wav")
+        try {
+            AiPulseStereoRenderer.render(AiPulseComposer.Request("Corrupt", seconds = 2), original)
+            val bytes = original.readBytes()
+            // The data chunk begins at offset 36 in the canonical renderer WAV.
+            for (i in 0..3) bytes[40 + i] = 0xFF.toByte()
+            corrupt.writeBytes(bytes)
+            assertTrue(runCatching { AiPulseWavResampler.sampleRate(corrupt) }.isFailure)
+        } finally {
+            original.delete()
+            corrupt.delete()
+        }
+    }
+
     @Test fun cancelledResampleDoesNotLeavePartialOutput() {
         val original = File.createTempFile("pulse-original-", ".wav")
         val converted = File.createTempFile("pulse-converted-", ".wav")
