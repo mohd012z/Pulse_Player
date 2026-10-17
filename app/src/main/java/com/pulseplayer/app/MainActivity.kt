@@ -278,7 +278,10 @@ class MainActivity : Activity() {
         trackAdapter.notifyDataSetChanged()
         libraryView.text = "${source}  ·  $currentDisplaySize tracks / stations"
         if (::sourceView.isInitialized) sourceView.text = "${source.replace('_', ' ')} · ${currentDisplaySize} items"
-        if (::sourceButton.isInitialized) sourceButton.text = "${source} ▾"
+        if (::sourceButton.isInitialized) {
+            sourceButton.text = "▣\nDevice"
+            sourceButton.contentDescription = "Music source: $source. Tap to change source"
+        }
     }
 
     private fun playSelection(index: Int) {
