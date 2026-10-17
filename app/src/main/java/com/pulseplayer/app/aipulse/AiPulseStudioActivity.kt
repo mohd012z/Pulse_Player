@@ -67,36 +67,11 @@ class AiPulseStudioActivity : Activity() {
             }
         }
         heading("AI PULSE · Offline Composer")
-        heading("Original synthesized instrumentals — not neural text-to-music")
-        heading("Visual preview · animated demo (not sound-reactive)")
-        root.addView(Button(this).apply {
-            text = "Open LIVE spectrum · FFT / Pixel Water"
-            contentDescription = "Open main music player to view the sound-reactive FFT or pixel-water waveform"
-            setOnClickListener {
-                startActivity(Intent(this@AiPulseStudioActivity, com.pulseplayer.app.MainActivity::class.java))
-                Toast.makeText(this@AiPulseStudioActivity,
-                    "Play a track, then select Live Audio Spectrum. Tap the live display to switch FFT and Pixel Water.",
-                    Toast.LENGTH_LONG).show()
-            }
-        })
-        val visuals = AiPulseVisualView(this)
-        root.addView(visuals, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
-        val presets = arrayOf("Spectrum Bars", "Neon Wave", "Orbit", "Minimal")
-        val presetButton = Button(this).apply { text = "Visual: Spectrum Bars" }
-        root.addView(presetButton)
-        presetButton.setOnClickListener {
-            AlertDialog.Builder(this).setTitle("Choose visual preset")
-                .setSingleChoiceItems(presets, visuals.preset.ordinal) { dialog, which ->
-                    visuals.preset = AiPulseVisualView.Preset.entries[which]
-                    presetButton.text = "Visual: ${presets[which]}"
-                    dialog.dismiss()
-                }.setNegativeButton("Cancel", null).show()
-        }
-        val motionButton = Button(this).apply { text = "Motion: On (tap to reduce)" }
-        root.addView(motionButton)
-        motionButton.setOnClickListener {
-            visuals.motionEnabled = !visuals.motionEnabled
-            motionButton.text = if (visuals.motionEnabled) "Motion: On (tap to reduce)" else "Motion: Off"
+        TextView(this).apply {
+            text = "Offline instrumental composer · lyrics, arrangement, recording and WAV export"
+            textSize = 13f
+            setTextColor(Color.LTGRAY)
+            root.addView(this)
         }
         val title = field("Track title", "My Pulse Song")
         val mood = field("Mood (bright / sad / dark)", "bright")
