@@ -440,7 +440,10 @@ class AiPulseStudioActivity : Activity() {
                             vocalDelayMs = vocalDelay.text.toString().toIntOrNull()
                                 ?: error("Invalid vocal delay"),
                             exportStems = exportStems.isChecked
-                        ))
+                        ),
+                        editedArrangement?.takeIf {
+                            it.genre == genre.selectedItem.toString() && it.bpm == bpm.progress + 60
+                        })
                     val file = File(filesDir, "ai_pulse_project.json")
                     file.writeText(project.toJson())
                     Toast.makeText(this@AiPulseStudioActivity, "Project saved locally", Toast.LENGTH_SHORT).show()
@@ -468,6 +471,7 @@ class AiPulseStudioActivity : Activity() {
                     recordedVoiceGain.progress = p.vocalGain
                     vocalDelay.setText(p.vocalDelayMs.toString())
                     exportStems.isChecked = p.exportStems
+                    editedArrangement = project.arrangement
                     (0 until genre.count).firstOrNull { genre.getItemAtPosition(it) == project.genre }?.let { genre.setSelection(it) }
                     (0 until language.count).firstOrNull { language.getItemAtPosition(it) == project.language }?.let { language.setSelection(it) }
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
