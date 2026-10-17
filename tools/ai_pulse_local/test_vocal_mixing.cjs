@@ -1,0 +1,36 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const dir=__dirname+'/../../app/src/main/assets/';
+const html=fs.readFileSync(dir+'pulse_nova.html','utf8');
+const scripts=[fs.readFileSync(dir+'pulse_pronunciation.js','utf8'),fs.readFileSync(dir+'pulse_vowel_formants.js','utf8')];
+const embedded=html.match(/<script>([\s\S]*?)<\/script>/);
+assert.ok(embedded,'composer inline script exists');
+const elements={};
+const document={getElementById(id){return elements[id]??(elements[id]={value:id==='lyricLanguage'?'bm':'42',checked:false,disabled:false,textContent:'',addEventListener(){},click(){},play(){return Promise.resolve()}});},createElement(){return {click(){}}}};
+const ctx=vm.createContext({document,console,Math,Number,Float32Array,ArrayBuffer,DataView,Blob,URL,Error,setTimeout,clearTimeout});
+for(const src of [...scripts,embedded[1]])vm.runInContext(src,ctx,{timeout:2000});
+const output=vm.runInContext(`composeFromLyrics({style:"pop",bpm:108,seed:42,lyricsText:"[Verse]\\nbuku kaki sayang"})`,ctx,{timeout:15000});
+const instrumental=output.audio;
+const mixed=vm.runInContext('mixVocalPreview',ctx)(instrumental,output.vocalNotes);
+assert.equal(mixed.byteLength,instrumental.byteLength,'WAV length must remain unchanged');
+const original=new Uint8Array(instrumental).slice();
+const iv=new DataView(instrumental),mv=new DataView(mixed);
+assert.equal(iv.getUint32(40,true),mv.getUint32(40,true),'PCM data size identical');
+assert.equal(iv.getUint32(24,true),mv.getUint32(24,true),'sample rate identical');
+let changed=0,peak=0,energy=0;
+for(let i=44;i<mixed.byteLength;i+=2){
+ const a=iv.getInt16(i,true),b=mv.getInt16(i,true);
+ if(a!==b)changed++;
+ peak=Math.max(peak,Math.abs(b)/32768);
+ energy+=(b-a)*(b-a);
+}
+assert.ok(changed>100,'vocal preview must change samples');
+assert.ok(energy>0,'vocal stem must introduce measurable delta');
+assert.ok(peak<=.951,'output must stay within safe peak ceiling');
+assert.deepEqual(new Uint8Array(instrumental),original,'instrumental input must not mutate');
+const repeat=vm.runInContext('mixVocalPreview',ctx)(instrumental,output.vocalNotes);
+assert.deepEqual(Buffer.from(mixed),Buffer.from(repeat),'same notes must produce identical mixed WAV');
+const noVowels=vm.runInContext('mixVocalPreview',ctx)(instrumental,[]);
+assert.deepEqual(Buffer.from(noVowels),Buffer.from(instrumental),'no vocal notes must preserve PCM exactly');
+console.log('PASS: mono vocal mixing preserves input, buffer length, deterministic output, measurable delta and peak ceiling');
