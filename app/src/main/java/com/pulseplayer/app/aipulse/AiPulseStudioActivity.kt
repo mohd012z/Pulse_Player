@@ -175,6 +175,7 @@ class AiPulseStudioActivity : Activity() {
                 }
             }
         })
+        var editedArrangement: AiPulseBrain.Plan? = null
         root.addView(Button(this).apply {
             text = "Brain: Generate song arrangement blueprint"
             setOnClickListener {
@@ -182,8 +183,9 @@ class AiPulseStudioActivity : Activity() {
                     genre = genre.selectedItem.toString(),
                     mood = mood.text.toString(),
                     bpm = bpm.progress + 60,
-                    bars = 32
+                    bars = 8
                 ))
+                editedArrangement = plan
                 val summary = plan.segments.joinToString("\\n") {
                     "Bars ${it.startBar + 1}–${it.startBar + it.bars}: ${it.section} · energy ${it.energy} · ${it.instruments.joinToString(", ")}"
                 }
@@ -191,6 +193,50 @@ class AiPulseStudioActivity : Activity() {
                     .setTitle("AI Pulse Brain · offline arrangement")
                     .setMessage(summary)
                     .setPositiveButton("OK", null).show()
+            }
+        })
+        root.addView(Button(this).apply {
+            text = "Edit arrangement sections"
+            setOnClickListener {
+                val plan = editedArrangement ?: AiPulseBrain.plan(AiPulseBrain.Input(
+                    genre = genre.selectedItem.toString(),
+                    mood = mood.text.toString(),
+                    bpm = bpm.progress + 60,
+                    bars = 8
+                )).also { editedArrangement = it }
+                val descriptions = plan.segments.map {
+                    "${it.section} · bars ${it.startBar + 1}–${it.startBar + it.bars}"
+                }.toTypedArray()
+                AlertDialog.Builder(this@AiPulseStudioActivity)
+                    .setTitle("Select section to edit")
+                    .setItems(descriptions) { _, index ->
+                        val actions = arrayOf("Move earlier", "Move later", "Add 4 bars",
+                            "Remove 4 bars", "Change section type")
+                        AlertDialog.Builder(this@AiPulseStudioActivity)
+                            .setTitle("Edit ${plan.segments[index].section}")
+                            .setItems(actions) { _, action ->
+                                runCatching {
+                                    val segment = plan.segments[index]
+                                    editedArrangement = when (action) {
+                                        0 -> AiPulseArrangementEditor.move(plan, index, index - 1)
+                                        1 -> AiPulseArrangementEditor.move(plan, index, index + 1)
+                                        2 -> AiPulseArrangementEditor.update(plan, index, bars = segment.bars + 4)
+                                        3 -> AiPulseArrangementEditor.update(plan, index, bars = segment.bars - 4)
+                                        else -> {
+                                            val types = AiPulseBrain.Section.entries
+                                            val next = types[(segment.section.ordinal + 1) % types.size]
+                                            AiPulseArrangementEditor.update(plan, index, section = next)
+                                        }
+                                    }
+                                    val updated = requireNotNull(editedArrangement)
+                                    Toast.makeText(this@AiPulseStudioActivity,
+                                        "Timeline updated: ${updated.totalBars} bars", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(this@AiPulseStudioActivity,
+                                        "Edit rejected: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }.show()
+                    }.show()
             }
         })
         heading("Your voice · local microphone recording")
@@ -463,6 +509,7 @@ class AiPulseStudioActivity : Activity() {
             )
             val includeRecordedVoice = useRecordedVoice.isChecked
             val saveStems = exportStems.isChecked
+            val chosenArrangement = editedArrangement?.takeIf { it.genre == request.genre && it.bpm == request.bpm }
             val instrumentLevels = AiPulseTrackMixer.apply(
                 AiPulseStereoRenderer.Levels(
                     lead = leadLevel.progress / 100.0,
@@ -487,7 +534,7 @@ class AiPulseStudioActivity : Activity() {
             thread(name = "AiPulseCompose") {
                 val tmp = File(cacheDir, "pulse-${System.nanoTime()}.wav")
                 val result = runCatching {
-                    AiPulseStereoRenderer.render(request, tmp, levels = instrumentLevels) { cancelRequested }
+                    AiPulseStereoRenderer.render(request, tmp, levels = instrumentLevels, arrangement = chosenArrangement) { cancelRequested }
                     if (cancelRequested) throw InterruptedException("Cancelled")
                     val report = AiPulseWaveInspector.inspect(tmp)
                     require(report.durationSeconds > 0.0) { "Empty output" }
@@ -530,7 +577,7 @@ class AiPulseStudioActivity : Activity() {
                     for (stem in AiPulseStereoRenderer.Stem.entries.filter { it != AiPulseStereoRenderer.Stem.MIX }) {
                         val stemFile = File(cacheDir, "stem-${stem.name.lowercase()}-${System.nanoTime()}.wav")
                         try {
-                            AiPulseStereoRenderer.render(request, stemFile, stem, instrumentLevels) { cancelRequested }
+                            AiPulseStereoRenderer.render(request, stemFile, stem, instrumentLevels, chosenArrangement) { cancelRequested }
                             if (cancelRequested) break
                             saveToMusic(stemFile, "${request.title}-${stem.name.lowercase()}")
                         } catch (error: Exception) {
