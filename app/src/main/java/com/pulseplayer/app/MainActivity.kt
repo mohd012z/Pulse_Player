@@ -957,6 +957,13 @@ class MainActivity : Activity() {
                 station.name.contains(query, ignoreCase = true)
         }
 
+    private fun showMoviesDialog() {
+        val options = arrayOf("YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports")
+        showPicker("Movies · TV · Sports (official sources)", options) { index ->
+            openProvider(options[index])
+        }
+    }
+
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
@@ -964,6 +971,7 @@ class MainActivity : Activity() {
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
+            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports" -> "https://www.youtube.com/"
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
             "BFM 89.9" -> "https://www.bfm.my/"
             "ERA Malaysia" -> "https://era.je/"
@@ -971,7 +979,7 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
+            if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports")) {
                 startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
             } else {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
@@ -1310,13 +1318,15 @@ class MainActivity : Activity() {
                 contentDescription = label
                 maxLines = 2
             }
-        sourceButton = navButton("▣", "Device") { showPlaylistDialog() }
+        // Five primary destinations keep labels readable on narrow phones.
+        sourceButton = navButton("▣", "Library") { showPlaylistDialog() }
         bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(54), 1f))
-        val radioButton = navButton("◉", "Radio") { switchPlaylist("MY RADIO") }
-        bottomNav.addView(radioButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
-        bottomNav.addView(navButton("♫", "FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
-        bottomNav.addView(navButton("▥", "Spectrum") { requestSpectrum() },
+        bottomNav.addView(navButton("▶", "Online") {
+            showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
+                openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
+            }
+        }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        bottomNav.addView(navButton("▤", "Movies") { showMoviesDialog() },
             LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("✦", "Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
