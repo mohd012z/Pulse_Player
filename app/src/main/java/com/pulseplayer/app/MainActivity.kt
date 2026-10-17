@@ -768,6 +768,16 @@ class MainActivity : Activity() {
     @Deprecated("Kept for standalone Activity with no AndroidX Activity dependency")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 106) {
+            if (resultCode == RESULT_OK) {
+                status("Deletion confirmed. Refreshing music library…")
+                scanLibrary()
+                scanFolders()
+            } else {
+                status("Deletion cancelled or not approved")
+            }
+            return
+        }
         if (requestCode == REQUEST_OPEN_FOLDER && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             val persist = data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
