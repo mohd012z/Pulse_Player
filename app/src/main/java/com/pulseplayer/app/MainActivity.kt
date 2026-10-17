@@ -114,6 +114,9 @@ class MainActivity : Activity() {
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             refreshNowPlaying()
+            // Release audio capture on pause, stop and track loss. The ticker will
+            // reconnect when playback resumes, provided the user opted in.
+            if (!player.isPlaying && spectrumView != null) stopSpectrum()
         }
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             status("Playback error: ${error.errorCodeName}. Try another audio file.")
