@@ -13,10 +13,11 @@ data class AiPulseProject(
     val instruments: List<String>,
     val lyrics: String,
     val bpm: Int,
-    val mixer: AiPulseMixPreset = AiPulseMixPreset()
+    val mixer: AiPulseMixPreset = AiPulseMixPreset(),
+    val arrangement: AiPulseBrain.Plan? = null
 ) {
     fun toJson(): String = JSONObject().apply {
-        put("version", 2)
+        put("version", 3)
         put("title", title)
         put("idea", idea)
         put("genre", genre)
@@ -26,13 +27,14 @@ data class AiPulseProject(
         put("lyrics", lyrics)
         put("bpm", bpm)
         put("mixer", JSONObject(mixer.toJson()))
+        if (arrangement != null) put("arrangement", AiPulseArrangementStorage.toJson(arrangement))
     }.toString(2)
 
     companion object {
         fun fromJson(json: String): AiPulseProject {
             val o = JSONObject(json)
             val version = o.getInt("version")
-            require(version in 1..2) { "Unsupported project version" }
+            require(version in 1..3) { "Unsupported project version" }
             val array = o.getJSONArray("instruments")
             require(array.length() <= 32) { "Too many instruments" }
             val project = AiPulseProject(
@@ -41,11 +43,17 @@ data class AiPulseProject(
                 (0 until array.length()).map { array.getString(it) },
                 o.getString("lyrics"), o.getInt("bpm"),
                 if (version >= 2) AiPulseMixPreset.fromJson(o.getJSONObject("mixer").toString())
-                else AiPulseMixPreset()
+                else AiPulseMixPreset(),
+                if (version >= 3 && !o.isNull("arrangement") && o.has("arrangement"))
+                    AiPulseArrangementStorage.fromJson(o.getJSONObject("arrangement")) else null
             )
             require(project.title.isNotBlank() && project.title.length <= 100)
             require(project.lyrics.length <= 12000)
             require(project.bpm in 60..180)
+            require(project.arrangement == null ||
+                (project.arrangement.bpm == project.bpm && project.arrangement.genre == project.genre)) {
+                "Arrangement must match project tempo and genre"
+            }
             return project
         }
     }
