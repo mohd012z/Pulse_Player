@@ -27,7 +27,11 @@ class OnlineMediaActivity : Activity() {
             "YouTube Music" to "https://music.youtube.com/",
             "YouTube Shorts" to "https://www.youtube.com/shorts",
             "JOOX" to "https://www.joox.com/",
-            "Spotify" to "https://open.spotify.com/"
+            "Spotify" to "https://open.spotify.com/",
+            "YouTube Movies" to "https://www.youtube.com/results?search_query=official+full+movies",
+            "Public Domain Movies" to "https://www.youtube.com/results?search_query=public+domain+full+movies",
+            "Live TV" to "https://www.youtube.com/results?search_query=official+live+tv+channel",
+            "Live Sports" to "https://www.youtube.com/results?search_query=official+live+sports"
         )
         val name = intent.getStringExtra("provider").orEmpty()
         val url = providers[name] ?: run { finish(); return }
