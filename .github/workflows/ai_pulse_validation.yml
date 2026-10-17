@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'tools/ai_pulse_validation/**'
+      - 'tools/ai_pulse_local/**'
+      - 'tools/ai_pulse_local/**'
       - '.github/workflows/ai_pulse_validation.yml'
   pull_request:
     paths:
@@ -19,4 +21,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run P0-P3 mock contract and WAV validation
-        run: python -m unittest discover -s tools/ai_pulse_validation -p 'test_*.py' -v
+        run: |
+          python -m unittest discover -s tools/ai_pulse_validation -p 'test_*.py' -v
+          python -m unittest discover -s tools/ai_pulse_local -p 'test_*.py' -v
