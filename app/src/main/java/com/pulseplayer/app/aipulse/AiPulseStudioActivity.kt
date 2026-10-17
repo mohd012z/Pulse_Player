@@ -360,15 +360,25 @@ class AiPulseStudioActivity : Activity() {
                             }
                         } else null
                         val vocal = decodedVoice ?: importedVoiceWav
+                        val resampledVoice = if (vocal != null && vocal.exists() &&
+                            AiPulseWavResampler.sampleRate(vocal) != 44100) {
+                            File(cacheDir, "resampled-vocal-${System.nanoTime()}.wav").also {
+                                AiPulseWavResampler.convert(vocal, it, 44100) { cancelRequested }
+                            }
+                        } else null
                         try {
-                        if (vocal != null && vocal.exists()) {
-                            val combined = File(cacheDir, "vocal-mix-${System.nanoTime()}.wav")
-                            try {
-                                AiPulseWavMixer.mix(mastered, vocal, combined, cancelled = { cancelRequested })
-                                saveToMusic(combined, request.title)
-                            } finally { combined.delete() }
-                        } else saveToMusic(mastered, request.title)
-                        } finally { decodedVoice?.delete() }
+                            val compatibleVoice = resampledVoice ?: vocal
+                            if (compatibleVoice != null && compatibleVoice.exists()) {
+                                val combined = File(cacheDir, "vocal-mix-${System.nanoTime()}.wav")
+                                try {
+                                    AiPulseWavMixer.mix(mastered, compatibleVoice, combined, cancelled = { cancelRequested })
+                                    saveToMusic(combined, request.title)
+                                } finally { combined.delete() }
+                            } else saveToMusic(mastered, request.title)
+                        } finally {
+                            resampledVoice?.delete()
+                            decodedVoice?.delete()
+                        }
                     } finally { mastered.delete() }
                 }
                 tmp.delete()
