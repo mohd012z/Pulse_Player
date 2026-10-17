@@ -505,6 +505,28 @@ class AiPulseStudioActivity : Activity() {
                 }.onFailure { Toast.makeText(this@AiPulseStudioActivity, it.message, Toast.LENGTH_LONG).show() }
             }
         })
+        val memory = AiPulseGenerationMemory(applicationContext)
+        root.addView(Button(this).apply {
+            text = "Generation history · chronological summary"
+            setOnClickListener {
+                val events = memory.recent(15)
+                val history = events.joinToString("\n") {
+                    "${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it.timestampMs))} · ${it.backendId} · ${it.outcome} · ${it.promptSummary}"
+                }
+                AlertDialog.Builder(this@AiPulseStudioActivity)
+                    .setTitle("AI Pulse generation memory")
+                    .setMessage(memory.summary() + if (history.isEmpty()) "\nNo attempts recorded yet." else "\n\n" + history)
+                    .setPositiveButton("Close", null)
+                    .setNeutralButton("Clear history") { _, _ ->
+                        AlertDialog.Builder(this@AiPulseStudioActivity)
+                            .setTitle("Delete generation history?")
+                            .setMessage("This clears only local generation history, not your songs or projects.")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("Clear") { _, _ -> memory.clear() }
+                            .show()
+                    }.show()
+            }
+        })
         val state = heading("Ready — generates WAV, saved to Music/AI Pulse")
         val create = Button(this).apply { text = "Generate music" }
         val cancel = Button(this).apply { text = "Cancel"; isEnabled = false }
@@ -564,6 +586,27 @@ class AiPulseStudioActivity : Activity() {
                 )
             )
             val selectedMasteringPreset = AiPulseMastering.Preset.entries[masteringPreset.selectedItemPosition]
+            val routing = AiPulseGenerationRouter.choose(
+                AiPulseGenerationRouter.Request(
+                    prompt = idea.text.toString().ifBlank { request.title },
+                    task = AiPulseGenerationRouter.Task.INSTRUMENTAL,
+                    offlineOnly = true
+                ),
+                AiPulseGenerationRouter.Device(availableRamMb = 0, online = false),
+                listOf(AiPulseGenerationRouter.Backend(
+                    id = "ai-pulse-procedural-v1",
+                    kind = AiPulseGenerationRouter.Kind.PROCEDURAL_OFFLINE,
+                    supportedTasks = setOf(AiPulseGenerationRouter.Task.INSTRUMENTAL),
+                    installed = true, licenseApproved = true, requiresNetwork = false
+                ))
+            )
+            if (routing.backend == null) {
+                state.text = routing.reason
+                return@setOnClickListener
+            }
+            val generationStartedAt = System.currentTimeMillis()
+            val generationId = java.util.UUID.randomUUID().toString()
+            val promptSummary = idea.text.toString().trim().take(240)
             working = true
             cancelRequested = false
             create.isEnabled = false
@@ -628,6 +671,23 @@ class AiPulseStudioActivity : Activity() {
                     }
                 }
                 tmp.delete()
+                runCatching {
+                    memory.record(AiPulseGenerationMemory.Event(
+                        id = generationId,
+                        timestampMs = generationStartedAt,
+                        backendId = routing.backend.id,
+                        task = "INSTRUMENTAL",
+                        promptSummary = promptSummary,
+                        outcome = when {
+                            result.isSuccess -> "success"
+                            result.exceptionOrNull() is InterruptedException -> "cancelled"
+                            else -> "failed"
+                        },
+                        durationMs = System.currentTimeMillis() - generationStartedAt
+                    ))
+                }.onFailure { error ->
+                    android.util.Log.w("AiPulseStudio", "Unable to save generation history", error)
+                }
                 runOnUiThread {
                     working = false
                     create.isEnabled = true
