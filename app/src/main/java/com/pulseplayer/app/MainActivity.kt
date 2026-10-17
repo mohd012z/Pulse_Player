@@ -1300,13 +1300,15 @@ class MainActivity : Activity() {
                 2 -> selectMixPreset()
                 3 -> showPicker("Audio processing", arrayOf(
                     "Custom 3-band EQ", "Bass strength", "PCM peak limiter",
+                    "Dynamic-range compressor",
                     "All sound effects and presets"
                 )) { selected ->
                     when (selected) {
                         0 -> showCustomEqualizer()
                         1 -> showBassDialog()
                         2 -> showSafetyLimiterToggle()
-                        3 -> showAudioMenu()
+                        3 -> showDynamicsToggle()
+                        4 -> showAudioMenu()
                     }
                 }
                 4 -> showDeviceSoundCapabilities()
@@ -1316,7 +1318,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "PCM safety limiter on/off", "Android system sound settings"
+        "Choose EQ preset", "NovaStream TV cinematic EQ", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Audio quality diagnostics", "Device speaker / spatial / refresh scan", "Suggested speaker/headphone tuning", "Auto sound on/off", "PCM safety limiter on/off", "Dynamic range compression on/off", "Android system sound settings"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1333,8 +1335,33 @@ class MainActivity : Activity() {
             7 -> applySuggestedOutputSound()
             8 -> showAutoSoundToggle()
             9 -> showSafetyLimiterToggle()
-            10 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            10 -> showDynamicsToggle()
+            11 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
         }
+    }
+
+    private fun showDynamicsToggle() {
+        val enabled = getSharedPreferences("player_state", MODE_PRIVATE)
+            .getBoolean("stereo_dynamics", false)
+        AlertDialog.Builder(this)
+            .setTitle("Stereo dynamic-range compressor")
+            .setMessage("Currently: ${if (enabled) "ON" else "OFF"}.\\n\\n" +
+                "Applies a gentle 2:1 linked stereo compressor above -18 dBFS " +
+                "to local/radio PCM16 stereo only. It reduces peaks rather than boosting " +
+                "quiet sounds. Keep the PCM safety limiter enabled if you need " +
+                "post-processor sample-peak protection. It does not process YouTube audio.")
+            .setPositiveButton(if (enabled) "Disable" else "Enable") { _, _ ->
+                val next = !enabled
+                customCommand(PlaybackService.CMD_DYNAMICS, Bundle().apply {
+                    putBoolean(PlaybackService.ARG_DYNAMICS, next)
+                }) { _, ok ->
+                    if (ok) getSharedPreferences("player_state", MODE_PRIVATE).edit()
+                        .putBoolean("stereo_dynamics", next).apply()
+                    status(if (ok) "Stereo dynamics: ${if (next) "ON" else "OFF"}" else "Compressor command failed")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showSafetyLimiterToggle() {
