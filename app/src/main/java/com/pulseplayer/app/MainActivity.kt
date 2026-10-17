@@ -1412,26 +1412,20 @@ class MainActivity : Activity() {
 
     private fun applySuggestedOutputSound() {
         val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-        val outputs = manager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-        val types = outputs.map { it.type }.toSet()
-        // This is a conservative recommendation based on connected devices, not
-        // proof of the currently routed media output. Never enable extreme bass.
-        val selected = when {
-            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP in types ||
-                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES in types ||
-                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET in types ||
-                android.media.AudioDeviceInfo.TYPE_USB_HEADSET in types -> "Stereo Clarity"
-            android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER in types -> "Balanced Speaker"
-            else -> "Flat"
-        }
+        val advice = OutputRouteAdvisor.inspect(manager)
+        val kind = if (advice.predictedMediaRoute) "Anticipated media route" else "Connected outputs"
+        val description = advice.devices.joinToString(", ") { it.productName.toString() }
+            .ifBlank { "None reported" }
         AlertDialog.Builder(this)
             .setTitle("Suggested sound profile")
-            .setMessage("Detected connected outputs suggest: $selected. This is not speaker calibration or Dolby Atmos. Apply only to Pulse Player local/radio playback?")
+            .setMessage("$kind: $description\\n\\nSuggested: ${advice.profile}. " +
+                "This is conservative EQ tuning, not speaker calibration or Dolby Atmos. " +
+                "Apply only to local/radio playback?")
             .setPositiveButton("Apply") { _, _ ->
                 customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
-                    putString(PlaybackService.ARG_PRESET, selected)
+                    putString(PlaybackService.ARG_PRESET, advice.profile)
                 }) { _, ok ->
-                    status(if (ok) "Sound profile applied: $selected" else "EQ unavailable for this output")
+                    status(if (ok) "Applied EQ: ${advice.profile}" else "EQ unavailable for this route")
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -1440,7 +1434,8 @@ class MainActivity : Activity() {
 
     private fun showDeviceSoundCapabilities() {
         val manager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-        val outputs = manager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+        val advice = OutputRouteAdvisor.inspect(manager)
+        val outputs = advice.devices
         val routeNames = outputs.map { device ->
             val type = when (device.type) {
                 android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in speaker"
@@ -1464,7 +1459,7 @@ class MainActivity : Activity() {
         val display = windowManager.defaultDisplay
         val modes = display.supportedModes.map { it.refreshRate }.distinct().sorted()
         val message = """
-            Connected output devices (not necessarily the active media route):
+            ${if (advice.predictedMediaRoute) "Anticipated media route (Android 13+):" else "Connected output devices (active route unknown):"}
             ${routeNames.ifEmpty { listOf("No output reported") }.joinToString("\n")}
 
             $spatial
