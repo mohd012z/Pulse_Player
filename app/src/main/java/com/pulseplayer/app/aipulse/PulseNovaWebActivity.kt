@@ -71,7 +71,29 @@ class PulseNovaWebActivity : Activity() {
                 }
             }
         }
+        val style = intent.getStringExtra("pulse_style_tags").orEmpty()
+        val lyrics = intent.getStringExtra("pulse_lyrics").orEmpty()
+        val enabled = intent.getBooleanExtra("pulse_lyric_mode", false)
         web.loadUrl("https://appassets.androidplatform.net/assets/pulse_nova.html")
+        if (style.isNotBlank() || lyrics.isNotBlank()) {
+            val payload = org.json.JSONObject().put("style", style).put("lyrics", lyrics).put("enabled", enabled)
+            web.webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                    val url = request.url
+                    if (url.scheme != "https" || url.host != origin.host || url.port != -1 ||
+                        !url.path.orEmpty().startsWith("/assets/")) {
+                        return WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden",
+                            mapOf("Cache-Control" to "no-store"), "".byteInputStream())
+                    }
+                    return loader.shouldInterceptRequest(url)
+                }
+                override fun onPageFinished(view: WebView, url: String) {
+                    if (url == "https://appassets.androidplatform.net/assets/pulse_nova.html") {
+                        view.evaluateJavascript("window.pulsePrefill && window.pulsePrefill(${payload})", null)
+                    }
+                }
+            }
+        }
     }
     @Deprecated("Legacy SAF callback for API 26–28")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
