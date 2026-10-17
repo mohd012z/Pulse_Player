@@ -44,30 +44,42 @@ object AiPulseBrain {
             "Acoustic" -> listOf("acoustic guitar", "bass", "percussion")
             else -> listOf("guitar", "bass", "drums")
         }
-        val sections = listOf(Section.INTRO, Section.VERSE, Section.CHORUS, Section.BRIDGE, Section.OUTRO)
+        // Preserve the chronological block sequence. Earlier implementations counted
+        // sections first and accidentally reordered repeated verses and choruses.
         val blocks = input.bars / 4
-        val counts = IntArray(5)
-        for (i in 0 until blocks) {
-            val target = when {
-                i == 0 -> 0
-                i == blocks - 1 -> 4
-                i % 4 == 3 -> 3
-                i % 2 == 0 -> 2
-                else -> 1
+        val energies = mapOf(
+            Section.INTRO to 0.40,
+            Section.VERSE to 0.65,
+            Section.CHORUS to 0.95,
+            Section.BRIDGE to 0.55,
+            Section.OUTRO to 0.35
+        )
+        val order = (0 until blocks).map { i ->
+            when {
+                i == 0 -> Section.INTRO
+                i == blocks - 1 -> Section.OUTRO
+                i % 4 == 3 -> Section.BRIDGE
+                i % 2 == 0 -> Section.CHORUS
+                else -> Section.VERSE
             }
-            counts[target]++
         }
         var cursor = 0
-        val segments = sections.indices.mapNotNull { i ->
-            val count = counts[i] * 4
-            if (count == 0) null else Segment(
-                section = sections[i],
-                startBar = cursor,
-                bars = count,
-                chordRoots = progression,
-                energy = listOf(0.40, 0.65, 0.95, 0.55, 0.35)[i],
-                instruments = instrumentation
-            ).also { cursor += count }
+        val segments = mutableListOf<Segment>()
+        for (section in order) {
+            val previous = segments.lastOrNull()
+            if (previous?.section == section) {
+                segments[segments.lastIndex] = previous.copy(bars = previous.bars + 4)
+            } else {
+                segments.add(Segment(
+                    section = section,
+                    startBar = cursor,
+                    bars = 4,
+                    chordRoots = progression,
+                    energy = requireNotNull(energies[section]),
+                    instruments = instrumentation
+                ))
+            }
+            cursor += 4
         }
         check(cursor == input.bars)
         return Plan(input.bpm, input.genre, segments)
