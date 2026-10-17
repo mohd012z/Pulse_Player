@@ -598,9 +598,15 @@ class AiPulseStudioActivity : Activity() {
             }
         })
         heading("Neural song generation · optional connected engine")
-        val neuralEndpoint = field("HTTPS neural WAV endpoint (POST)", "")
+        val neuralEndpoint = field("HTTPS server URL · ACE-Step 1.5 base URL or direct WAV POST", "")
         neuralEndpoint.setText(getPreferences(MODE_PRIVATE).getString("neural_endpoint", ""))
-        val neuralStatus = heading("No neural model bundled. Connect a compatible model server to enable sung vocals.")
+        val aceStepMode = android.widget.CheckBox(this).apply {
+            text = "ACE-Step 1.5 native API (recommended)"
+            isChecked = true
+            setTextColor(Color.WHITE)
+        }
+        root.addView(aceStepMode)
+        val neuralStatus = heading("Connect your ACE-Step server over HTTPS; model runs on the server.")
         root.addView(Button(this).apply {
             text = "Generate neural song"
             setOnClickListener {
@@ -622,8 +628,11 @@ class AiPulseStudioActivity : Activity() {
                 neuralStatus.text = "Generating neural song…"
                 thread(name = "AiPulseNeural") {
                     val result = runCatching {
-                        val generated = AiPulseNeuralBridge(applicationContext)
-                            .generate(endpoint, task) { cancelRequested }
+                        val generated = if (aceStepMode.isChecked) {
+                            AceStepClient(applicationContext).generate(endpoint, task) { cancelRequested }
+                        } else {
+                            AiPulseNeuralBridge(applicationContext).generate(endpoint, task) { cancelRequested }
+                        }
                         try {
                             if (cancelRequested) throw InterruptedException("Cancelled")
                             saveToMusic(generated, task.title)
