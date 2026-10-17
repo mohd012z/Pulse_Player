@@ -37,6 +37,13 @@ object AiPulseComposer {
         val notes = if (cheerful) intArrayOf(0, 4, 7, 12, 7, 4, 2, 7)
                     else intArrayOf(0, 3, 7, 10, 7, 3, 5, 7)
         val root = 48 + Math.floorMod(request.seed, 12)
+        val chordRoots = when (request.genre) {
+            "Ballad" -> intArrayOf(0, 7, 9, 5)
+            "R&B" -> intArrayOf(0, 5, 9, 7)
+            "EDM" -> intArrayOf(0, 9, 5, 7)
+            "Acoustic" -> intArrayOf(0, 5, 7, 0)
+            else -> intArrayOf(0, 7, 5, 9)
+        }
         output.parentFile?.mkdirs()
         val temp = File(output.absolutePath + ".part")
         try {
@@ -52,7 +59,8 @@ object AiPulseComposer {
                         val t = index.toDouble() / sampleRate
                         val beat = t / beatSeconds
                         val noteIndex = (beat.toInt() / 2) % notes.size
-                        val freq = 440.0 * Math.pow(2.0, (root + notes[noteIndex] - 69) / 12.0)
+                        val chord = chordRoots[(beat / 4.0).toInt() % chordRoots.size]
+                        val freq = 440.0 * Math.pow(2.0, (root + chord + notes[noteIndex] - 69) / 12.0)
                         val phase = beat % 2.0
                         val envelope = exp(-1.2 * phase)
                         val lead = sin(2 * PI * freq * t) * envelope * 0.28
