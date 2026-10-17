@@ -45,6 +45,14 @@ class TestPulse(unittest.TestCase):
             self.assertEqual(verify_wav(p)["duration_seconds"],1.0)
     def test_p0_remote_http_rejected(self):
         with self.assertRaises(ValueError):AceStepAPI("http://example.com")
+    def test_p0_blank_prompt_rejected(self):
+        api=AceStepAPI("http://127.0.0.1:"+str(self.server.server_port))
+        with self.assertRaises(ValueError):api.generate("   ")
+    def test_p0_redirect_rejected(self):
+        from pulse_validation import _NoRedirect
+        handler=_NoRedirect()
+        with self.assertRaises(ValueError):
+            handler.redirect_request(None,None,302,"Redirect",{},"https://example.com/audio.wav")
     def test_p1_edit_contracts(self):
         with self.assertRaises(ValueError):EditRequest("repaint","edit").validate()
         with self.assertRaises(ValueError):EditRequest("repaint","edit","owned.wav",8,4).validate()
