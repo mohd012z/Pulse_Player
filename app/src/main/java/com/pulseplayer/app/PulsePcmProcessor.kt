@@ -17,6 +17,8 @@ class PulsePcmProcessor : BaseAudioProcessor() {
     @Volatile var enabled: Boolean = false
     @Volatile var bassDb: Float = 0f
     @Volatile var clarityDb: Float = 0f
+    @Volatile var safetyLimiterEnabled: Boolean = false
+    private var limiterGain = 1.0f
     private var nativeHandle: Long = 0L
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -27,27 +29,43 @@ class PulsePcmProcessor : BaseAudioProcessor() {
 
     override fun onFlush() {
         releaseNative()
+        limiterGain = 1.0f
         if (inputAudioFormat.sampleRate > 0) {
             nativeHandle = runCatching { nativeCreate(inputAudioFormat.sampleRate.toDouble()) }.getOrDefault(0L)
         }
     }
 
-    override fun onReset() { releaseNative() }
+    override fun onReset() { releaseNative(); limiterGain = 1.0f }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val bytes = inputBuffer.remaining()
         if (bytes == 0) return
         val output = replaceOutputBuffer(bytes)
         // The input is normally frame-aligned; copy unaligned tails unchanged.
-        if (!enabled || nativeHandle == 0L) {
+        if ((!enabled || nativeHandle == 0L) && !safetyLimiterEnabled) {
             output.put(inputBuffer)
         } else {
             val sampleCount = bytes / 2
             val pcm = ShortArray(sampleCount)
             val view = inputBuffer.slice().order(ByteOrder.LITTLE_ENDIAN)
             for (i in pcm.indices) pcm[i] = view.short
-            if (sampleCount >= 2) {
+            if (enabled && nativeHandle != 0L && sampleCount >= 2) {
                 nativeProcess(nativeHandle, pcm, sampleCount / 2, bassDb, clarityDb)
+            }
+            if (safetyLimiterEnabled && sampleCount > 0) {
+                // Linked-channel peak attenuation; cannot repair pre-existing clipping.
+                var peak = 1
+                for (sample in pcm) {
+                    val magnitude = kotlin.math.abs(sample.toInt())
+                    if (magnitude > peak) peak = magnitude
+                }
+                val target = kotlin.math.min(1f, 30000f / peak)
+                limiterGain = if (target < limiterGain) target
+                    else limiterGain + (target - limiterGain) * 0.015f
+                for (i in pcm.indices) {
+                    pcm[i] = (pcm[i].toInt() * limiterGain).toInt()
+                        .coerceIn(-30000, 30000).toShort()
+                }
             }
             for (sample in pcm) {
                 output.put((sample.toInt() and 255).toByte())
