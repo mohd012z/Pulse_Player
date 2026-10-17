@@ -66,7 +66,7 @@ object AiPulseComposer {
                         val bar = (beat / 4.0).toInt()
                         val section = arrangement.segments.lastOrNull { bar >= it.startBar }
                             ?: arrangement.segments.first()
-                        val chord = section.chordRoots[bar % section.chordRoots.size]
+                        val chord = chordRoots[bar % chordRoots.size]
                         val freq = 440.0 * Math.pow(2.0, (root + chord + notes[noteIndex] - 69) / 12.0)
                         val phase = beat % 2.0
                         val envelope = exp(-1.2 * phase)
