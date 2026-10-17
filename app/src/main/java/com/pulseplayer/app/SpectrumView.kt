@@ -12,7 +12,7 @@ import kotlin.math.ln
 
 /** Pixel-sharp, centered AC-style waveform from the active audio session. */
 class SpectrumView(context: Context) : View(context) {
-    enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER }
+    enum class DisplayMode { FREQUENCY_BARS, PIXEL_WATER, MIRROR_BARS, OSCILLOSCOPE }
     var displayMode: DisplayMode = DisplayMode.FREQUENCY_BARS
         set(value) { field = value; invalidate() }
     private val spectrum = FloatArray(32)
@@ -229,6 +229,32 @@ class SpectrumView(context: Context) : View(context) {
         if (width <= 0 || height <= 0) return
         if (displayMode == DisplayMode.FREQUENCY_BARS) {
             drawFrequencyBars(canvas)
+            return
+        }
+        if (displayMode == DisplayMode.MIRROR_BARS) {
+            val mid = height / 2f
+            val barWidth = width.toFloat() / spectrum.size
+            line.style = Paint.Style.FILL
+            for (i in spectrum.indices) {
+                val magnitude = spectrum[i].coerceIn(0f, 1f) * height * 0.46f
+                line.color = Color.HSVToColor(floatArrayOf((165f + i * 5f) % 360f, 0.82f, 0.98f))
+                val x = i * barWidth + barWidth * 0.13f
+                canvas.drawRoundRect(x, mid - magnitude, x + barWidth * 0.74f,
+                    mid + magnitude, dpFloat(2f), dpFloat(2f), line)
+            }
+            return
+        }
+        if (displayMode == DisplayMode.OSCILLOSCOPE) {
+            line.style = Paint.Style.STROKE
+            line.color = 0xFF65E6CC.toInt()
+            line.strokeWidth = dpFloat(1.7f)
+            val mid = height / 2f
+            for (i in 1 until wave.size) {
+                val x1 = (i - 1).toFloat() / (wave.size - 1) * width
+                val x2 = i.toFloat() / (wave.size - 1) * width
+                canvas.drawLine(x1, mid - wave[i - 1] * height * 0.43f,
+                    x2, mid - wave[i] * height * 0.43f, line)
+            }
             return
         }
         if (!receivedNonSilentAudio) {
