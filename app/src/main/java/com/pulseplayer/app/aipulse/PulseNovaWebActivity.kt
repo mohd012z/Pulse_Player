@@ -1,6 +1,8 @@
 package com.pulseplayer.app.aipulse
 
 import android.app.Activity
+import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebResourceRequest
@@ -15,10 +17,22 @@ import androidx.webkit.WebViewFeature
 class PulseNovaWebActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var bridge: PulseNativeExport
+    private val legacySaveRequest = 7812
     private val origin = Uri.parse("https://appassets.androidplatform.net")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        bridge = PulseNativeExport(applicationContext)
+        bridge = PulseNativeExport(applicationContext) { name ->
+            if (Build.VERSION.SDK_INT < 29) {
+                val safe = name.take(60).replace(Regex("[^a-zA-Z0-9 _-]"), "_").ifBlank { "PulseNova" }
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "audio/wav"
+                    putExtra(Intent.EXTRA_TITLE, "$safe.wav")
+                }
+                try { startActivityForResult(intent, legacySaveRequest) }
+                catch (_: Exception) { bridge.finishLegacySave(null) }
+            }
+        }
         web = WebView(this)
         setContentView(web)
         web.settings.apply {
@@ -57,6 +71,13 @@ class PulseNovaWebActivity : Activity() {
             }
         }
         web.loadUrl("https://appassets.androidplatform.net/assets/pulse_nova.html")
+    }
+    @Deprecated("Legacy SAF callback for API 26–28")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == legacySaveRequest) {
+            bridge.finishLegacySave(if (resultCode == RESULT_OK) data?.data else null)
+        }
     }
     override fun onDestroy() {
         bridge.shutdown()
