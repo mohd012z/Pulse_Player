@@ -571,6 +571,10 @@ class AiPulseStudioActivity : Activity() {
                     .show()
             }
         })
+        root.addView(Button(this).apply {
+            text = "My generated songs · play / delete"
+            setOnClickListener { showGeneratedSongs() }
+        })
         val memory = AiPulseGenerationMemory(applicationContext)
         root.addView(Button(this).apply {
             text = "Generation history · chronological summary"
@@ -826,6 +830,100 @@ class AiPulseStudioActivity : Activity() {
         }.onFailure {
             Toast.makeText(this, "Import failed: ${it.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun showGeneratedSongs() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val directory = File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "AI Pulse")
+            val songs = directory.listFiles { file -> file.isFile && file.extension.equals("wav", true) }
+                ?.sortedByDescending { it.lastModified() }.orEmpty()
+            if (songs.isEmpty()) {
+                Toast.makeText(this, "No generated songs yet", Toast.LENGTH_SHORT).show()
+                return
+            }
+            AlertDialog.Builder(this).setTitle("My generated songs")
+                .setItems(songs.map { it.name }.toTypedArray()) { _, selected ->
+                    val song = songs[selected]
+                    AlertDialog.Builder(this).setTitle(song.name)
+                        .setItems(arrayOf("Play", "Delete")) { _, action ->
+                            if (action == 0) {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(Uri.fromFile(song), "audio/wav")
+                                }
+                                runCatching { startActivity(intent) }.onFailure {
+                                    Toast.makeText(this, "Playback unavailable: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                            } else {
+                                AlertDialog.Builder(this).setTitle("Delete ${song.name}?")
+                                    .setNegativeButton("Cancel", null)
+                                    .setPositiveButton("Delete") { _, _ ->
+                                        Toast.makeText(this,
+                                            if (song.delete()) "Song deleted" else "Delete failed",
+                                            Toast.LENGTH_SHORT).show()
+                                        showGeneratedSongs()
+                                    }.show()
+                            }
+                        }.show()
+                }.show()
+            return
+        }
+        val projection = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DISPLAY_NAME)
+        val where = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+        val names = mutableListOf<String>()
+        val ids = mutableListOf<Long>()
+        contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection,
+            where, arrayOf("%Music/AI Pulse/%"),
+            "${MediaStore.Audio.Media.DATE_ADDED} DESC")?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+            val nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+            while (cursor.moveToNext()) {
+                ids.add(cursor.getLong(idIndex))
+                names.add(cursor.getString(nameIndex) ?: "Untitled WAV")
+            }
+        }
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "No generated songs yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("My generated songs")
+            .setItems(names.toTypedArray()) { _, selected ->
+                val uri = android.content.ContentUris.withAppendedId(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, ids[selected])
+                AlertDialog.Builder(this).setTitle(names[selected])
+                    .setItems(arrayOf("Play", "Delete")) { _, action ->
+                        if (action == 0) {
+                            runCatching {
+                                startActivity(Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "audio/wav")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                })
+                            }.onFailure {
+                                Toast.makeText(this, "Playback unavailable: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            AlertDialog.Builder(this).setTitle("Delete ${names[selected]}?")
+                                .setNegativeButton("Cancel", null)
+                                .setPositiveButton("Delete") { _, _ ->
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                        runCatching {
+                                            val request = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+                                            startIntentSenderForResult(request.intentSender, 190, null, 0, 0, 0)
+                                        }.onFailure {
+                                            Toast.makeText(this, "Delete failed: ${it.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        val removed = runCatching {
+                                            contentResolver.delete(uri, null, null) > 0
+                                        }.getOrDefault(false)
+                                        Toast.makeText(this,
+                                            if (removed) "Song deleted" else "Delete unavailable",
+                                            Toast.LENGTH_SHORT).show()
+                                        showGeneratedSongs()
+                                    }
+                                }.show()
+                        }
+                    }.show()
+            }.show()
     }
 
     private fun saveToMusic(input: File, title: String): String {
