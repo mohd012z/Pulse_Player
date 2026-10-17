@@ -141,17 +141,33 @@ class AiPulseStudioActivity : Activity() {
         }
         root.addView(lyrics)
         root.addView(Button(this).apply {
-            text = "Assistant: Suggest structure and arrangement"
+            text = "Assistant: Title → full lyrics, style and vocal advice"
             setOnClickListener {
                 val suggestion = AiPulseSongAssistant.style(genre.selectedItem.toString())
-                bpm.progress = suggestion.bpm - 60
-                instruments.setText(suggestion.instruments.joinToString(", "))
-                if (lyrics.text.isBlank()) lyrics.setText(
-                    AiPulseSongAssistant.lyricOutline(idea.text.toString(), language.selectedItem.toString()))
+                val advice = AiPulseTitleAdvisor.suggest(
+                    title.text.toString(), idea.text.toString(),
+                    genre.selectedItem.toString(), language.selectedItem.toString()
+                )
                 AlertDialog.Builder(this@AiPulseStudioActivity)
-                    .setTitle("Arrangement advice")
-                    .setMessage("Chords: ${suggestion.chords}\n${suggestion.guidance}\nLyrics are editable placeholders, not AI-generated verses.")
-                    .setPositiveButton("OK", null).show()
+                    .setTitle("Original songwriting advice")
+                    .setMessage("Style: ${advice.style}\\nVocal profile: ${advice.vocalProfile}\\nTempo: ${suggestion.bpm} BPM\\nChords: ${suggestion.chords}\\n\\n${suggestion.guidance}\\n\\nThis creates editable original lyrics, not sung audio.")
+                    .setNegativeButton("Cancel", null)
+                    .setNeutralButton("Style only") { _, _ ->
+                        bpm.progress = suggestion.bpm - 60
+                        instruments.setText(suggestion.instruments.joinToString(", "))
+                    }
+                    .setPositiveButton("Apply lyrics + style") { _, _ ->
+                        bpm.progress = suggestion.bpm - 60
+                        instruments.setText(suggestion.instruments.joinToString(", "))
+                        if (lyrics.text.isNotBlank()) {
+                            AlertDialog.Builder(this@AiPulseStudioActivity)
+                                .setTitle("Replace existing lyrics?")
+                                .setMessage("Your current edited lyrics will be replaced. Save your project first if you want to keep them.")
+                                .setNegativeButton("Keep existing", null)
+                                .setPositiveButton("Replace") { _, _ -> lyrics.setText(advice.lyrics) }
+                                .show()
+                        } else lyrics.setText(advice.lyrics)
+                    }.show()
             }
         })
         heading("Creative generation controls · independent engine")
