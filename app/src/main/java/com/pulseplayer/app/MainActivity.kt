@@ -1122,7 +1122,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner", "Caller announcement", "Speak notifications"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner", "Caller announcement"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -1164,51 +1164,7 @@ class MainActivity : Activity() {
             9 -> showMoviesDialog()
             10 -> showRadioTuner()
             11 -> showCallerAnnouncement()
-            12 -> showSpokenNotifications()
         }
-    }
-
-    private fun showSpokenNotifications() {
-        val prefs = getSharedPreferences(SpokenNotificationService.PREFS, MODE_PRIVATE)
-        val groups = arrayOf("WhatsApp", "Telegram", "SMS", "Gmail", "Calendar", "Other apps")
-        val keys = arrayOf("whatsapp", "telegram", "sms", "gmail", "calendar", "other")
-        val checked = BooleanArray(keys.size) { prefs.getBoolean("app_" + keys[it], true) }
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), dp(8))
-        }
-        val mode = android.widget.CheckBox(this).apply {
-            text = "Read full message text aloud (privacy sensitive)"
-            isChecked = prefs.getString(SpokenNotificationService.MODE, "full") == "full"
-        }
-        panel.addView(mode)
-        groups.forEachIndexed { index, name ->
-            panel.addView(android.widget.CheckBox(this).apply {
-                text = name
-                isChecked = checked[index]
-                setOnCheckedChangeListener { _, value -> checked[index] = value }
-            })
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Spoken notifications")
-            .setMessage("Android Notification Access is required. Messages may be audible to people nearby on the system output. Announcements are suppressed while locked, silent, in calls, or in Do Not Disturb. Message content is not saved. Media3 handles music focus recovery; automatic resumption requires device verification.")
-            .setView(panel)
-            .setPositiveButton("Enable / save") { _, _ ->
-                val editor = prefs.edit()
-                    .putBoolean(SpokenNotificationService.ENABLED, true)
-                    .putString(SpokenNotificationService.MODE, if (mode.isChecked) "full" else "sender")
-                keys.forEachIndexed { i, key -> editor.putBoolean("app_" + key, checked[i]) }
-                editor.apply()
-                if (!SpokenNotificationService.hasAccess(this)) {
-                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                    status("Grant Pulse Player Notification Access in Android Settings")
-                } else status("Spoken notifications enabled")
-            }
-            .setNeutralButton("Disable") { _, _ ->
-                prefs.edit().putBoolean(SpokenNotificationService.ENABLED, false).apply()
-                status("Spoken notifications disabled")
-            }
-            .setNegativeButton("Cancel", null).show()
     }
 
     private fun showCallerAnnouncement() {
