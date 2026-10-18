@@ -1457,32 +1457,32 @@ class MainActivity : Activity() {
         val bottomNav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, 0)
+            setPadding(0, dp(2), 0, 0)
         }
         fun navButton(icon: String, label: String, action: () -> Unit): Button =
             button("$icon\n$label", action).apply {
-                textSize = 10f
+                textSize = 9f
                 gravity = android.view.Gravity.CENTER
-                setPadding(dp(2), dp(4), dp(2), dp(4))
+                setPadding(dp(1), dp(1), dp(1), dp(1))
                 contentDescription = label
                 maxLines = 2
             }
         // Five primary destinations keep labels readable on narrow phones.
         sourceButton = navButton("♫", "Library") { showPlaylistDialog() }
-        bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(54), 1f))
+        bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(42), 1f))
         bottomNav.addView(navButton("◎", "Online") {
             showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
             }
-        }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("▣", "Watch") { showMoviesDialog() },
-            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("♬", "Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
-        }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
         // Discovery and station tuner are accessible without displacing the five main tabs.
         bottomNav.addView(navButton("☰", "More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
         root.addView(bottomNav)
     }
 
