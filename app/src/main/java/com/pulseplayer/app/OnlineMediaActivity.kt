@@ -131,7 +131,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         // Dedicated browser screen: avoid OEM edge-to-edge status icons obscuring controls.
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
@@ -150,6 +150,12 @@ class OnlineMediaActivity : Activity() {
             "5-Minute Crafts" to "https://www.youtube.com/channel/UC295-Dw_tDNtZXFeAPAW6Aw",
             "Live Streaming" to "https://rtmklik.rtm.gov.my/",
             "Drama China (Pelakon Sebenar)" to "https://www.youtube.com/results?search_query=Chinese+short+drama+live+action+official+-AI+-animated+-animation+-generated",
+            "Drama Melayu" to "https://www.youtube.com/results?search_query=drama+melayu+episod+penuh+rasmi",
+            "Drama Korea" to "https://www.youtube.com/results?search_query=korean+drama+full+episodes+official",
+            "Al-Quran" to "https://www.youtube.com/results?search_query=bacaan+al+quran+rasmi",
+            "Nasyid" to "https://www.youtube.com/results?search_query=nasyid+malaysia+official",
+            "Tarannum" to "https://www.youtube.com/results?search_query=tarannum+al+quran+Malaysia",
+            "Netflix Movies" to "https://www.netflix.com/browse",
             "Radio Malaysia (RTM)" to "https://radio.rtm.gov.my/"
         )
         val name = intent.getStringExtra("provider").orEmpty()
@@ -176,7 +182,7 @@ class OnlineMediaActivity : Activity() {
         }
         // Use density-independent available width rather than a fixed handset model.
         // Narrow phones get two compact rows; tablets get one proportional toolbar.
-        val isTablet = resources.configuration.smallestScreenWidthDp >= 600
+        val isTablet = resources.configuration.screenWidthDp >= 600
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(6), dp(4), dp(6), dp(4))
@@ -211,7 +217,7 @@ class OnlineMediaActivity : Activity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
-        val downloadButton = toolbarButton("Save", "Download supported direct media") { showDirectMediaDownload() }
+        val downloadButton = toolbarButton("Download", "Download available media") { showMediaDownloadOptions() }
         compactButton.setOnLongClickListener {
             Toast.makeText(this, "Use the Home gesture for floating MINI where supported", Toast.LENGTH_LONG).show()
             true
@@ -302,7 +308,7 @@ class OnlineMediaActivity : Activity() {
                 fullscreenContainer = container
                 addContentView(container, ViewGroup.LayoutParams(-1, -1))
                 // Allow both portrait short dramas and landscape movies without forcing a reload.
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
 
             override fun onHideCustomView() {
@@ -406,6 +412,19 @@ class OnlineMediaActivity : Activity() {
             return
         }
         browser?.evaluateJavascript("(function(){var v=document.querySelector('video,audio');if(v){$script}})();", null)
+    }
+
+    private fun showMediaDownloadOptions() {
+        val current = browser?.url.orEmpty()
+        val host = runCatching { Uri.parse(current).host?.lowercase().orEmpty() }.getOrDefault("")
+        if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
+            AlertDialog.Builder(this)
+                .setTitle("YouTube download")
+                .setMessage("YouTube watch pages are streaming pages, not downloadable media files. For videos with offline access, use YouTube's official Download feature where available. Pulse Player can save direct, authorized MP3/MP4 files.")
+                .setPositiveButton("Direct file URL") { _, _ -> showDirectMediaDownload() }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else showDirectMediaDownload()
     }
 
     private fun showDirectMediaDownload() {
