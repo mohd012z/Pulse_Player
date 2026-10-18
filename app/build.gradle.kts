@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val tvLite = providers.gradleProperty("pulseTvLite").orNull == "true"
+
 android {
     namespace = "com.pulseplayer.app"
     compileSdk = 36
@@ -12,7 +14,12 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 4
-        versionName = "4.0.0"
+        versionName = if (tvLite) "4.0.0-tv-lite" else "4.0.0"
+        if (tvLite) {
+            applicationIdSuffix = ".tv"
+            ndk { abiFilters += "arm64-v8a" }
+        }
+        resValue("string", "app_name", if (tvLite) "Pulse Player TV" else "Pulse Player")
     }
 
     buildTypes {
