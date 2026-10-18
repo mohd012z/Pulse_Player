@@ -1022,21 +1022,29 @@ class MainActivity : Activity() {
     }
 
     private fun showRadioTuner() {
-        // Internet radio station selection, not hardware FM frequency tuning.
-        val options = arrayOf("RTM radio portal", "NASIONALfm", "TRAXXfm", "AIfm",
-            "Radio KLASIK", "SELANGORfm", "KLfm", "Add streaming URL")
-        showPicker("Malaysia Internet Radio · Station Tuner", options) { index ->
+        // Official web radio players; do not confuse these with hardware FM tuning.
+        val stations = linkedMapOf(
+            "SINAR" to "https://audio1.syok.my/sinar",
+            "ERA" to "https://audio1.syok.my/era",
+            "HITZ" to "https://audio1.syok.my/hitz",
+            "SURIA FM" to "https://dengar.suria.my/",
+            "MIX" to "https://audio1.syok.my/mix",
+            "LITE" to "https://audio1.syok.my/lite",
+            "ZAYAN" to "https://audio1.syok.my/zayan",
+            "MY FM" to "https://audio1.syok.my/my",
+            "GEGAR" to "https://audio1.syok.my/gegar",
+            "RTM Radio" to "https://radio.rtm.gov.my/"
+        )
+        val options = stations.keys.toTypedArray() + arrayOf("Add direct stream URL", "Discover Malaysia radio")
+        showPicker("Malaysia radio · Internet tuner", options) { index ->
             when (index) {
-                7 -> addRadioDialog()
+                stations.size -> addRadioDialog()
+                stations.size + 1 -> discoverMalaysiaRadio()
                 else -> {
-                    val url = when (index) {
-                        0 -> "https://radio.rtm.gov.my/"
-                        1 -> "https://radio.rtm.gov.my/station/nasional-fm"
-                        else -> "https://radio.rtm.gov.my/senarai-radio"
-                    }
+                    val name = options[index]
                     startActivity(Intent(this, OnlineMediaActivity::class.java)
-                        .putExtra("provider", "Radio Malaysia (RTM)"))
-                    status("RTM station selection: ${options[index]}. Select the station in the official portal.")
+                        .putExtra("provider", "Radio: $name")
+                        .putExtra("url", stations.getValue(name)))
                 }
             }
         }
@@ -1072,6 +1080,7 @@ class MainActivity : Activity() {
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
+            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies" -> ""
             "YouTube Music" -> "https://music.youtube.com/"
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
             "JOOX" -> "https://www.joox.com/"
@@ -1088,7 +1097,9 @@ class MainActivity : Activity() {
             if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
                 startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
             } else {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                if (destination in listOf("Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies")) {
+                    startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
+                } else startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                     addCategory(Intent.CATEGORY_BROWSABLE)
                 })
             }
