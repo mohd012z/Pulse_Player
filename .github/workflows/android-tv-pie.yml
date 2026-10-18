@@ -22,10 +22,12 @@ jobs:
       # The runner already includes the Android SDK; Gradle resolves required packages.
       - name: Android SDK availability
         run: test -d "$ANDROID_HOME" && test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
       - name: Build Android 9 TV APK
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug -PtvPieBuild=true
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug -PtvPieBuild=true
       - name: Verify APK
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
