@@ -1046,7 +1046,8 @@ class MainActivity : Activity() {
         val options = arrayOf(
             "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
-            "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia"
+            "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia",
+            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies"
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
             if (options[index] == "Misteri Indonesia") showIndonesianMystery()
