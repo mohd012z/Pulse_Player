@@ -3,16 +3,21 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val tvPieBuild = providers.gradleProperty("tvPieBuild").orNull == "true"
+
 android {
     namespace = "com.pulseplayer.app"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.pulseplayer.app"
-        minSdk = 26
+        minSdk = if (tvPieBuild) 28 else 26
         targetSdk = 36
         versionCode = 4
-        versionName = "4.0.0"
+        versionName = if (tvPieBuild) "4.0.0-tv-pie" else "4.0.0"
+        if (tvPieBuild) {
+            ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
+        }
     }
 
     buildTypes {
