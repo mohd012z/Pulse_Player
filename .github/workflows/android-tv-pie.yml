@@ -19,7 +19,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      # The runner already includes the Android SDK; Gradle resolves required packages.
+      - name: Android SDK availability
+        run: test -d "$ANDROID_HOME" && test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
       - name: Build Android 9 TV APK
         run: |
           chmod +x gradlew
