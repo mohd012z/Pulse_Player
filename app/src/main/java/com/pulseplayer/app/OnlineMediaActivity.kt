@@ -27,6 +27,25 @@ import org.json.JSONObject
  */
 class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
+    private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
+    private var activeProvider = ""
+    private var homeUrl = ""
+
+    private fun allowedSessionUrl(value: String?): Boolean {
+        val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return false
+        val host = uri.host?.lowercase() ?: return false
+        val homeHost = Uri.parse(homeUrl).host?.lowercase()
+        val youtubeHosts = setOf("www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")
+        return uri.scheme == "https" && (host == homeHost ||
+            (homeHost in youtubeHosts && host in youtubeHosts))
+    }
+
+    private fun persistPage(value: String?) {
+        if (activeProvider.isNotBlank() && allowedSessionUrl(value)) {
+            sessionStore.edit().putString("page:$activeProvider", value).apply()
+        }
+    }
+
     private val historyStore by lazy { getSharedPreferences("pulse_video_history", MODE_PRIVATE) }
     private fun readHistory(): JSONArray = try {
         JSONArray(historyStore.getString("videos", "[]"))
@@ -125,6 +144,8 @@ class OnlineMediaActivity : Activity() {
             "Public Domain Movies" -> "https://www.youtube.com/results?search_query=$year+public+domain+movies+new+uploads"
             else -> providers[name]
         } ?: run { finish(); return }
+        activeProvider = name
+        homeUrl = url
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF10141F.toInt())
@@ -163,6 +184,7 @@ class OnlineMediaActivity : Activity() {
         web.settings.setSupportMultipleWindows(false)
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
+                persistPage(url)
                 url?.let { runCatching { rememberVideo(Uri.parse(it)) } }
             }
 
@@ -197,10 +219,16 @@ class OnlineMediaActivity : Activity() {
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
-        if (savedInstanceState == null) web.loadUrl(url) else web.restoreState(savedInstanceState)
+        if (savedInstanceState == null) {
+            val last = sessionStore.getString("page:$name", null)
+            web.loadUrl(if (allowedSessionUrl(last)) last!! else url)
+        } else if (web.restoreState(savedInstanceState) == null) {
+            web.loadUrl(url)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        persistPage(browser?.url)
         browser?.saveState(outState)
         super.onSaveInstanceState(outState)
     }
@@ -226,6 +254,7 @@ class OnlineMediaActivity : Activity() {
     }
 
     override fun onPause() {
+        persistPage(browser?.url)
         browser?.onPause()
         super.onPause()
     }
