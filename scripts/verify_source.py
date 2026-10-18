@@ -22,8 +22,12 @@ for required in (
 ):
     assert required in permissions, f"Missing {required}"
 services = manifest.findall(".//service")
-assert len(services) == 1, "Expected exactly one player service"
-service = services[0]
+player_services = [item for item in services if item.get(ANDROID + "name") == ".PlaybackService"]
+assert len(player_services) == 1, "Expected exactly one PlaybackService"
+service = player_services[0]
+notification_services = [item for item in services if item.get(ANDROID + "name") == ".SpokenNotificationService"]
+assert len(notification_services) == 1, "Expected exactly one notification listener"
+assert notification_services[0].get(ANDROID + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
 assert service.get(ANDROID + "name") == ".PlaybackService"
 assert service.get(ANDROID + "foregroundServiceType") == "mediaPlayback"
 intents = [a.get(ANDROID + "name") for a in service.findall(".//action")]
