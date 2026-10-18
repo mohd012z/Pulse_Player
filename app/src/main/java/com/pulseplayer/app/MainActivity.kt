@@ -1269,6 +1269,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
+        val tvMode = DeviceFormFactor.isTelevision(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(COLOR_BG)
@@ -1317,13 +1318,14 @@ class MainActivity : Activity() {
                 override fun afterTextChanged(s: Editable?) = Unit
             })
         }
-        root.addView(filterView, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(7) })
+        root.addView(filterView, LinearLayout.LayoutParams(-1, if (tvMode) dp(54) else dp(46)).apply { topMargin = dp(7) })
         val filtersButton = Button(this).apply {
             text = "FILTER  ·  SOURCE / MP3 / WAV / FLAC"
             textSize = 12f
             setOnClickListener { showMusicFilters() }
         }
         root.addView(filtersButton, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
+        if (tvMode) filtersButton.visibility = View.GONE
         libraryView = label("Music library", 12f, COLOR_MUTED)
         root.addView(libraryView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
         trackAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, arrayListOf<String>()) {
@@ -1365,6 +1367,7 @@ class MainActivity : Activity() {
         lyricView.isSelected = true
         lyricView.setOnClickListener { showLyricDialog() }
         root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
+        if (tvMode) lyricView.visibility = View.GONE
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))
@@ -1457,6 +1460,19 @@ class MainActivity : Activity() {
             seekRelative(10_000L)
         }, LinearLayout.LayoutParams(dp(30), dp(34)))
         dock.addView(mini)
+        if (tvMode) {
+            for (index in 0 until mini.childCount) {
+                val control = mini.getChildAt(index)
+                if (control is Button) {
+                    control.layoutParams = (control.layoutParams as LinearLayout.LayoutParams).apply {
+                        width = dp(66)
+                        height = dp(56)
+                        leftMargin = dp(5)
+                    }
+                    control.textSize = 22f
+                }
+            }
+        }
 
         seekBar = SeekBar(this).apply {
             isEnabled = false
@@ -1484,15 +1500,16 @@ class MainActivity : Activity() {
         }
         fun navButton(icon: String, label: String, action: () -> Unit): Button =
             button("$icon\n$label", action).apply {
-                textSize = 9f
+                textSize = if (tvMode) 18f else 9f
                 gravity = android.view.Gravity.CENTER
                 setPadding(dp(1), dp(1), dp(1), dp(1))
                 contentDescription = label
                 maxLines = 2
+                if (tvMode) setSingleLine(false)
             }
         // Five primary destinations keep labels readable on narrow phones.
         sourceButton = navButton("♫", "Library") { showPlaylistDialog() }
-        bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, dp(42), 1f))
+        bottomNav.addView(sourceButton, LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f))
         bottomNav.addView(navButton("◎", "Online") {
             showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
@@ -1507,6 +1524,10 @@ class MainActivity : Activity() {
         bottomNav.addView(navButton("☰", "More") { showMoreMenu() },
             LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
         root.addView(bottomNav)
+        if (tvMode) {
+            bottomNav.isFocusable = false
+            sourceButton.requestFocus()
+        }
     }
 
     private fun seekRelative(delta: Long) {
