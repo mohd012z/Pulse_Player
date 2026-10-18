@@ -25,9 +25,8 @@ services = manifest.findall(".//service")
 player_services = [item for item in services if item.get(ANDROID + "name") == ".PlaybackService"]
 assert len(player_services) == 1, "Expected exactly one PlaybackService"
 service = player_services[0]
-notification_services = [item for item in services if item.get(ANDROID + "name") == ".SpokenNotificationService"]
-assert len(notification_services) == 1, "Expected exactly one notification listener"
-assert notification_services[0].get(ANDROID + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+assert not any(item.get(ANDROID + "name") == ".SpokenNotificationService" for item in services), "Spoken notifications must remain unregistered in rollback build"
+assert not any(item.get(ANDROID + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" for item in services), "Notification listener binding must be absent"
 assert service.get(ANDROID + "name") == ".PlaybackService"
 assert service.get(ANDROID + "foregroundServiceType") == "mediaPlayback"
 intents = [a.get(ANDROID + "name") for a in service.findall(".//action")]
