@@ -1,5 +1,6 @@
 package com.pulseplayer.app
 
+import android.app.role.RoleManager
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -56,6 +57,7 @@ import kotlin.concurrent.thread
 /** Fully native, dependency-light player UI; service owns playback. */
 class MainActivity : Activity() {
     companion object {
+        private const val REQUEST_CALLER_CONTACTS = 106
         private const val REQUEST_AUDIO_PERMISSION = 101
         private const val REQUEST_OPEN_AUDIO = 102
         private const val REQUEST_OPEN_FOLDER = 103
@@ -220,6 +222,10 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CALLER_CONTACTS) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) requestCallerRole()
+            else status("Contacts permission denied; caller announcement stays disabled")
+        }
         if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
                 spectrumPreferences().edit().putBoolean("enabled", true).apply()
@@ -1107,7 +1113,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner", "Caller announcement"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -1148,6 +1154,55 @@ class MainActivity : Activity() {
             8 -> shareCurrentTrack()
             9 -> showMoviesDialog()
             10 -> showRadioTuner()
+            11 -> showCallerAnnouncement()
+        }
+    }
+
+    private fun showCallerAnnouncement() {
+        val prefs = getSharedPreferences(CallerAnnouncementService.PREFS, MODE_PRIVATE)
+        val roleManager = getSystemService(RoleManager::class.java)
+        val hasRole = roleManager?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
+        val enabled = prefs.getBoolean(CallerAnnouncementService.ENABLED, false)
+        AlertDialog.Builder(this)
+            .setTitle("Announce caller name")
+            .setMessage("Caller names are spoken aloud using Android TTS. This can reveal contact names to people nearby. Android selects the actual audio output; speaker routing cannot be guaranteed. Music resumption is managed by Media3 audio focus. Status: " +
+                (if (enabled && hasRole) "Enabled" else "Disabled or role not granted"))
+            .setPositiveButton("Enable") { _, _ ->
+                if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), REQUEST_CALLER_CONTACTS)
+                } else requestCallerRole()
+            }
+            .setNeutralButton("Disable") { _, _ ->
+                prefs.edit().putBoolean(CallerAnnouncementService.ENABLED, false).apply()
+                status("Caller announcements disabled")
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun requestCallerRole() {
+        val roles = getSystemService(RoleManager::class.java)
+        if (roles == null || !roles.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING)) {
+            status("Call screening role unavailable on this device")
+            return
+        }
+        if (roles.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) {
+            getSharedPreferences(CallerAnnouncementService.PREFS, MODE_PRIVATE)
+                .edit().putBoolean(CallerAnnouncementService.ENABLED, true).apply()
+            status("Caller-name announcement enabled")
+        } else {
+            startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING), 107)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 107) {
+            val roles = getSystemService(RoleManager::class.java)
+            val granted = resultCode == RESULT_OK &&
+                roles?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
+            getSharedPreferences(CallerAnnouncementService.PREFS, MODE_PRIVATE)
+                .edit().putBoolean(CallerAnnouncementService.ENABLED, granted).apply()
+            status(if (granted) "Caller-name announcement enabled" else "Call screening role not granted")
         }
     }
 
