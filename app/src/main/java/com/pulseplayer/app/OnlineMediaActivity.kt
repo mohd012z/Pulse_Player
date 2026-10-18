@@ -428,7 +428,10 @@ class OnlineMediaActivity : Activity() {
             AlertDialog.Builder(this)
                 .setTitle("YouTube download")
                 .setMessage("YouTube watch pages are streaming pages, not downloadable media files. For videos with offline access, use YouTube's official Download feature where available. Pulse Player can save direct, authorized MP3/MP4 files.")
-                .setPositiveButton("Direct file URL") { _, _ -> showDirectMediaDownload() }
+                .setPositiveButton("My uploads · Studio") { _, _ ->
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://studio.youtube.com/")))
+                }
+                .setNeutralButton("Direct file URL") { _, _ -> showDirectMediaDownload() }
                 .setNegativeButton("Cancel", null)
                 .show()
         } else showDirectMediaDownload()
