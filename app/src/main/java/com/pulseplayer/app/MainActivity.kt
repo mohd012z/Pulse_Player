@@ -79,6 +79,7 @@ class MainActivity : Activity() {
     private var lyricLines: List<TimedLyrics.Line> = emptyList()
     private var lyricGeneration = 0
     private var spectrumView: SpectrumView? = null
+    private val powerSaving by lazy { PowerSavingManager(this) }
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -119,7 +120,7 @@ class MainActivity : Activity() {
     private val ticker = object : Runnable {
         override fun run() {
             refreshNowPlaying()
-            clock.postDelayed(this, 750L)
+            clock.postDelayed(this, powerSaving.refreshIntervalMillis(controller?.isPlaying == true))
         }
     }
 
@@ -914,7 +915,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Power saving mode"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -953,7 +954,28 @@ class MainActivity : Activity() {
                 }
             }
             8 -> shareCurrentTrack()
+            9 -> showPowerSavingDialog()
         }
+    }
+
+    private fun showPowerSavingDialog() {
+        val modes = PowerSavingManager.Mode.values()
+        val labels = arrayOf(
+            "Auto Smart · adapt to battery level",
+            "Eco · slower interface refresh",
+            "Ultra Saving · minimal optional UI activity",
+            "Off · normal performance"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Smart Power Saving")
+            .setSingleChoiceItems(labels, modes.indexOf(powerSaving.mode)) { dialog, selected ->
+                powerSaving.mode = modes[selected]
+                if (!powerSaving.allowSpectrum()) spectrumView?.stop()
+                status("Power mode: ${powerSaving.mode.name} · effective ${powerSaving.effectiveMode().name}")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
