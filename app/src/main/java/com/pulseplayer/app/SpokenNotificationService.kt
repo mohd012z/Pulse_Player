@@ -31,10 +31,12 @@ class SpokenNotificationService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (!prefs.getBoolean(ENABLED, false)) return
-        val app = appLabel(sbn.packageName) ?: return
+        if (sbn.packageName == packageName || sbn.isOngoing) return
+        val app = appLabel(sbn.packageName) ?: if (prefs.getBoolean(OTHER_APPS, false)) "app" else return
         val n = sbn.notification
         if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
-        if (n.category == Notification.CATEGORY_CALL || n.category == Notification.CATEGORY_TRANSPORT) return
+        if (n.category == Notification.CATEGORY_CALL || n.category == Notification.CATEGORY_TRANSPORT ||
+            n.category == Notification.CATEGORY_SERVICE || n.visibility == Notification.VISIBILITY_SECRET) return
         if (n.extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false) && n.extras.getCharSequence(Notification.EXTRA_TITLE).isNullOrBlank()) return
         val manager = getSystemService(NotificationManager::class.java)
         if (manager?.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) return
@@ -103,12 +105,16 @@ class SpokenNotificationService : NotificationListenerService() {
         speaker?.stop()
         speaker?.shutdown()
         speaker = null
+        ready = false
+        pending = null
+        recent.clear()
         super.onDestroy()
     }
 
     companion object {
         const val PREFS = "spoken_notifications"
         const val ENABLED = "enabled"
+        const val OTHER_APPS = "other_apps"
         fun hasAccess(context: Context): Boolean {
             val value = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false
             val own = ComponentName(context, SpokenNotificationService::class.java).flattenToString()
