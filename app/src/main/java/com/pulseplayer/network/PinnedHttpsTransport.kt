@@ -23,9 +23,11 @@ class PinnedHttpsTransport(private val resolver: (String) -> List<InetAddress> =
         val resolved = resolver(host)
         val pinned = PublicEndpointPolicy.validateResolved(resolved.toTypedArray())
         val client = OkHttpClient.Builder()
-            .dns(Dns { requested ->
-                if (!requested.equals(host, ignoreCase = true)) throw IOException("Unexpected DNS hostname")
-                listOf(pinned)
+            .dns(object : Dns {
+                override fun lookup(requested: String): List<InetAddress> {
+                    if (!requested.equals(host, ignoreCase = true)) throw IOException("Unexpected DNS hostname")
+                    return listOf(pinned)
+                }
             })
             .proxy(java.net.Proxy.NO_PROXY)
             .followRedirects(false)
