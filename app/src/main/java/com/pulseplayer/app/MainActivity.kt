@@ -1093,13 +1093,23 @@ class MainActivity : Activity() {
         toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
         root.addView(toolbar)
 
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        // Adaptive two-row navigation: prevent the old duplicate radio shortcut and
+        // preserve legible touch targets on narrow portrait displays.
+        val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val primaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        tabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(44), 1.6f))
-        tabs.addView(button("MY Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
-        tabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(44), 0.7f).apply { leftMargin = dp(6) })
+        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1f))
+        primaryTabs.addView(button("♫ FX") { selectMixPreset() },
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
+        tabs.addView(primaryTabs)
+        val categoryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        categoryTabs.addView(button("♫ Music") { switchPlaylist("DEVICE") },
+            LinearLayout.LayoutParams(0, dp(48), 1f))
+        categoryTabs.addView(button("📻 Radio") { switchPlaylist("RADIO") },
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
+        categoryTabs.addView(button("★ My Radio") { switchPlaylist("MY RADIO") },
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
+        tabs.addView(categoryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
         root.addView(tabs)
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
@@ -1267,7 +1277,7 @@ class MainActivity : Activity() {
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
         this.text = text
         setAllCaps(false)
-        textSize = 11f
+        textSize = 13f
         setTextColor(Color.WHITE)
         background = GradientDrawable().apply {
             setColor(0xFF2A3849L.toInt())
