@@ -27,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".OnlineMediaActivity" android:screenOrientation="portrait" android:exported="false" android:supportsPictureInPicture="true" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity android:name=".OnlineMediaActivity" android:exported="false" android:supportsPictureInPicture="true" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
 
         <activity android:name=".aipulse.AiPulseStudioActivity" android:exported="false" />
         <activity android:name=".aipulse.PulseNovaWebActivity" android:exported="false" />
