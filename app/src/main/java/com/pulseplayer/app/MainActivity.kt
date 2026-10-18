@@ -1113,7 +1113,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner", "Caller announcement"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Watch · Learn · Live", "Malaysia radio tuner", "Caller announcement", "Speak notifications"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -1155,7 +1155,30 @@ class MainActivity : Activity() {
             9 -> showMoviesDialog()
             10 -> showRadioTuner()
             11 -> showCallerAnnouncement()
+            12 -> showSpokenNotifications()
         }
+    }
+
+    private fun showSpokenNotifications() {
+        val prefs = getSharedPreferences(SpokenNotificationService.PREFS, MODE_PRIVATE)
+        val enabled = prefs.getBoolean(SpokenNotificationService.ENABLED, false)
+        val access = SpokenNotificationService.hasAccess(this)
+        AlertDialog.Builder(this)
+            .setTitle("Speak notifications · sender only")
+            .setMessage("Allowed: WhatsApp, Telegram, SMS, Gmail and Calendar. Reads only the notification title when safe; never the message body. No announcements while locked, silent, during calls or Do Not Disturb. Audio follows Android's system output. Music focus recovery is handled by Media3. Notification Access reveals sensitive data to this app; enable only if you agree.\n\nStatus: " +
+                (if (enabled && access) "Enabled" else if (enabled) "Waiting for Notification Access" else "Disabled"))
+            .setPositiveButton("Enable / grant access") { _, _ ->
+                prefs.edit().putBoolean(SpokenNotificationService.ENABLED, true).apply()
+                if (!SpokenNotificationService.hasAccess(this)) {
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    status("Grant Pulse Player Notification Access in Android Settings")
+                } else status("Spoken notifications enabled")
+            }
+            .setNeutralButton("Disable") { _, _ ->
+                prefs.edit().putBoolean(SpokenNotificationService.ENABLED, false).apply()
+                status("Spoken notifications disabled")
+            }
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun showCallerAnnouncement() {
