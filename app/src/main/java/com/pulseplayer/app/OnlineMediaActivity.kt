@@ -131,6 +131,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         // Dedicated browser screen: avoid OEM edge-to-edge status icons obscuring controls.
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
@@ -263,7 +264,7 @@ class OnlineMediaActivity : Activity() {
                 fullscreenContainer = container
                 addContentView(container, ViewGroup.LayoutParams(-1, -1))
                 // Allow both portrait short dramas and landscape movies without forcing a reload.
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
 
             override fun onHideCustomView() {
@@ -416,7 +417,7 @@ class OnlineMediaActivity : Activity() {
         (container.parent as? ViewGroup)?.removeView(container)
         val callback = fullscreenCallback
         fullscreenCallback = null
-        requestedOrientation = previousOrientation
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         callback?.onCustomViewHidden()
     }
 
