@@ -10,6 +10,7 @@ import androidx.work.workDataOf
 import com.pulseplayer.data.room.DownloadQueuePolicy
 import com.pulseplayer.data.room.DownloadState
 import com.pulseplayer.data.room.PulsePlayerDatabase
+import com.pulseplayer.network.PublicEndpointPolicy
 import com.pulseplayer.inspector.SourceType
 import com.pulseplayer.inspector.UrlInspector
 import java.io.IOException
@@ -45,10 +46,10 @@ class DirectMediaDownloadWorker(context: Context, params: WorkerParameters) : Co
         val inspected = UrlInspector.inspect(raw)
         val type = inspected.sourceType as? SourceType.DirectMedia ?: return@withContext Result.failure()
         if (type.extension !in setOf("mp4", "webm", "mp3", "m4a", "aac", "opus")) return@withContext Result.failure()
-        val uri = URI(inspected.normalizedUrl)
+        val uri = try { PublicEndpointPolicy.validateUrl(inspected.normalizedUrl) } catch (_: Exception) { return@withContext Result.failure() }
         val host = uri.host ?: return@withContext Result.failure()
         val addresses = try { InetAddress.getAllByName(host) } catch (_: Exception) { return@withContext Result.failure() }
-        if (addresses.isEmpty() || addresses.any { it.isAnyLocalAddress || it.isLoopbackAddress || it.isSiteLocalAddress || it.isLinkLocalAddress || it.isMulticastAddress }) {
+        if (addresses.isEmpty() || addresses.any { !PublicEndpointPolicy.isAllowed(it) }) {
             return@withContext Result.failure()
         }
         // DNS validation and connection are not pinned to the same resolved IP.
