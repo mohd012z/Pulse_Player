@@ -182,19 +182,17 @@ class OnlineMediaActivity : Activity() {
         root.addView(top)
         // Compact mode keeps the provider WebView visible and active while this
         // activity is foregrounded; it does not bypass provider background rules.
-        val compactSupported = name == "YouTube" || name == "YouTube Music" || name == "Spotify"
+        // All supported online providers and movie categories can use compact mode.
         val compactButton = Button(this).apply { text = "Mini" }
         val providerNote = TextView(this).apply {
-            text = "Playback is controlled by the provider. For screen-off or background listening, use its official app and supported plan."
+            text = "Mini mode keeps this page visible while Pulse Player is open. Background playback depends on the provider and Android."
             setTextColor(0xFFB6C3CD.toInt())
             textSize = 12f
             setPadding(12, 4, 12, 4)
             visibility = View.GONE
         }
-        if (compactSupported) {
-            top.addView(compactButton)
-            root.addView(providerNote)
-        }
+        top.addView(compactButton)
+        root.addView(providerNote)
         val web = WebView(this)
         browser = web
         web.settings.javaScriptEnabled = true
@@ -240,7 +238,7 @@ class OnlineMediaActivity : Activity() {
             }
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
-        if (compactSupported) {
+        run {
             var compact = false
             compactButton.setOnClickListener {
                 compact = !compact
