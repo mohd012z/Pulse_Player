@@ -211,6 +211,7 @@ class OnlineMediaActivity : Activity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
+        val downloadButton = toolbarButton("Save", "Download supported direct media") { showDirectMediaDownload() }
         compactButton.setOnLongClickListener {
             Toast.makeText(this, "Use the Home gesture for floating MINI where supported", Toast.LENGTH_LONG).show()
             true
@@ -224,6 +225,7 @@ class OnlineMediaActivity : Activity() {
         if (isTablet) {
             firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(94), dp(38)))
             firstRow.addView(external, LinearLayout.LayoutParams(dp(114), dp(38)))
+            firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(64), dp(38)))
         }
         firstRow.addView(compactButton, LinearLayout.LayoutParams(dp(64), dp(38)))
         top.addView(firstRow)
@@ -234,6 +236,7 @@ class OnlineMediaActivity : Activity() {
             }
             secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
+            secondRow.addView(downloadButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             top.addView(secondRow)
         }
         root.addView(top)
@@ -403,6 +406,54 @@ class OnlineMediaActivity : Activity() {
             return
         }
         browser?.evaluateJavascript("(function(){var v=document.querySelector('video,audio');if(v){$script}})();", null)
+    }
+
+    private fun showDirectMediaDownload() {
+        val detected = browser?.url.orEmpty()
+        val input = android.widget.EditText(this).apply {
+            setSingleLine(true)
+            setText(detected)
+            hint = "Direct HTTPS MP3, M4A, MP4 or WEBM URL"
+            selectAll()
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Save media · auto-detected URL")
+            .setMessage("Only direct, downloadable files are supported. YouTube watch pages and streaming/DRM links cannot be extracted.")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                val raw = input.text.toString().trim()
+                val uri = runCatching { Uri.parse(raw) }.getOrNull()
+                val extension = uri?.lastPathSegment?.substringBefore('?')?.substringAfterLast('.', "")?.lowercase().orEmpty()
+                val allowed = mapOf("mp3" to "audio/mpeg", "m4a" to "audio/mp4",
+                    "aac" to "audio/aac", "wav" to "audio/wav",
+                    "mp4" to "video/mp4", "webm" to "video/webm")
+                if (uri?.scheme != "https" || uri.host.isNullOrBlank() || extension !in allowed) {
+                    Toast.makeText(this, "Not a direct media file. Paste an authorized HTTPS file link.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                AlertDialog.Builder(this)
+                    .setTitle("Quality and destination")
+                    .setSingleChoiceItems(arrayOf("Original source quality (no conversion)"), 0) { dialog, _ -> dialog.dismiss() }
+                    .setPositiveButton("Music") { _, _ -> enqueueMediaDownload(uri!!, extension, allowed.getValue(extension), true) }
+                    .setNeutralButton("Downloads") { _, _ -> enqueueMediaDownload(uri!!, extension, allowed.getValue(extension), false) }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }.show()
+    }
+
+    private fun enqueueMediaDownload(uri: Uri, extension: String, mime: String, music: Boolean) {
+        val filename = "Pulse_" + System.currentTimeMillis() + "." + extension
+        val directory = if (music) android.os.Environment.DIRECTORY_MUSIC else android.os.Environment.DIRECTORY_DOWNLOADS
+        val request = android.app.DownloadManager.Request(uri)
+            .setTitle(filename)
+            .setMimeType(mime)
+            .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(directory, filename)
+        val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
+        runCatching { manager.enqueue(request) }
+            .onSuccess { Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show() }
+            .onFailure { Toast.makeText(this, "Download unavailable: ${it.message}", Toast.LENGTH_LONG).show() }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
