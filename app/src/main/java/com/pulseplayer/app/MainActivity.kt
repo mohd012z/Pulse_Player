@@ -1167,7 +1167,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
-        "Choose EQ preset", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings"
+        "Choose EQ preset", "Custom 3-band equalizer", "Bass strength", "Noise Softening (EQ only)", "Android system sound settings", "Reset mixer to Flat"
     )) {
         when (it) {
             0 -> selectMixPreset()
@@ -1177,6 +1177,31 @@ class MainActivity : Activity() {
                 putString(PlaybackService.ARG_PRESET, "Noise Softening")
             }) { _, ok -> status(if (ok) "Noise Softening EQ applied; this is not AI restoration" else "EQ unavailable") }
             4 -> openSystemSettings(Settings.ACTION_SOUND_SETTINGS)
+            5 -> AlertDialog.Builder(this)
+                .setTitle("Reset audio mixer?")
+                .setMessage("Restore Flat EQ, zero custom bass/mid/treble and disable bass boost for local playback.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Reset") { _, _ ->
+                    customCommand(PlaybackService.CMD_SET_CUSTOM, Bundle().apply {
+                        putInt(PlaybackService.ARG_CUSTOM_BASS, 0)
+                        putInt(PlaybackService.ARG_CUSTOM_MID, 0)
+                        putInt(PlaybackService.ARG_CUSTOM_TREBLE, 0)
+                    }) { _, _ ->
+                        customCommand(PlaybackService.CMD_SET_BASS, Bundle().apply {
+                            putInt(PlaybackService.ARG_BASS, 0)
+                        }) { _, _ ->
+                            customCommand(PlaybackService.CMD_SET_PRESET, Bundle().apply {
+                                putString(PlaybackService.ARG_PRESET, "Flat")
+                            }) { _, ok ->
+                                if (ok) {
+                                    customLow = 0; customMid = 0; customHigh = 0
+                                    bassStrength = 0
+                                }
+                                status(if (ok) "Mixer reset to Flat" else "Audio effects unavailable on this output")
+                            }
+                        }
+                    }
+                }.show()
         }
     }
 
@@ -1387,16 +1412,35 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
         mini.addView(titleInfo, LinearLayout.LayoutParams(0, -2, 1f))
-        mini.addView(button("◀◀") { controller?.let { c ->
-            if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem()
-        } }, LinearLayout.LayoutParams(dp(48), dp(44)))
-        playButton = button("▶") {
+        fun miniControl(symbol: String, hint: String, action: () -> Unit): Button =
+            button(symbol, action).apply {
+                textSize = 13f
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = 0
+                minimumHeight = 0
+                setPadding(0, 0, 0, 0)
+                contentDescription = hint
+            }
+        mini.addView(miniControl("↤", "Start of track") {
+            controller?.seekTo(0L)
+        }, LinearLayout.LayoutParams(dp(30), dp(34)))
+        mini.addView(miniControl("↶", "Back 10 seconds") {
+            seekRelative(-10_000L)
+        }, LinearLayout.LayoutParams(dp(30), dp(34)))
+        mini.addView(miniControl("◀", "Previous track") {
+            controller?.let { if (it.hasPreviousMediaItem()) it.seekToPreviousMediaItem() }
+        }, LinearLayout.LayoutParams(dp(30), dp(34)))
+        playButton = miniControl("▶", "Play or pause") {
             controller?.let { if (it.isPlaying) it.pause() else { it.prepare(); it.play() } }
         }
-        mini.addView(playButton, LinearLayout.LayoutParams(dp(48), dp(44)))
-        mini.addView(button("▶▶") { controller?.let { c ->
-            if (c.hasNextMediaItem()) c.seekToNextMediaItem()
-        } }, LinearLayout.LayoutParams(dp(48), dp(44)))
+        mini.addView(playButton, LinearLayout.LayoutParams(dp(34), dp(34)))
+        mini.addView(miniControl("▶", "Next track") {
+            controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() }
+        }, LinearLayout.LayoutParams(dp(30), dp(34)))
+        mini.addView(miniControl("↷", "Forward 10 seconds") {
+            seekRelative(10_000L)
+        }, LinearLayout.LayoutParams(dp(30), dp(34)))
         dock.addView(mini)
 
         seekBar = SeekBar(this).apply {
