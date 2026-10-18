@@ -180,6 +180,21 @@ class OnlineMediaActivity : Activity() {
         top.addView(historyButton)
         top.addView(external)
         root.addView(top)
+        // Compact mode keeps the provider WebView visible and active while this
+        // activity is foregrounded; it does not bypass provider background rules.
+        val compactSupported = name == "YouTube" || name == "YouTube Music" || name == "Spotify"
+        val compactButton = Button(this).apply { text = "Mini" }
+        val providerNote = TextView(this).apply {
+            text = "Playback is controlled by the provider. For screen-off or background listening, use its official app and supported plan."
+            setTextColor(0xFFB6C3CD.toInt())
+            textSize = 12f
+            setPadding(12, 4, 12, 4)
+            visibility = View.GONE
+        }
+        if (compactSupported) {
+            top.addView(compactButton)
+            root.addView(providerNote)
+        }
         val web = WebView(this)
         browser = web
         web.settings.javaScriptEnabled = true
@@ -225,6 +240,17 @@ class OnlineMediaActivity : Activity() {
             }
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (compactSupported) {
+            var compact = false
+            compactButton.setOnClickListener {
+                compact = !compact
+                val height = if (compact) (resources.displayMetrics.density * 240).toInt() else 0
+                web.layoutParams = LinearLayout.LayoutParams(-1, height, if (compact) 0f else 1f)
+                web.requestLayout()
+                compactButton.text = if (compact) "Expand" else "Mini"
+                providerNote.visibility = if (compact) View.VISIBLE else View.GONE
+            }
+        }
         setContentView(root)
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
         if (savedInstanceState == null) {
