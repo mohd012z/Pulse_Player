@@ -16,6 +16,10 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.app.AlertDialog
+import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * In-app browser for official music/video websites.
@@ -23,6 +27,70 @@ import android.widget.TextView
  */
 class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
+    private val historyStore by lazy { getSharedPreferences("pulse_video_history", MODE_PRIVATE) }
+    private fun readHistory(): JSONArray = try {
+        JSONArray(historyStore.getString("videos", "[]"))
+    } catch (_: Exception) { JSONArray() }
+
+    private fun youtubeId(uri: Uri): String? {
+        val host = uri.host?.lowercase()?.removePrefix("www.") ?: return null
+        val id = when (host) {
+            "youtube.com", "m.youtube.com" -> when {
+                uri.path == "/watch" -> uri.getQueryParameter("v")
+                uri.path?.startsWith("/shorts/") == true -> uri.pathSegments.getOrNull(1)
+                uri.path?.startsWith("/live/") == true -> uri.pathSegments.getOrNull(1)
+                else -> null
+            }
+            "youtu.be" -> uri.pathSegments.firstOrNull()
+            else -> null
+        }
+        return id?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+    }
+
+    private fun rememberVideo(uri: Uri) {
+        val id = youtubeId(uri) ?: return
+        val old = readHistory()
+        val next = JSONArray()
+        next.put(JSONObject().put("id", id).put("visitedAt", System.currentTimeMillis()))
+        for (i in 0 until old.length()) {
+            val item = old.optJSONObject(i) ?: continue
+            if (item.optString("id") != id && next.length() < 100) next.put(item)
+        }
+        historyStore.edit().putString("videos", next.toString()).apply()
+    }
+
+    private fun showWatchHistory() {
+        val items = readHistory()
+        if (items.length() == 0) {
+            Toast.makeText(this, "No videos in history yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = (0 until items.length()).map { i ->
+            val entry = items.optJSONObject(i)
+            val date = java.text.DateFormat.getDateTimeInstance().format(
+                java.util.Date(entry?.optLong("visitedAt") ?: 0L))
+            "$date · ${entry?.optString("id").orEmpty()}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Watch history")
+            .setItems(labels) { _, index ->
+                val id = items.optJSONObject(index)?.optString("id").orEmpty()
+                if (id.matches(Regex("[A-Za-z0-9_-]{11}"))) {
+                    browser?.loadUrl("https://www.youtube.com/watch?v=$id")
+                }
+            }
+            .setNeutralButton("Clear history") { _, _ ->
+                AlertDialog.Builder(this)
+                    .setMessage("Clear Pulse Player watch history?")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Clear") { _, _ ->
+                        historyStore.edit().remove("videos").apply()
+                    }.show()
+            }
+            .setPositiveButton("Close", null)
+            .show()
+    }
+
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var fullscreenContainer: FrameLayout? = null
@@ -76,6 +144,11 @@ class OnlineMediaActivity : Activity() {
         }
         top.addView(back)
         top.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
+        val historyButton = Button(this).apply {
+            text = "History"
+            setOnClickListener { showWatchHistory() }
+        }
+        top.addView(historyButton)
         top.addView(external)
         root.addView(top)
         val web = WebView(this)
@@ -89,6 +162,10 @@ class OnlineMediaActivity : Activity() {
         web.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         web.settings.setSupportMultipleWindows(false)
         web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                url?.let { runCatching { rememberVideo(Uri.parse(it)) } }
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
                 val target = request?.url ?: return true
                 return target.scheme != "https"
