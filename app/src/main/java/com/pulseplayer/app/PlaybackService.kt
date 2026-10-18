@@ -83,7 +83,17 @@ class PlaybackService : MediaSessionService() {
                         persistState()
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        Log.i("PulsePlayer", "isPlaying=$isPlaying state=$playbackState suppression=$playbackSuppressionReason")
                         persistState()
+                    }
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        Log.i("PulsePlayer", "playbackState=$playbackState playWhenReady=$playWhenReady")
+                    }
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        Log.i("PulsePlayer", "playWhenReady=$playWhenReady reason=$reason")
+                    }
+                    override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                        Log.i("PulsePlayer", "suppressionReason=$playbackSuppressionReason")
                     }
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         Log.e("PulsePlayer", "Playback failed: ${error.errorCodeName}", error)
