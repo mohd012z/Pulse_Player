@@ -155,6 +155,8 @@ class OnlineMediaActivity : Activity() {
             "Al-Quran" to "https://www.youtube.com/results?search_query=bacaan+al+quran+rasmi",
             "Nasyid" to "https://www.youtube.com/results?search_query=nasyid+malaysia+official",
             "Tarannum" to "https://www.youtube.com/results?search_query=tarannum+al+quran+Malaysia",
+            "Selawat" to "https://www.youtube.com/results?search_query=selawat+rasmi+Malaysia",
+            "Netflix on YouTube" to "https://www.youtube.com/results?search_query=Netflix+official+trailers+clips",
             "Netflix Movies" to "https://www.netflix.com/browse",
             "Radio Malaysia (RTM)" to "https://radio.rtm.gov.my/"
         )
@@ -442,7 +444,7 @@ class OnlineMediaActivity : Activity() {
         }
         AlertDialog.Builder(this)
             .setTitle("Save media · auto-detected URL")
-            .setMessage("Only direct, downloadable files are supported. YouTube watch pages and streaming/DRM links cannot be extracted.")
+            .setMessage("Paste a direct authorized HTTPS MP3/MP4 file URL. YouTube watch pages are not direct file links.")
             .setView(input)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Continue") { _, _ ->
