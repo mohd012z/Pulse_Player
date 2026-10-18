@@ -1,6 +1,11 @@
 package com.pulseplayer.app
 
 import android.app.Activity
+import android.app.PictureInPictureParams
+import android.os.Build
+import android.content.pm.PackageManager
+import android.util.Rational
+import android.content.res.Configuration
 import android.content.Intent
 import android.graphics.Color
 import android.content.pm.ActivityInfo
@@ -27,6 +32,7 @@ import org.json.JSONObject
  */
 class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
+    private var playerChrome: View? = null
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
@@ -160,6 +166,7 @@ class OnlineMediaActivity : Activity() {
             fitsSystemWindows = true
         }
         val top = LinearLayout(this)
+        playerChrome = top
         val back = Button(this).apply { text = "← Back"; setOnClickListener { finish() } }
         val title = TextView(this).apply {
             text = name
@@ -238,17 +245,7 @@ class OnlineMediaActivity : Activity() {
             }
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
-        run {
-            var compact = false
-            compactButton.setOnClickListener {
-                compact = !compact
-                val height = if (compact) (resources.displayMetrics.density * 240).toInt() else 0
-                web.layoutParams = LinearLayout.LayoutParams(-1, height, if (compact) 0f else 1f)
-                web.requestLayout()
-                compactButton.text = if (compact) "Expand" else "Mini"
-                providerNote.visibility = if (compact) View.VISIBLE else View.GONE
-            }
-        }
+        compactButton.setOnClickListener { enterFloatingMini() }
         setContentView(root)
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
         if (savedInstanceState == null) {
@@ -257,6 +254,29 @@ class OnlineMediaActivity : Activity() {
         } else if (web.restoreState(savedInstanceState) == null) {
             web.loadUrl(url)
         }
+    }
+
+    private fun enterFloatingMini() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+            !packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            Toast.makeText(this, "Floating MINI is not supported on this device", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (fullscreenView != null) {
+            Toast.makeText(this, "Exit fullscreen before using MINI", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val rect = android.graphics.Rect()
+        browser?.getGlobalVisibleRect(rect)
+        val params = PictureInPictureParams.Builder().setAspectRatio(Rational(9, 16))
+        if (!rect.isEmpty) params.setSourceRectHint(rect)
+        val entered = runCatching { enterPictureInPictureMode(params.build()) }.getOrDefault(false)
+        if (!entered) Toast.makeText(this, "Unable to open floating MINI", Toast.LENGTH_LONG).show()
+    }
+
+    override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(inPip, newConfig)
+        playerChrome?.visibility = if (inPip) View.GONE else View.VISIBLE
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -287,7 +307,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onPause() {
         persistPage(browser?.url)
-        browser?.onPause()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode) browser?.onPause()
         super.onPause()
     }
 
