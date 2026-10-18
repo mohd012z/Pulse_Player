@@ -189,7 +189,8 @@ class OnlineMediaActivity : Activity() {
         }
         // Use density-independent available width rather than a fixed handset model.
         // Narrow phones get two compact rows; tablets get one proportional toolbar.
-        val isTablet = resources.configuration.screenWidthDp >= 600
+        val tvMode = DeviceFormFactor.isTelevision(this)
+        val isTablet = tvMode || resources.configuration.screenWidthDp >= 600
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(6), dp(4), dp(6), dp(4))
@@ -200,7 +201,7 @@ class OnlineMediaActivity : Activity() {
         fun toolbarButton(textValue: String, description: String, action: () -> Unit) =
             Button(this).apply {
                 text = textValue
-                textSize = if (isTablet) 12f else 11f
+                textSize = if (tvMode) 18f else if (isTablet) 12f else 11f
                 setAllCaps(false)
                 minWidth = 0
                 minimumWidth = 0
@@ -209,6 +210,15 @@ class OnlineMediaActivity : Activity() {
                 setPadding(dp(3), 0, dp(3), 0)
                 contentDescription = description
                 setOnClickListener { action() }
+                if (tvMode) {
+                    isFocusable = true
+                    isFocusableInTouchMode = false
+                    setOnFocusChangeListener { view, focused ->
+                        view.alpha = if (focused) 1f else 0.8f
+                        view.scaleX = if (focused) 1.06f else 1f
+                        view.scaleY = if (focused) 1.06f else 1f
+                    }
+                }
             }
         val back = toolbarButton("‹ Back", "Back to Pulse Player") { finish() }
         val title = TextView(this).apply {
@@ -233,15 +243,16 @@ class OnlineMediaActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        firstRow.addView(back, LinearLayout.LayoutParams(dp(if (isTablet) 88 else 70), dp(38)))
-        firstRow.addView(title, LinearLayout.LayoutParams(0, dp(38), 1f))
+        firstRow.addView(back, LinearLayout.LayoutParams(dp(if (tvMode) 130 else if (isTablet) 88 else 70), dp(if (tvMode) 68 else 38)))
+        firstRow.addView(title, LinearLayout.LayoutParams(0, dp(if (tvMode) 68 else 38), 1f))
         if (isTablet) {
-            firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(94), dp(38)))
-            firstRow.addView(external, LinearLayout.LayoutParams(dp(114), dp(38)))
-            firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(64), dp(38)))
+            firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
+            firstRow.addView(external, LinearLayout.LayoutParams(dp(if (tvMode) 160 else 114), dp(if (tvMode) 68 else 38)))
+            firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(if (tvMode) 150 else 64), dp(if (tvMode) 68 else 38)))
         }
         firstRow.addView(compactButton, LinearLayout.LayoutParams(dp(64), dp(38)))
         top.addView(firstRow)
+        if (tvMode) downloadButton.requestFocus()
         if (!isTablet) {
             val secondRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
