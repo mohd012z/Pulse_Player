@@ -52,9 +52,17 @@ class PlaybackService : MediaSessionService() {
 
     private val checkpoint = object : Runnable {
         override fun run() {
-            persistState()
-            handler.postDelayed(this, 15_000L)
+            // A paused player has no advancing position; transitions and pause events
+            // already persist state. Avoid needless periodic preference writes.
+            if (::player.isInitialized && player.isPlaying) persistState()
+            handler.postDelayed(this, checkpointIntervalMillis())
         }
+    }
+
+    private fun checkpointIntervalMillis(): Long {
+        // Preserve the original 15-second recovery window during active playback.
+        // Paused/idle playback needs only a lightweight timer check.
+        return if (::player.isInitialized && player.isPlaying) 15_000L else 60_000L
     }
 
     override fun onCreate() {
