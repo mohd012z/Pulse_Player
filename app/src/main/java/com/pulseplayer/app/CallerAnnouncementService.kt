@@ -21,7 +21,8 @@ import java.util.Locale
  */
 class CallerAnnouncementService : CallScreeningService() {
     override fun onScreenCall(callDetails: Call.Details) {
-        if (callDetails.callDirection != Call.Details.DIRECTION_INCOMING) return
+        if (Build.VERSION.SDK_INT >= 29 &&
+            callDetails.callDirection != Call.Details.DIRECTION_INCOMING) return
         // Respond immediately: the system requires a response within five seconds.
         respondToCall(callDetails, CallResponse.Builder().build())
         if (!getSharedPreferences(PREFS, Context.MODE_PRIVATE)
