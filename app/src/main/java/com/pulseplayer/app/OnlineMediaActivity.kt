@@ -34,6 +34,7 @@ class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
     private var playerChrome: View? = null
     private var pipEnabled = false
+    private var enteringPip = false
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
@@ -277,7 +278,9 @@ class OnlineMediaActivity : Activity() {
         browser?.getGlobalVisibleRect(rect)
         val params = PictureInPictureParams.Builder().setAspectRatio(Rational(9, 16))
         if (!rect.isEmpty) params.setSourceRectHint(rect)
+        enteringPip = true
         val entered = runCatching { enterPictureInPictureMode(params.build()) }.getOrDefault(false)
+        if (!entered) enteringPip = false
         if (!entered) Toast.makeText(this, "Unable to open floating MINI", Toast.LENGTH_LONG).show()
     }
 
@@ -288,7 +291,9 @@ class OnlineMediaActivity : Activity() {
 
     override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(inPip, newConfig)
+        enteringPip = false
         playerChrome?.visibility = if (inPip) View.GONE else View.VISIBLE
+        if (inPip) browser?.onResume()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -319,7 +324,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onPause() {
         persistPage(browser?.url)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode) browser?.onPause()
+        if (!enteringPip && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode)) browser?.onPause()
         super.onPause()
     }
 
