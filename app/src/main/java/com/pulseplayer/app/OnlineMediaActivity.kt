@@ -142,7 +142,15 @@ class OnlineMediaActivity : Activity() {
         val url = when (name) {
             "YouTube Movies" -> "https://www.youtube.com/results?search_query=$year+new+full+movies+official"
             "Public Domain Movies" -> "https://www.youtube.com/results?search_query=$year+public+domain+movies+new+uploads"
-            else -> providers[name]
+            else -> if (name.startsWith("Misteri Indonesia: ")) {
+                val creator = name.removePrefix("Misteri Indonesia: ").trim()
+                val allowed = setOf("Kang Ujang Busthomi", "Mamaz Karyo", "Gus Nur Syamsudin",
+                    "Padepokan Nur Dzat Sejati", "Gus Samsudin", "Gus Idris",
+                    "Jurnalrisa", "Sara Wijayanto", "Kisah Tanah Jawa",
+                    "Nessie Judge", "Nadia Omara", "Ewing HD", "Lentera Malam")
+                if (creator in allowed) "https://www.youtube.com/results?search_query=" + Uri.encode(creator + " official")
+                else null
+            } else providers[name]
         } ?: run { finish(); return }
         activeProvider = name
         homeUrl = url
