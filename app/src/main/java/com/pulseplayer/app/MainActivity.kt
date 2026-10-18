@@ -1163,9 +1163,10 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences(SpokenNotificationService.PREFS, MODE_PRIVATE)
         val enabled = prefs.getBoolean(SpokenNotificationService.ENABLED, false)
         val access = SpokenNotificationService.hasAccess(this)
+        val otherApps = prefs.getBoolean(SpokenNotificationService.OTHER_APPS, false)
         AlertDialog.Builder(this)
             .setTitle("Speak notifications · sender only")
-            .setMessage("Allowed: WhatsApp, Telegram, SMS, Gmail and Calendar. Reads only the notification title when safe; never the message body. No announcements while locked, silent, during calls or Do Not Disturb. Audio follows Android's system output. Music focus recovery is handled by Media3. Notification Access reveals sensitive data to this app; enable only if you agree.\n\nStatus: " +
+            .setMessage("Allowed: WhatsApp, Telegram, SMS, Gmail and Calendar. Other apps: " + (if (otherApps) "enabled" else "disabled") + ". Reads only the notification title when safe; never the message body. No announcements while locked, silent, during calls or Do Not Disturb. Audio follows Android's system output. Music focus recovery is handled by Media3. Notification Access reveals sensitive data to this app; enable only if you agree.\n\nStatus: " +
                 (if (enabled && access) "Enabled" else if (enabled) "Waiting for Notification Access" else "Disabled"))
             .setPositiveButton("Enable / grant access") { _, _ ->
                 prefs.edit().putBoolean(SpokenNotificationService.ENABLED, true).apply()
@@ -1178,7 +1179,17 @@ class MainActivity : Activity() {
                 prefs.edit().putBoolean(SpokenNotificationService.ENABLED, false).apply()
                 status("Spoken notifications disabled")
             }
-            .setNegativeButton("Cancel", null).show()
+            .setNegativeButton("Other apps settings") { _, _ ->
+                val current = prefs.getBoolean(SpokenNotificationService.OTHER_APPS, false)
+                AlertDialog.Builder(this)
+                    .setTitle("Announce notifications from other apps?")
+                    .setMessage("This includes apps beyond WhatsApp, Telegram, SMS, Gmail and Calendar. Sender titles may contain sensitive information and may be spoken through the system-selected speaker. Only enable if you accept this privacy risk.")
+                    .setPositiveButton(if (current) "Disable other apps" else "Enable other apps") { _, _ ->
+                        prefs.edit().putBoolean(SpokenNotificationService.OTHER_APPS, !current).apply()
+                        status(if (current) "Other apps disabled" else "Other apps enabled")
+                    }
+                    .setNegativeButton("Cancel", null).show()
+            }.show()
     }
 
     private fun showCallerAnnouncement() {
