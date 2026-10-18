@@ -15,7 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import java.util.Locale
 
-/** Opt-in, sender-only announcements. Never reads message bodies or persists identities. */
+/** Opt-in announcements. Full mode reads message bodies in memory only; never persists identities or text. */
 class SpokenNotificationService : NotificationListenerService() {
     private val recent = LinkedHashMap<String, Long>()
     private var speaker: TextToSpeech? = null
@@ -32,7 +32,9 @@ class SpokenNotificationService : NotificationListenerService() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (!prefs.getBoolean(ENABLED, false)) return
         if (sbn.packageName == packageName || sbn.isOngoing) return
-        val app = appLabel(sbn.packageName) ?: if (prefs.getBoolean(OTHER_APPS, false)) "app" else return
+        val group = appGroup(sbn.packageName)
+        if (!prefs.getBoolean("app_" + group, true)) return
+        val app = appLabel(sbn.packageName) ?: "app"
         val n = sbn.notification
         if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if (n.category == Notification.CATEGORY_CALL || n.category == Notification.CATEGORY_TRANSPORT ||
@@ -45,17 +47,22 @@ class SpokenNotificationService : NotificationListenerService() {
         val km = getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
         if (km?.isDeviceLocked == true) return
 
-        // Sender mode uses only the notification title, never EXTRA_TEXT, big text,
-        // messaging histories, or contact data. Some providers put message text
-        // in the title; suppress titles that resemble content or are too long.
+        // Never speak private notifications on the lock screen. Message bodies are
+        // handled in memory only and are never written to disk or diagnostic logs.
         val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
-            ?.takeIf { it.isNotEmpty() && it.length <= 60 && !it.contains('\n') }
-        val safeSender = NotificationSenderPolicy.safeTitle(title)
-        val announcement = if (safeSender != null) "New $app notification from $safeSender"
-            else "New $app notification"
+            ?.takeIf { it.isNotEmpty() && it.length <= 100 && !it.contains('\n') }
+        val safeSender = title?.takeIf { !it.contains("http", ignoreCase = true) }
+        val body = (n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?: n.extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        val full = prefs.getString(MODE, "full") == "full"
+        val announcement = if (full && body != null)
+            "New " + app + " notification. " + (safeSender ?: "") + ". " + body.take(350)
+        else if (safeSender != null) "New " + app + " notification from " + safeSender
+        else "New " + app + " notification"
 
         val now = SystemClock.elapsedRealtime()
-        val key = sbn.packageName + "|" + sbn.key + "|" + (safeSender ?: "")
+        val key = sbn.packageName + "|" + sbn.key + "|" + (body?.hashCode() ?: 0)
         synchronized(recent) {
             recent.entries.removeAll { now - it.value > 60_000L }
             if (recent[key]?.let { now - it < 15_000L } == true) return
@@ -63,6 +70,15 @@ class SpokenNotificationService : NotificationListenerService() {
             if (recent.size > 80) recent.remove(recent.keys.first())
         }
         main.post { speak(announcement) }
+    }
+
+    private fun appGroup(pkg: String): String = when (pkg) {
+        "com.whatsapp", "com.whatsapp.w4b" -> "whatsapp"
+        "org.telegram.messenger", "org.thunderdog.challegram" -> "telegram"
+        "com.google.android.apps.messaging", "com.samsung.android.messaging" -> "sms"
+        "com.google.android.gm" -> "gmail"
+        "com.google.android.calendar", "com.samsung.android.calendar" -> "calendar"
+        else -> "other"
     }
 
     private fun appLabel(pkg: String): String? = when (pkg) {
@@ -115,6 +131,7 @@ class SpokenNotificationService : NotificationListenerService() {
         const val PREFS = "spoken_notifications"
         const val ENABLED = "enabled"
         const val OTHER_APPS = "other_apps"
+        const val MODE = "mode"
         fun hasAccess(context: Context): Boolean {
             val value = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false
             val own = ComponentName(context, SpokenNotificationService::class.java).flattenToString()
