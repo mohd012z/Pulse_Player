@@ -81,6 +81,9 @@ class PlaybackService : MediaSessionService() {
         effects.setBass(preferences.getInt("bass", 0))
         player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
+            // Keep CPU/Wi-Fi available while network audio is actively playing.
+            // ExoPlayer manages lock acquisition and release with playback state.
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build().apply {
                 setAudioAttributes(attrs, true)
                 addListener(object : Player.Listener {
