@@ -27,6 +27,9 @@ assert len(player_services) == 1, "Expected exactly one PlaybackService"
 service = player_services[0]
 assert not any(item.get(ANDROID + "name") == ".SpokenNotificationService" for item in services), "Spoken notifications must remain unregistered in rollback build"
 assert not any(item.get(ANDROID + "permission") == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" for item in services), "Notification listener binding must be absent"
+assert "android.permission.READ_CONTACTS" not in permissions, "Contacts permission must be absent"
+assert not any(item.get(ANDROID + "name") == ".CallerAnnouncementService" for item in services), "Caller screening service must be absent"
+assert not any(item.get(ANDROID + "permission") == "android.permission.BIND_SCREENING_SERVICE" for item in services), "Caller screening binding must be absent"
 assert service.get(ANDROID + "name") == ".PlaybackService"
 assert service.get(ANDROID + "foregroundServiceType") == "mediaPlayback"
 intents = [a.get(ANDROID + "name") for a in service.findall(".//action")]
