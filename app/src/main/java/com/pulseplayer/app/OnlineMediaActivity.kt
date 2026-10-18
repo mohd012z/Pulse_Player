@@ -33,6 +33,7 @@ import org.json.JSONObject
 class OnlineMediaActivity : Activity() {
     private var browser: WebView? = null
     private var playerChrome: View? = null
+    private var pipEnabled = false
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
@@ -167,6 +168,8 @@ class OnlineMediaActivity : Activity() {
         }
         val top = LinearLayout(this)
         playerChrome = top
+        pipEnabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
         val back = Button(this).apply { text = "← Back"; setOnClickListener { finish() } }
         val title = TextView(this).apply {
             text = name
@@ -246,6 +249,10 @@ class OnlineMediaActivity : Activity() {
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         compactButton.setOnClickListener { enterFloatingMini() }
+        compactButton.setOnLongClickListener {
+            Toast.makeText(this, "Tip: use the Home gesture to enter floating MINI on supported Android versions", Toast.LENGTH_LONG).show()
+            true
+        }
         setContentView(root)
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
         if (savedInstanceState == null) {
@@ -272,6 +279,11 @@ class OnlineMediaActivity : Activity() {
         if (!rect.isEmpty) params.setSourceRectHint(rect)
         val entered = runCatching { enterPictureInPictureMode(params.build()) }.getOrDefault(false)
         if (!entered) Toast.makeText(this, "Unable to open floating MINI", Toast.LENGTH_LONG).show()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (pipEnabled && fullscreenView == null && browser != null) enterFloatingMini()
     }
 
     override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
