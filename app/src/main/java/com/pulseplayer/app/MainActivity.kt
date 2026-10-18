@@ -1283,6 +1283,11 @@ class MainActivity : Activity() {
             }
         }
         setContentView(root)
+        if (DeviceFormFactor.isTelevision(this)) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            root.isFocusableInTouchMode = true
+            root.requestFocus()
+        }
 
         val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1344,6 +1349,11 @@ class MainActivity : Activity() {
             }
         }
         // This weighted ListView owns the screen's scrolling; the mini-player never scrolls away.
+        if (DeviceFormFactor.isTelevision(this)) {
+            trackList.isFocusable = true
+            trackList.isFocusableInTouchMode = false
+            trackList.choiceMode = ListView.CHOICE_MODE_SINGLE
+        }
         root.addView(trackList, LinearLayout.LayoutParams(-1, 0, 1f))
 
         statusView = label("Connecting…", 11f, COLOR_MUTED)
@@ -1522,6 +1532,15 @@ class MainActivity : Activity() {
     }
 
     private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
+        if (DeviceFormFactor.isTelevision(this@MainActivity)) {
+            isFocusable = true
+            isFocusableInTouchMode = false
+            setOnFocusChangeListener { view, hasFocus ->
+                view.alpha = if (hasFocus) 1f else 0.82f
+                view.scaleX = if (hasFocus) 1.05f else 1f
+                view.scaleY = if (hasFocus) 1.05f else 1f
+            }
+        }
         this.text = text
         setAllCaps(false)
         textSize = 11f
