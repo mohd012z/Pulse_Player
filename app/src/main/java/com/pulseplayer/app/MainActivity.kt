@@ -1046,10 +1046,25 @@ class MainActivity : Activity() {
         val options = arrayOf(
             "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
-            "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming"
+            "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia"
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
-            openProvider(options[index])
+            if (options[index] == "Misteri Indonesia") showIndonesianMystery()
+            else openProvider(options[index])
+        }
+    }
+
+    private fun showIndonesianMystery() {
+        // Search by creator name instead of relying on unverified channel handles.
+        val creators = arrayOf(
+            "Kang Ujang Busthomi", "Mamaz Karyo", "Gus Nur Syamsudin",
+            "Padepokan Nur Dzat Sejati", "Gus Samsudin", "Gus Idris",
+            "Jurnalrisa", "Sara Wijayanto", "Kisah Tanah Jawa",
+            "Nessie Judge", "Nadia Omara", "Ewing HD", "Lentera Malam"
+        )
+        showPicker("Misteri Indonesia · YouTube", creators) { index ->
+            startActivity(Intent(this, OnlineMediaActivity::class.java)
+                .putExtra("provider", "Misteri Indonesia: " + creators[index]))
         }
     }
 
