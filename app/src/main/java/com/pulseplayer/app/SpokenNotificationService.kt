@@ -50,7 +50,7 @@ class SpokenNotificationService : NotificationListenerService() {
         // in the title; suppress titles that resemble content or are too long.
         val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
             ?.takeIf { it.isNotEmpty() && it.length <= 60 && !it.contains('\n') }
-        val safeSender = title?.takeIf { !it.contains(':') && !it.contains("http", ignoreCase = true) }
+        val safeSender = NotificationSenderPolicy.safeTitle(title)
         val announcement = if (safeSender != null) "New $app notification from $safeSender"
             else "New $app notification"
 
