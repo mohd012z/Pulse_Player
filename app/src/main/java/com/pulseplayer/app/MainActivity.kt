@@ -1055,7 +1055,8 @@ class MainActivity : Activity() {
             "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
             "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia",
-            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies"
+            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat",
+            "Netflix on YouTube", "Netflix Movies"
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
             if (options[index] == "Misteri Indonesia") showIndonesianMystery()
@@ -1080,7 +1081,7 @@ class MainActivity : Activity() {
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
-            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies" -> ""
+            "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat", "Netflix on YouTube", "Netflix Movies" -> ""
             "YouTube Music" -> "https://music.youtube.com/"
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
             "JOOX" -> "https://www.joox.com/"
@@ -1097,7 +1098,7 @@ class MainActivity : Activity() {
             if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
                 startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
             } else {
-                if (destination in listOf("Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Netflix Movies")) {
+                if (destination in listOf("Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat", "Netflix on YouTube", "Netflix Movies")) {
                     startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
                 } else startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                     addCategory(Intent.CATEGORY_BROWSABLE)
