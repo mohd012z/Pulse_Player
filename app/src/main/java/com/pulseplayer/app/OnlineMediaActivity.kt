@@ -35,6 +35,7 @@ class OnlineMediaActivity : Activity() {
     private var playerChrome: View? = null
     private var pipEnabled = false
     private var enteringPip = false
+    private var providerVideoPlaying = false
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
@@ -207,6 +208,13 @@ class OnlineMediaActivity : Activity() {
         val web = WebView(this)
         browser = web
         web.settings.javaScriptEnabled = true
+        // Observe HTML5 playback state without injecting play commands or bypassing provider controls.
+        web.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface
+            fun report(playing: Boolean) {
+                runOnUiThread { providerVideoPlaying = playing }
+            }
+        }, "PulsePlaybackObserver")
         web.settings.domStorageEnabled = true
         web.settings.mediaPlaybackRequiresUserGesture = true
         web.settings.allowFileAccess = false
@@ -217,6 +225,15 @@ class OnlineMediaActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 persistPage(url)
+                // Read-only observation; YouTube may use a player implementation that does not expose HTML5 video.
+                view?.evaluateJavascript("""(function(){
+                  if(window.__pulseObserved)return;window.__pulseObserved=true;
+                  function report(){var v=document.querySelector('video');if(v)PulsePlaybackObserver.report(!v.paused&&!v.ended);}
+                  document.addEventListener('play',report,true);
+                  document.addEventListener('pause',report,true);
+                  document.addEventListener('ended',report,true);
+                  report();
+                })();""", null)
                 url?.let { runCatching { rememberVideo(Uri.parse(it)) } }
             }
 
@@ -286,7 +303,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (pipEnabled && fullscreenView == null && browser != null) enterFloatingMini()
+        if (pipEnabled && fullscreenView == null && providerVideoPlaying) enterFloatingMini()
     }
 
     override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
@@ -294,6 +311,7 @@ class OnlineMediaActivity : Activity() {
         enteringPip = false
         playerChrome?.visibility = if (inPip) View.GONE else View.VISIBLE
         if (inPip) browser?.onResume()
+        if (!inPip) providerVideoPlaying = false
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -324,7 +342,8 @@ class OnlineMediaActivity : Activity() {
 
     override fun onPause() {
         persistPage(browser?.url)
-        if (!enteringPip && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode)) browser?.onPause()
+        // Keep the WebView lifecycle active across PiP; providers independently decide playback.
+        if (!enteringPip && !providerVideoPlaying && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode)) browser?.onPause()
         super.onPause()
     }
 
