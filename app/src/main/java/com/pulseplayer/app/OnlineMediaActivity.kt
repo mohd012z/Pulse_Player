@@ -188,7 +188,7 @@ class OnlineMediaActivity : Activity() {
             Button(this).apply {
                 text = textValue
                 textSize = if (isTablet) 12f else 11f
-                isAllCaps = false
+                setAllCaps(false)
                 minWidth = 0
                 minimumWidth = 0
                 minHeight = 0
