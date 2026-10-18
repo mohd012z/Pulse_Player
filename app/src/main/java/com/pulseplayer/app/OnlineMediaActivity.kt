@@ -342,8 +342,8 @@ class OnlineMediaActivity : Activity() {
 
     override fun onPause() {
         persistPage(browser?.url)
-        // Keep the WebView lifecycle active across PiP; providers independently decide playback.
-        if (!enteringPip && !providerVideoPlaying && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode)) browser?.onPause()
+        // Android invokes Activity.onPause on PiP entry and screen lock.
+        // Do not explicitly suspend the embedded player here.
         super.onPause()
     }
 
