@@ -17,7 +17,25 @@ import java.util.concurrent.TimeUnit
  * Callers must close returned Response. This transport is not yet wired to downloads.
  */
 class PinnedHttpsTransport(private val resolver: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() }) {
-    fun open(url: String): Response {
+    fun open(url: String): Response = openWithRedirects(url)
+
+    fun openWithRedirects(initialUrl: String): Response {
+        var url = initialUrl
+        var followed = 0
+        while (true) {
+            val response = openSingle(url)
+            if (response.code !in 300..399) return response
+            val location = response.header("Location")
+            response.close()
+            if (response.code !in setOf(301, 302, 303, 307, 308) || location.isNullOrBlank()) {
+                throw IOException("Unsupported redirect")
+            }
+            url = RedirectPolicy.resolve(url, location, followed)
+            followed++
+        }
+    }
+
+    private fun openSingle(url: String): Response {
         val uri = PublicEndpointPolicy.validateUrl(url)
         val host = requireNotNull(uri.host)
         val resolved = resolver(host)
@@ -37,11 +55,7 @@ class PinnedHttpsTransport(private val resolver: (String) -> List<InetAddress> =
             .build()
         val request = Request.Builder().url(url).get().build()
         val response = client.newCall(request).execute()
-        if (response.code in 300..399) {
-            response.close()
-            throw IOException("Redirect rejected")
-        }
-        if (!response.isSuccessful) {
+        if (response.code !in 300..399 && !response.isSuccessful) {
             val code = response.code
             response.close()
             throw IOException("HTTP $code")
