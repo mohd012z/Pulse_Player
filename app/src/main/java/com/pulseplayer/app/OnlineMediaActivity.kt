@@ -481,8 +481,44 @@ class OnlineMediaActivity : Activity() {
             .setDestinationInExternalPublicDir(directory, filename)
         val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
         runCatching { manager.enqueue(request) }
-            .onSuccess { Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show() }
+            .onSuccess { downloadId ->
+                Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show()
+                watchDownloadStatus(manager, downloadId)
+            }
             .onFailure { Toast.makeText(this, "Download unavailable: ${it.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    /**
+     * Android DownloadManager enqueue() only confirms scheduling, not successful transfer.
+     * Query the actual transfer result and report failures to the user.
+     */
+    private fun watchDownloadStatus(manager: android.app.DownloadManager, downloadId: Long) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        val check = object : Runnable {
+            override fun run() {
+                if (isFinishing || isDestroyed) return
+                val status = runCatching {
+                    manager.query(android.app.DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                        if (!cursor.moveToFirst()) return@use null
+                        val state = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS))
+                        val reason = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_REASON))
+                        state to reason
+                    }
+                }.getOrNull()
+                when (status?.first) {
+                    android.app.DownloadManager.STATUS_SUCCESSFUL ->
+                        Toast.makeText(this@OnlineMediaActivity, "Download completed. Check Music or Downloads.", Toast.LENGTH_LONG).show()
+                    android.app.DownloadManager.STATUS_FAILED ->
+                        Toast.makeText(this@OnlineMediaActivity, "Download failed (Android reason code: ${status.second}). Check URL access and network.", Toast.LENGTH_LONG).show()
+                    null -> Toast.makeText(this@OnlineMediaActivity, "Download record unavailable.", Toast.LENGTH_LONG).show()
+                    else -> if (android.os.SystemClock.elapsedRealtime() - startedAt < 30L * 60L * 1000L) {
+                        handler.postDelayed(this, 2000L)
+                    }
+                }
+            }
+        }
+        handler.postDelayed(check, 2000L)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
