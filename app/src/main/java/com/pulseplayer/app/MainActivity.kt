@@ -613,6 +613,10 @@ class MainActivity : Activity() {
     }
 
     private fun requestSpectrum() {
+        if (!powerSaving.allowSpectrum()) {
+            status("Spectrum disabled in Ultra Saving. Change Power Saving mode to enable it.")
+            return
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
                 .setTitle("Optional live audio visualizer")
@@ -625,6 +629,10 @@ class MainActivity : Activity() {
     }
 
     private fun showSpectrum() {
+        if (!powerSaving.allowSpectrum()) {
+            status("Spectrum disabled in Ultra Saving")
+            return
+        }
         customCommand(PlaybackService.CMD_STATUS) { extras, success ->
             if (!success || isFinishing || isDestroyed) return@customCommand
             val sessionId = extras.getInt(PlaybackService.ARG_AUDIO_SESSION_ID, -1)
@@ -879,6 +887,12 @@ class MainActivity : Activity() {
             "ERA Malaysia" -> "https://era.je/"
             "MY FM" -> "https://my.com.my/"
             else -> return
+        }
+        if (destination in listOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+            val mode = powerSaving.effectiveMode()
+            if (mode != PowerSavingManager.Mode.OFF) {
+                status("$destination opens in its own app/browser; Pulse Player cannot control its video quality or battery usage. Power mode: ${mode.name}.")
+            }
         }
         runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
