@@ -814,6 +814,15 @@ class MainActivity : Activity() {
     @Deprecated("Kept for standalone Activity with no AndroidX Activity dependency")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 107) {
+            val roles = getSystemService(RoleManager::class.java)
+            val granted = resultCode == RESULT_OK &&
+                roles?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
+            getSharedPreferences(CallerAnnouncementService.PREFS, MODE_PRIVATE)
+                .edit().putBoolean(CallerAnnouncementService.ENABLED, granted).apply()
+            status(if (granted) "Caller-name announcement enabled" else "Call screening role not granted")
+            return
+        }
         if (requestCode == 106) {
             if (resultCode == RESULT_OK) {
                 status("Deletion confirmed. Refreshing music library…")
@@ -1235,18 +1244,6 @@ class MainActivity : Activity() {
             status("Caller-name announcement enabled")
         } else {
             startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING), 107)
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 107) {
-            val roles = getSystemService(RoleManager::class.java)
-            val granted = resultCode == RESULT_OK &&
-                roles?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true
-            getSharedPreferences(CallerAnnouncementService.PREFS, MODE_PRIVATE)
-                .edit().putBoolean(CallerAnnouncementService.ENABLED, granted).apply()
-            status(if (granted) "Caller-name announcement enabled" else "Call screening role not granted")
         }
     }
 
