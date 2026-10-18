@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only requested after the user explicitly enables caller announcements. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Requested only if the user explicitly enables FFT visualization. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -32,6 +34,15 @@
         <activity android:name=".aipulse.AiPulseStudioActivity" android:exported="false" />
         <activity android:name=".aipulse.PulseNovaWebActivity" android:exported="false" />
         <activity android:name=".aipulse.AiPulseVoicePackActivity" android:exported="false" />
+
+        <service
+            android:name=".CallerAnnouncementService"
+            android:permission="android.permission.BIND_SCREENING_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".PlaybackService"
