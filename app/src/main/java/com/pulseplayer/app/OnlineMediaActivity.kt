@@ -21,6 +21,7 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.SeekBar
 import android.app.AlertDialog
 import android.widget.Toast
 import org.json.JSONArray
@@ -36,6 +37,10 @@ class OnlineMediaActivity : Activity() {
     private var pipEnabled = false
     private var enteringPip = false
     private var providerVideoPlaying = false
+    private var miniControls: View? = null
+    private var miniSeek: SeekBar? = null
+    private var miniProgress: TextView? = null
+    private var updatingSeek = false
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
@@ -266,6 +271,75 @@ class OnlineMediaActivity : Activity() {
             }
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
+        // Small in-app transport controls; only act on accessible HTML5 media.
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xDD10141F.toInt())
+            visibility = View.VISIBLE
+        }
+        miniControls = controls
+        val seek = SeekBar(this).apply { max = 1000 }
+        miniSeek = seek
+        controls.addView(seek, LinearLayout.LayoutParams(-1, (30 * resources.displayMetrics.density).toInt()))
+        val buttons = LinearLayout(this).apply { gravity = android.view.Gravity.CENTER }
+        fun control(label: String, action: String) {
+            buttons.addView(Button(this).apply {
+                text = label
+                textSize = 11f
+                isAllCaps = false
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = 0
+                minimumHeight = 0
+                setPadding(2, 0, 2, 0)
+                setOnClickListener { mediaCommand(action) }
+            }, LinearLayout.LayoutParams(0, (36 * resources.displayMetrics.density).toInt(), 1f))
+        }
+        control("−10s", "back")
+        control("◀◀", "previous")
+        control("▶/Ⅱ", "toggle")
+        control("▶▶", "next")
+        control("+10s", "forward")
+        controls.addView(buttons)
+        val progress = TextView(this).apply {
+            text = "00:00 / --:--"
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+        }
+        miniProgress = progress
+        controls.addView(progress)
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(bar: SeekBar?) { updatingSeek = true }
+            override fun onStopTrackingTouch(bar: SeekBar?) {
+                val position = (bar?.progress ?: 0) / 1000.0
+                browser?.evaluateJavascript("""(function(){var v=document.querySelector('video,audio');if(v&&isFinite(v.duration)&&v.duration>0)v.currentTime=v.duration*$position;})();""", null)
+                updatingSeek = false
+            }
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {}
+        })
+        root.addView(controls)
+        val poll = object : Runnable {
+            override fun run() {
+                if (browser == null || isFinishing) return
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isInPictureInPictureMode) {
+                    browser?.evaluateJavascript("""(function(){var v=document.querySelector('video,audio');return v?JSON.stringify({t:v.currentTime||0,d:isFinite(v.duration)?v.duration:0}):'';})();""") { raw ->
+                        val value = runCatching { org.json.JSONTokener(raw).nextValue() as? String }.getOrNull()
+                        val data = runCatching { JSONObject(value ?: "") }.getOrNull()
+                        if (data != null) {
+                            val duration = data.optDouble("d", 0.0)
+                            val position = data.optDouble("t", 0.0)
+                            if (duration > 0 && !updatingSeek) miniSeek?.progress = (position / duration * 1000).toInt().coerceIn(0,1000)
+                            fun clock(s: Double): String = "%02d:%02d".format((s / 60).toInt(), s.toInt() % 60)
+                            miniProgress?.text = clock(position) + " / " + if (duration > 0) clock(duration) else "--:--"
+                        }
+                    }
+                }
+                miniControls?.postDelayed(this, 1000)
+            }
+        }
+        controls.post(poll)
+
         compactButton.setOnClickListener { enterFloatingMini() }
         compactButton.setOnLongClickListener {
             Toast.makeText(this, "Tip: use the Home gesture to enter floating MINI on supported Android versions", Toast.LENGTH_LONG).show()
@@ -279,6 +353,20 @@ class OnlineMediaActivity : Activity() {
         } else if (web.restoreState(savedInstanceState) == null) {
             web.loadUrl(url)
         }
+    }
+
+    private fun mediaCommand(action: String) {
+        val script = when (action) {
+            "back" -> "v.currentTime=Math.max(0,v.currentTime-10)"
+            "forward" -> "v.currentTime=Math.min(v.duration||Infinity,v.currentTime+10)"
+            "toggle" -> "if(v.paused)v.play();else v.pause()"
+            else -> ""
+        }
+        if (script.isEmpty()) {
+            Toast.makeText(this, "Use the provider's own previous/next controls", Toast.LENGTH_SHORT).show()
+            return
+        }
+        browser?.evaluateJavascript("(function(){var v=document.querySelector('video,audio');if(v){$script}})();", null)
     }
 
     private fun enterFloatingMini() {
@@ -310,6 +398,7 @@ class OnlineMediaActivity : Activity() {
         super.onPictureInPictureModeChanged(inPip, newConfig)
         enteringPip = false
         playerChrome?.visibility = if (inPip) View.GONE else View.VISIBLE
+        miniControls?.visibility = if (inPip) View.GONE else View.VISIBLE
         if (inPip) browser?.onResume()
         if (!inPip) providerVideoPlaying = false
     }
