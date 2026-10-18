@@ -163,7 +163,12 @@ class OnlineMediaActivity : Activity() {
         val url = when (name) {
             "YouTube Movies" -> "https://www.youtube.com/results?search_query=$year+new+full+movies+official"
             "Public Domain Movies" -> "https://www.youtube.com/results?search_query=$year+public+domain+movies+new+uploads"
-            else -> if (name.startsWith("Misteri Indonesia: ")) {
+            else -> if (name.startsWith("Radio: ")) {
+                intent.getStringExtra("url")?.takeIf { value ->
+                    val uri = Uri.parse(value)
+                    uri.scheme == "https" && uri.host in setOf("audio1.syok.my", "dengar.suria.my", "radio.rtm.gov.my")
+                }
+            } else if (name.startsWith("Misteri Indonesia: ")) {
                 val creator = name.removePrefix("Misteri Indonesia: ").trim()
                 val allowed = setOf("Kang Ujang Busthomi", "Mamaz Karyo", "Gus Nur Syamsudin",
                     "Padepokan Nur Dzat Sejati", "Gus Samsudin", "Gus Idris",
