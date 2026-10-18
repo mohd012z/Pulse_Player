@@ -174,42 +174,75 @@ class OnlineMediaActivity : Activity() {
             setBackgroundColor(0xFF10141F.toInt())
             fitsSystemWindows = true
         }
-        val top = LinearLayout(this)
+        // Use density-independent available width rather than a fixed handset model.
+        // Narrow phones get two compact rows; tablets get one proportional toolbar.
+        val isTablet = resources.configuration.smallestScreenWidthDp >= 600
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+        }
         playerChrome = top
         pipEnabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        val back = Button(this).apply { text = "← Back"; setOnClickListener { finish() } }
+        fun toolbarButton(textValue: String, description: String, action: () -> Unit) =
+            Button(this).apply {
+                text = textValue
+                textSize = if (isTablet) 12f else 11f
+                isAllCaps = false
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = 0
+                minimumHeight = 0
+                setPadding(dp(3), 0, dp(3), 0)
+                contentDescription = description
+                setOnClickListener { action() }
+            }
+        val back = toolbarButton("‹ Back", "Back to Pulse Player") { finish() }
         val title = TextView(this).apply {
             text = name
             setTextColor(Color.WHITE)
-            textSize = 17f
+            textSize = if (isTablet) 16f else 13f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val external = Button(this).apply {
-            text = "Open official app"
-            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        val historyButton = toolbarButton("History", "Watch history") { showWatchHistory() }
+        val external = toolbarButton("Official app", "Open official app") {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
-        top.addView(back)
-        top.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
-        val historyButton = Button(this).apply {
-            text = "History"
-            setOnClickListener { showWatchHistory() }
+        val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
+        compactButton.setOnLongClickListener {
+            Toast.makeText(this, "Use the Home gesture for floating MINI where supported", Toast.LENGTH_LONG).show()
+            true
         }
-        top.addView(historyButton)
-        top.addView(external)
+        val firstRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        firstRow.addView(back, LinearLayout.LayoutParams(dp(if (isTablet) 88 else 70), dp(38)))
+        firstRow.addView(title, LinearLayout.LayoutParams(0, dp(38), 1f))
+        if (isTablet) {
+            firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(94), dp(38)))
+            firstRow.addView(external, LinearLayout.LayoutParams(dp(114), dp(38)))
+        }
+        firstRow.addView(compactButton, LinearLayout.LayoutParams(dp(64), dp(38)))
+        top.addView(firstRow)
+        if (!isTablet) {
+            val secondRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
+            secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
+            top.addView(secondRow)
+        }
         root.addView(top)
-        // Compact mode keeps the provider WebView visible and active while this
-        // activity is foregrounded; it does not bypass provider background rules.
-        // All supported online providers and movie categories can use compact mode.
-        val compactButton = Button(this).apply { text = "Mini" }
         val providerNote = TextView(this).apply {
-            text = "Mini mode keeps this page visible while Pulse Player is open. Background playback depends on the provider and Android."
+            text = "Background playback depends on the provider and Android."
             setTextColor(0xFFB6C3CD.toInt())
             textSize = 12f
-            setPadding(12, 4, 12, 4)
             visibility = View.GONE
         }
-        top.addView(compactButton)
         root.addView(providerNote)
         val web = WebView(this)
         browser = web
@@ -222,6 +255,8 @@ class OnlineMediaActivity : Activity() {
             }
         }, "PulsePlaybackObserver")
         web.settings.domStorageEnabled = true
+        web.settings.useWideViewPort = true
+        web.settings.loadWithOverviewMode = true
         web.settings.mediaPlaybackRequiresUserGesture = true
         web.settings.allowFileAccess = false
         web.settings.allowContentAccess = false
@@ -369,6 +404,8 @@ class OnlineMediaActivity : Activity() {
         }
         browser?.evaluateJavascript("(function(){var v=document.querySelector('video,audio');if(v){$script}})();", null)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun enterFloatingMini() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
