@@ -88,6 +88,9 @@ class CinemaActivity : Activity() {
         outState.putString("category",selected)
         super.onSaveInstanceState(outState)
     }
+    private fun openProvider(provider: String) {
+        startActivity(Intent(this, ProviderBrowserActivity::class.java).putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, provider))
+    }
     private fun openOnline(url: String) {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
     }
@@ -105,13 +108,13 @@ class CinemaActivity : Activity() {
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
         hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
         hero.addView(button("▶ YouTube · official online video") {
-            openOnline("https://www.youtube.com/")
+            openProvider("YouTube")
         })
         hero.addView(button("▶ YouTube Shorts · online") {
-            openOnline("https://www.youtube.com/shorts")
+            openProvider("YouTube Shorts")
         })
         hero.addView(button("▶ Online short drama search") {
-            openOnline("https://www.youtube.com/results?search_query=short+drama")
+            openProvider("Short Drama")
         })
         hero.addView(button("▶ Play a video from my device") {
             startActivity(Intent(this,LocalVideoActivity::class.java))
