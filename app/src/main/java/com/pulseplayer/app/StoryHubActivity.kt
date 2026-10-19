@@ -5,6 +5,10 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.content.res.Configuration
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -23,16 +27,46 @@ class StoryHubActivity : Activity() {
     private val videos = mutableListOf<Uri>()
     private var videoIndex = 0
     private lateinit var root: LinearLayout
+    private lateinit var content: LinearLayout
+    private var currentScreen = "hub"
+    private var activeNovel: Uri? = null
+    private var activeVideo: VideoView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = 0xFF10141F.toInt()
+        window.navigationBarColor = 0xFF10141F.toInt()
+        window.decorView.systemUiVisibility = 0
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
             setBackgroundColor(0xFF10141F.toInt())
         }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        scroll.addView(content)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                view.setPadding(maxOf(dp(12), bars.left), maxOf(dp(12), bars.top), maxOf(dp(12), bars.right), maxOf(dp(12), bars.bottom))
+                insets
+            }
+        } else {
+            root.setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
         setContentView(root)
         showHub()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        when (currentScreen) {
+            "drama" -> showDrama()
+            "novel" -> activeNovel?.let { showNovel(it) } ?: showHub()
+            "player" -> playEpisode()
+            else -> showHub()
+        }
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -50,8 +84,10 @@ class StoryHubActivity : Activity() {
             .currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
 
     private fun header(title: String) {
-        root.removeAllViews()
-        root.addView(TextView(this).apply {
+        activeVideo?.stopPlayback()
+        activeVideo = null
+        content.removeAllViews()
+        content.addView(TextView(this).apply {
             text = title
             textSize = if (isTelevision()) 27f else 22f
             setTextColor(-1)
@@ -61,20 +97,22 @@ class StoryHubActivity : Activity() {
     }
 
     private fun showHub() {
+        currentScreen = "hub"
         header("Pulse · Stories")
-        root.addView(action("🎬  Short Drama · My episodes") { showDrama() })
-        root.addView(action("📖  Novel · My bookshelf") { importNovel() })
-        root.addView(action("ℹ  Content & privacy") {
+        content.addView(action("🎬  Short Drama · My episodes") { showDrama() })
+        content.addView(action("📖  Novel · My bookshelf") { importNovel() })
+        content.addView(action("ℹ  Content & privacy") {
             AlertDialog.Builder(this).setTitle("Your content")
                 .setMessage("Import videos and TXT books that you own or are authorized to use. Files stay on your device. No MovieBox credentials, private APIs, or hidden streaming endpoints are used.")
                 .setPositiveButton("OK", null).show()
         })
-        root.getChildAt(1)?.requestFocus()
+        content.getChildAt(1)?.requestFocus()
     }
 
     private fun showDrama() {
+        currentScreen = "drama"
         header("🎬 Short Drama")
-        root.addView(action("＋ Import episodes (video files)") {
+        content.addView(action("＋ Import episodes (video files)") {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "video/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -82,25 +120,29 @@ class StoryHubActivity : Activity() {
             }, requestVideos)
         })
         if (videos.isEmpty()) {
-            root.addView(TextView(this).apply {
+            content.addView(TextView(this).apply {
                 text = "No episodes imported yet. Select your own MP4 or supported video files."
                 setTextColor(-1)
             })
         }
         videos.forEachIndexed { index, uri ->
-            root.addView(action("▶ Episode ${index + 1} · ${uri.lastPathSegment?.takeLast(30) ?: "Video"}") {
+            content.addView(action("▶ Episode ${index + 1} · ${uri.lastPathSegment?.takeLast(30) ?: "Video"}") {
                 videoIndex = index
                 playEpisode()
             })
         }
-        root.addView(action("← Stories") { showHub() })
+        content.addView(action("← Stories") { showHub() })
     }
 
     private fun playEpisode() {
+        currentScreen = "player"
         val uri = videos.getOrNull(videoIndex) ?: return
         header("Episode ${videoIndex + 1} / ${videos.size}")
         val video = VideoView(this)
-        root.addView(video, LinearLayout.LayoutParams(-1, 0, 1f))
+        activeVideo = video
+        val width = resources.displayMetrics.widthPixels - dp(36)
+        val videoHeight = (width * 9 / 16).coerceIn(dp(180), dp(if (isTelevision()) 540 else 400))
+        content.addView(video, LinearLayout.LayoutParams(-1, videoHeight))
         video.setVideoURI(uri)
         video.setMediaController(android.widget.MediaController(this).apply { setAnchorView(video) })
         video.setOnPreparedListener { video.start() }
@@ -110,17 +152,17 @@ class StoryHubActivity : Activity() {
                 playEpisode()
             }
         }
-        root.addView(action("⏮ Previous episode") {
+        content.addView(action("⏮ Previous episode") {
             video.stopPlayback()
             videoIndex = (videoIndex - 1).coerceAtLeast(0)
             playEpisode()
         })
-        root.addView(action("⏭ Next episode") {
+        content.addView(action("⏭ Next episode") {
             video.stopPlayback()
             videoIndex = (videoIndex + 1).coerceAtMost(videos.lastIndex)
             playEpisode()
         })
-        root.addView(action("← Episode list") {
+        content.addView(action("← Episode list") {
             video.stopPlayback()
             showDrama()
         })
@@ -135,6 +177,8 @@ class StoryHubActivity : Activity() {
     }
 
     private fun showNovel(uri: Uri) {
+        currentScreen = "novel"
+        activeNovel = uri
         val text = try {
             contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
                 // Cap reads to 2 million characters to avoid freezing on oversized documents.
@@ -160,11 +204,16 @@ class StoryHubActivity : Activity() {
             setPadding(dp(8), dp(12), dp(8), dp(12))
         }
         scroll.addView(page)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(action("A−  Smaller text") { page.textSize = (page.textSize / resources.displayMetrics.scaledDensity - 2).coerceAtLeast(12f) })
-        root.addView(action("A＋  Larger text") { page.textSize = (page.textSize / resources.displayMetrics.scaledDensity + 2).coerceAtMost(36f) })
-        root.addView(action("← Stories") { showHub() })
+        content.addView(scroll, LinearLayout.LayoutParams(-1, -2))
+        content.addView(action("A−  Smaller text") { page.textSize = (page.textSize / resources.displayMetrics.scaledDensity - 2).coerceAtLeast(12f) })
+        content.addView(action("A＋  Larger text") { page.textSize = (page.textSize / resources.displayMetrics.scaledDensity + 2).coerceAtMost(36f) })
+        content.addView(action("← Stories") { showHub() })
         scroll.requestFocus()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        activeVideo?.pause()
     }
 
     @Deprecated("Uses legacy result API for compatibility with existing Activity architecture")
