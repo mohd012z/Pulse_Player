@@ -26,8 +26,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Locate Android SDK manager
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKM" ]; then
+            echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          else
+            find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit
+          fi
+      - name: Install Android platform if SDK manager available
+        run: |
+          if command -v sdkmanager >/dev/null; then
+            yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
+          fi
       - name: Compile and unit test
         run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
       - name: Verify APK generated
