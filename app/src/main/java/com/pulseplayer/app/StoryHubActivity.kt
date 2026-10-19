@@ -100,12 +100,27 @@ class StoryHubActivity : Activity() {
         header("Pulse · Stories")
         content.addView(action("🎬  Short Drama · My episodes") { showDrama() })
         content.addView(action("📖  Novel · My bookshelf") { importNovel() })
+        content.addView(action("⚙  Content rating settings") { showRatingSettings() })
         content.addView(action("ℹ  Content & privacy") {
             AlertDialog.Builder(this).setTitle("Your content")
                 .setMessage("Import videos and TXT books that you own or are authorized to use. Files stay on your device. No MovieBox credentials, private APIs, or hidden streaming endpoints are used.")
                 .setPositiveButton("OK", null).show()
         })
         content.getChildAt(1)?.requestFocus()
+    }
+
+    private fun showRatingSettings() {
+        val prefs = getSharedPreferences("pulse_catalog", MODE_PRIVATE)
+        val current = prefs.getString("rating_mode", "STANDARD")
+        val choices = arrayOf("Standard (up to PG-13 / TV-14)", "Family Friendly (up to PG / TV-PG)")
+        AlertDialog.Builder(this)
+            .setTitle("Content rating")
+            .setSingleChoiceItems(choices, if (current == "FAMILY_FRIENDLY") 1 else 0) { dialog, selected ->
+                prefs.edit().putString("rating_mode", if (selected == 1) "FAMILY_FRIENDLY" else "STANDARD").apply()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showDrama() {
