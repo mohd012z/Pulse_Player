@@ -51,7 +51,7 @@ class CinemaActivity : Activity() {
         val title = text("▶  PULSE CINEMA",if(tv()) 27f else 21f)
         root.addView(title)
         val search = EditText(this).apply {
-            hint = "Search your local library"; setSingleLine(true)
+            hint = "Search Internet Archive"; setSingleLine(true)
             setTextColor(Color.WHITE); setHintTextColor(0xFFB6BCCB.toInt())
             setText(query); minHeight = dp(if(tv()) 60 else 48)
             setOnEditorActionListener { _, _, _ ->
@@ -66,7 +66,7 @@ class CinemaActivity : Activity() {
         scroller.addView(body)
         root.addView(scroller,LinearLayout.LayoutParams(-1,0,1f))
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Home","Movies","ShortTV","Downloads","Me").forEach { label ->
+        listOf("Music","Movies","ShortTV","Downloads","Me").forEach { label ->
             nav.addView(button(label) {
                 when(label) {
                     "Music" -> finish()
@@ -102,10 +102,10 @@ class CinemaActivity : Activity() {
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
         hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
         hero.addView(button("Browse Internet Archive films") {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://archive.org/details/feature_films")))
+            openArchive(ArchiveBrowserActivity.FILMS)
         })
         hero.addView(button("Browse Internet Archive animation") {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://archive.org/details/animationandcartoons")))
+            openArchive(ArchiveBrowserActivity.ANIMATION)
         })
         hero.addView(button("▶ Open my Short Drama episodes") {
             startActivity(Intent(this,StoryHubActivity::class.java))
@@ -124,32 +124,32 @@ class CinemaActivity : Activity() {
         }
         horizontal.addView(chips)
         body.addView(horizontal)
-        listOf("Continue Watching","Trending Drama","Movies & TV","Anime","Short Drama","Novels").forEach { section ->
+        listOf("Public films","Public animation","My Short Drama episodes").forEach { section ->
             body.addView(text(section,if(tv()) 24f else 19f))
             val rowScroll=HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled=false }
             val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-            val message = if(section=="Continue Watching")
-                "Your local episodes are available in Stories"
-            else "Connect an authorized catalog to show titles"
-            row.addView(button(message) {
-                if(section=="Continue Watching" || section=="Short Drama" || section=="Novels")
-                    startActivity(Intent(this,StoryHubActivity::class.java))
-                else AlertDialog.Builder(this).setTitle(section)
-                    .setMessage("This catalog has no authorized provider connected. No placeholder posters or fake Play links are displayed.")
-                    .setPositiveButton("OK",null).show()
-            },LinearLayout.LayoutParams(dp(if(tv()) 430 else 280),dp(if(tv()) 150 else 112)))
+            val destination = when(section) {
+                "Public films" -> ArchiveBrowserActivity.FILMS
+                "Public animation" -> ArchiveBrowserActivity.ANIMATION
+                else -> ""
+            }
+            row.addView(button(if (destination.isNotEmpty()) "Browse and play on Internet Archive" else "Open my episodes") {
+                if (destination.isNotEmpty()) openArchive(destination)
+                else startActivity(Intent(this,StoryHubActivity::class.java))
+            },LinearLayout.LayoutParams(dp(if(tv()) 430 else 280),dp(if(tv()) 100 else 76)))
             rowScroll.addView(row)
             body.addView(rowScroll)
         }
     }
+    private fun openArchive(url: String) {
+        startActivity(Intent(this, ArchiveBrowserActivity::class.java)
+            .putExtra(ArchiveBrowserActivity.EXTRA_URL, url))
+    }
     private fun showLocalSearch(value:String) {
         if (value.isBlank()) return
-        AlertDialog.Builder(this)
-            .setTitle("Search: $value")
-            .setMessage("Online title search requires an authorized catalog. Open ShortTV to browse locally imported episodes.")
-            .setPositiveButton("Open ShortTV") { _, _ ->
-                startActivity(Intent(this,StoryHubActivity::class.java))
-            }.setNegativeButton("Close",null).show()
+        val url = Uri.parse("https://archive.org/search").buildUpon()
+            .appendQueryParameter("query", value).build().toString()
+        openArchive(url)
     }
     private fun showDownloads() {
         AlertDialog.Builder(this).setTitle("Downloads")
