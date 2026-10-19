@@ -34,6 +34,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.view.inputmethod.EditorInfo
@@ -59,6 +60,8 @@ class MainActivity : Activity() {
         private const val REQUEST_OPEN_AUDIO = 102
         private const val REQUEST_OPEN_FOLDER = 103
         private const val REQUEST_OPEN_LRC = 104
+        private const val REQUEST_LYRICS = 105
+        private const val REQUEST_SPECTRUM_PERMISSION = 106
         private const val EXTRA_SHORTCUT = "shortcut"
         private const val COLOR_BG = 0xFF10141FL.toInt()
         private const val COLOR_PANEL = 0xFF1B2331L.toInt()
@@ -108,6 +111,7 @@ class MainActivity : Activity() {
     private lateinit var artistView: TextView
     private lateinit var progressView: TextView
     private lateinit var statusView: TextView
+    private lateinit var lyricView: TextView
     private lateinit var libraryView: TextView
     private lateinit var sourceView: TextView
     private lateinit var seekBar: SeekBar
@@ -215,6 +219,13 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_SPECTRUM_PERMISSION) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                showSpectrum()
+            } else {
+                status("FFT visualization requires optional audio capture permission")
+            }
+        }
         if (requestCode == REQUEST_AUDIO_PERMISSION) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
                 scanLibrary()
@@ -765,6 +776,19 @@ class MainActivity : Activity() {
             }.getOrElse { status("Could not open LRC file: ${it.message}"); return }
             importedLyrics = parsed
             status("Loaded ${parsed.size} synchronized lyric lines")
+        }
+        if (requestCode == REQUEST_LYRICS && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            val id = controller?.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
+                ?: controller?.currentMediaItem?.localConfiguration?.uri?.toString()
+            if (id == null) {
+                status("Play a local track before attaching LRC lyrics")
+                return
+            }
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            lyricsPrefs.edit().putString(lyricKey(id), uri.toString()).apply()
+            lyricsTrackId = id
+            parseLyricsAsync(id, uri)
         }
         if (requestCode == REQUEST_OPEN_AUDIO && resultCode == RESULT_OK) {
             val chosen = LinkedHashSet<Uri>()
@@ -1430,6 +1454,12 @@ class MainActivity : Activity() {
         statusView = label("Connecting…", 11f, COLOR_MUTED)
         statusView.maxLines = 2
         root.addView(statusView, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
+        lyricView = label("♫ Lyrics: More → Lyrics → Import .lrc", 12f, COLOR_ACCENT)
+        lyricView.isSingleLine = true
+        lyricView.ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+        lyricView.isSelected = true
+        lyricView.setOnClickListener { showLyricDialog() }
+        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))

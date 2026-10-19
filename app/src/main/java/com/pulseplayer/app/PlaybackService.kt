@@ -28,10 +28,15 @@ class PlaybackService : MediaSessionService() {
     companion object {
         const val CMD_SET_PRESET = "com.pulseplayer.command.PRESET"
         const val CMD_SET_BASS = "com.pulseplayer.command.BASS"
+        const val CMD_SET_CUSTOM = "com.pulseplayer.command.CUSTOM_EQ"
         const val CMD_SET_SLEEP = "com.pulseplayer.command.SLEEP"
         const val CMD_STATUS = "com.pulseplayer.command.STATUS"
         const val ARG_PRESET = "preset"
         const val ARG_BASS = "bass"
+        const val ARG_CUSTOM_BASS = "custom_bass"
+        const val ARG_CUSTOM_MID = "custom_mid"
+        const val ARG_CUSTOM_TREBLE = "custom_treble"
+        const val ARG_AUDIO_SESSION_ID = "audio_session_id"
         const val ARG_MINUTES = "minutes"
         const val ARG_EQ_SUPPORTED = "eq_supported"
         const val ARG_BASS_SUPPORTED = "bass_supported"
@@ -66,6 +71,12 @@ class PlaybackService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
+        effects.setPreset(preferences.getString("preset", "Flat") ?: "Flat")
+        effects.setCustom(
+            preferences.getInt("custom_bass", 0),
+            preferences.getInt("custom_mid", 0),
+            preferences.getInt("custom_treble", 0)
+        )
         effects.setPreset(preferences.getString("preset", "Flat") ?: "Flat")
         effects.setBass(preferences.getInt("bass", 0))
         player = ExoPlayer.Builder(this)
@@ -118,6 +129,7 @@ class PlaybackService : MediaSessionService() {
                     .buildUpon()
                     .add(SessionCommand(CMD_SET_PRESET, Bundle.EMPTY))
                     .add(SessionCommand(CMD_SET_BASS, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_SET_CUSTOM, Bundle.EMPTY))
                     .add(SessionCommand(CMD_SET_SLEEP, Bundle.EMPTY))
                     .add(SessionCommand(CMD_STATUS, Bundle.EMPTY))
                     .build()
@@ -152,6 +164,21 @@ class PlaybackService : MediaSessionService() {
                         applied
                     }
                 }
+                CMD_SET_CUSTOM -> {
+                    val low = args.getInt(ARG_CUSTOM_BASS, Int.MIN_VALUE)
+                    val mid = args.getInt(ARG_CUSTOM_MID, Int.MIN_VALUE)
+                    val high = args.getInt(ARG_CUSTOM_TREBLE, Int.MIN_VALUE)
+                    if (listOf(low, mid, high).any { it !in -6..6 }) false else {
+                        val applied = effects.setCustom(low, mid, high)
+                        preferences.edit()
+                            .putInt("custom_bass", low)
+                            .putInt("custom_mid", mid)
+                            .putInt("custom_treble", high)
+                            .putString("preset", "Custom")
+                            .apply()
+                        applied
+                    }
+                }
                 CMD_SET_SLEEP -> {
                     val minutes = args.getInt(ARG_MINUTES, -1)
                     if (minutes !in listOf(0, 15, 30, 60)) false else {
@@ -167,6 +194,10 @@ class PlaybackService : MediaSessionService() {
                 putBoolean(ARG_BASS_SUPPORTED, effects.hasBassBoost)
                 putString(ARG_PRESET, effects.preset)
                 putInt(ARG_BASS, effects.bass)
+                putInt(ARG_CUSTOM_BASS, effects.customBassDb)
+                putInt(ARG_CUSTOM_MID, effects.customMidDb)
+                putInt(ARG_CUSTOM_TREBLE, effects.customTrebleDb)
+                putInt(ARG_AUDIO_SESSION_ID, player.audioSessionId)
                 val left = (sleepUntilMillis - android.os.SystemClock.elapsedRealtime())
                     .coerceAtLeast(0L)
                 putInt(ARG_MINUTES, if (left == 0L) 0 else ((left + 59_999L) / 60_000L).toInt())
