@@ -7,6 +7,9 @@ import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.Button
 import android.widget.TextView
+import android.widget.EditText
+import android.widget.Toast
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -32,6 +35,29 @@ class LocalVideoActivity : Activity() {
                 }, requestVideo)
             }
         })
+        val urlInput = EditText(this).apply {
+            hint = "Paste authorized HTTPS video URL (.mp4 / .m3u8 / .mpd)"
+            setSingleLine(true)
+        }
+        layout.addView(urlInput)
+        layout.addView(Button(this).apply {
+            text = "Play online URL"
+            setOnClickListener {
+                val url = urlInput.text.toString().trim()
+                when (VideoUrlRouter.classify(url)) {
+                    VideoUrlRouter.Kind.HLS -> play(Uri.parse(url), MimeTypes.APPLICATION_M3U8)
+                    VideoUrlRouter.Kind.DASH -> play(Uri.parse(url), MimeTypes.APPLICATION_MPD)
+                    VideoUrlRouter.Kind.VIDEO -> play(Uri.parse(url), null)
+                    VideoUrlRouter.Kind.YOUTUBE -> startActivity(
+                        Intent(this@LocalVideoActivity, ProviderBrowserActivity::class.java)
+                            .putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, "YouTube"))
+                    VideoUrlRouter.Kind.WEBPAGE -> Toast.makeText(this@LocalVideoActivity,
+                        "Webpage is not a direct video stream", Toast.LENGTH_LONG).show()
+                    VideoUrlRouter.Kind.INVALID -> Toast.makeText(this@LocalVideoActivity,
+                        "Use a valid public HTTPS media URL", Toast.LENGTH_LONG).show()
+                }
+            }
+        })
         view = PlayerView(this).apply { useController = true }
         layout.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(layout)
@@ -43,10 +69,13 @@ class LocalVideoActivity : Activity() {
         val uri = data?.data ?: return
         if (uri.scheme != "content") return
         contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        play(uri, null)
+    }
+    private fun play(uri: Uri, mimeType: String?) {
         player?.release()
         player = ExoPlayer.Builder(this).build().also {
             view?.player = it
-            it.setMediaItem(MediaItem.fromUri(uri))
+            it.setMediaItem(MediaItem.Builder().setUri(uri).apply { if (mimeType != null) setMimeType(mimeType) }.build())
             it.prepare()
             it.playWhenReady = true
         }
