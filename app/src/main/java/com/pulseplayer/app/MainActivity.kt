@@ -1189,7 +1189,7 @@ class MainActivity : Activity() {
             })
         }
         addDestination("♫ Music") { switchPlaylist("DEVICE") }
-        addDestination("🎬 Movies") { showCinemaCategories() }
+        addDestination("🎬 Movies") { startActivity(Intent(this, CinemaActivity::class.java)) }
         addDestination("▣ ShortTV") { startActivity(Intent(this, StoryHubActivity::class.java)) }
         addDestination("⇩ Files") { showPicker("Files", arrayOf("Import audio file", "Import audio folder")) { index ->
             if (index == 0) openFilePicker() else openFolderPicker()
