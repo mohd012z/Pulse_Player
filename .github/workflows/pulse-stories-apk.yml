@@ -21,7 +21,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Verify preinstalled Android SDK
+        run: test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || command -v sdkmanager
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
