@@ -116,6 +116,9 @@ class CinemaActivity : Activity() {
         hero.addView(button("▶ Online short drama search") {
             openProvider("Short Drama")
         })
+        hero.addView(button("▶ Play online video URL (MP4 / HLS / DASH)") {
+            startActivity(Intent(this,LocalVideoActivity::class.java))
+        })
         hero.addView(button("▶ Play a video from my device") {
             startActivity(Intent(this,LocalVideoActivity::class.java))
         })
