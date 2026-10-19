@@ -1,6 +1,7 @@
 package com.pulseplayer.app
 
 import java.util.Locale
+import android.content.Context
 
 /**
  * Fail-closed catalog filtering. Applies to all remote discovery, search, rails and cached results.
@@ -20,6 +21,14 @@ object PulseCatalogPolicy {
     private val safeCertifications = setOf("u", "g", "pg", "pg-13", "12", "12a", "13", "tv-y", "tv-y7", "tv-g", "tv-pg", "tv-14")
 
     enum class RatingMode { STANDARD, FAMILY_FRIENDLY }
+
+    fun configuredMode(context: Context): RatingMode {
+        val stored = context.getSharedPreferences("pulse_catalog", Context.MODE_PRIVATE)
+            .getString("rating_mode", RatingMode.STANDARD.name)
+        return if (stored == RatingMode.FAMILY_FRIENDLY.name) RatingMode.FAMILY_FRIENDLY else RatingMode.STANDARD
+    }
+
+    fun allowConfigured(context: Context, entry: Entry): Boolean = allow(entry, configuredMode(context))
 
     fun allow(entry: Entry, mode: RatingMode = RatingMode.STANDARD): Boolean {
         if (entry.category?.trim()?.lowercase(Locale.ROOT) in excludedCategories) return false
