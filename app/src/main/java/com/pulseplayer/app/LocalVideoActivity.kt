@@ -10,6 +10,8 @@ import android.widget.TextView
 import android.widget.EditText
 import android.widget.Toast
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -68,13 +70,21 @@ class LocalVideoActivity : Activity() {
         if (requestCode != requestVideo || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         if (uri.scheme != "content") return
-        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } // Some document providers only grant a temporary read permission.
         play(uri, null)
     }
     private fun play(uri: Uri, mimeType: String?) {
         player?.release()
         player = ExoPlayer.Builder(this).build().also {
             view?.player = it
+            it.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    Toast.makeText(this@LocalVideoActivity,
+                        "Playback failed: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+                }
+            })
             it.setMediaItem(MediaItem.Builder().setUri(uri).apply { if (mimeType != null) setMimeType(mimeType) }.build())
             it.prepare()
             it.playWhenReady = true
