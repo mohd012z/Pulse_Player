@@ -8,6 +8,14 @@ The bundled navigation declares five primary tabs (Home, NovelHub, Fight Zone, D
 
 The static APK also includes native codec/player libraries and offline mini-app packages. Their presence alone **does not** prove a URL is currently playable, licensed, or available on a given device.
 
+## Pulse catalog exclusions
+
+The MovieBox category named `Nollywood` is **not included** in Pulse Player's navigation, home rails, category chips, recommendations, or imported MovieBox category mapping.
+
+Apply exclusion at the **category ID/label** level, not by actor identity, language, nationality, or a broad origin-country ban. Titles in general Movie/TV search are not automatically removed solely because they were produced in Nigeria.
+
+Use a canonical category mapping before display; reject the normalized exact category ID `nollywood` from navigation and any category-specific feed. Do not rely on a text substring in a film title. Apply the same category exclusion to search facets, home-page recommendations and cached category lists.
+
 ## Playback routing — design target
 
 | Source | Player | Requirement | Fallback |
