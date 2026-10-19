@@ -1189,7 +1189,7 @@ class MainActivity : Activity() {
             })
         }
         addDestination("♫ Music") { switchPlaylist("DEVICE") }
-        addDestination("🎬 Movies") { startActivity(Intent(this, StoryHubActivity::class.java)) }
+        addDestination("🎬 Movies") { showCinemaCategories() }
         addDestination("▣ ShortTV") { startActivity(Intent(this, StoryHubActivity::class.java)) }
         addDestination("⇩ Files") { showPicker("Files", arrayOf("Import audio file", "Import audio folder")) { index ->
             if (index == 0) openFilePicker() else openFolderPicker()
@@ -1324,6 +1324,28 @@ class MainActivity : Activity() {
                 topMargin = dp(6)
             })
         }
+    }
+
+    private fun showCinemaCategories() {
+        val categories = PulseCatalogNavigation.visibleCategories()
+            .filterNot { it.sourceCode.equals("Nollywood", ignoreCase = true) }
+        val labels = categories.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Pulse Cinema · Categories")
+            .setItems(labels) { _, index ->
+                val chosen = categories[index]
+                if (chosen.sourceCode == "ShortTV_Discover" || chosen.sourceCode == "Novel") {
+                    startActivity(Intent(this, StoryHubActivity::class.java))
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle(chosen.label)
+                        .setMessage("Online catalog is not connected to an authorized provider yet. Your existing music and local stories remain available.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun isTelevisionUi(): Boolean =
