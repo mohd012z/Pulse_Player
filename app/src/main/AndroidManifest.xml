@@ -2,12 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-<<<<<<< HEAD
-=======
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Requested only if the user explicitly enables FFT visualization. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
->>>>>>> origin/main
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
