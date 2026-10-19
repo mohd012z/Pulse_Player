@@ -28,6 +28,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".StoryHubActivity" android:exported="false" />
+
         <service
             android:name=".PlaybackService"
             android:exported="true"
