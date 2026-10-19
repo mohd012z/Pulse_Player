@@ -1,0 +1,38 @@
+name: Approved Provider Health Monitor
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check approved public status endpoints
+        id: check
+        continue-on-error: true
+        env:
+          PULSE_PROVIDER_HEALTH_JSON: ${{ vars.PULSE_PROVIDER_HEALTH_JSON }}
+        run: python3 tools/provider_health_monitor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-health-report
+          path: provider-health.json
+          if-no-files-found: ignore
+      - name: Open or update alert issue
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Pulse provider health regression"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body "An approved provider status check failed. Inspect the workflow artifact, verify official provider changes and update adapters only through a tested PR. Do not bypass access restrictions."
+          else
+            gh issue comment "$existing" --body "Health check failed again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
