@@ -3,6 +3,7 @@ package com.pulseplayer.app
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -99,7 +100,13 @@ class CinemaActivity : Activity() {
         }
         hero.addView(text("PULSE CINEMA",if(tv()) 34f else 26f))
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
-        hero.addView(text("Discover content from approved providers. No licensed online movie catalog is connected yet.",13f))
+        hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
+        hero.addView(button("Browse Internet Archive films") {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://archive.org/details/feature_films")))
+        })
+        hero.addView(button("Browse Internet Archive animation") {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://archive.org/details/animationandcartoons")))
+        })
         hero.addView(button("▶ Open my Short Drama episodes") {
             startActivity(Intent(this,StoryHubActivity::class.java))
         })
