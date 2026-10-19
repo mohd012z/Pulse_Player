@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -21,6 +22,7 @@ class CinemaActivity : Activity() {
     private val accent = 0xFF8C5CF6.toInt()
     private lateinit var body: LinearLayout
     private var selected = "Trending"
+    private var query = ""
     private fun dp(v:Int) = (v * resources.displayMetrics.density + .5f).toInt()
     private fun tv() = (getSystemService(UI_MODE_SERVICE) as android.app.UiModeManager)
         .currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
@@ -47,17 +49,29 @@ class CinemaActivity : Activity() {
         }
         val title = text("▶  PULSE CINEMA",if(tv()) 27f else 21f)
         root.addView(title)
+        val search = EditText(this).apply {
+            hint = "Search your local library"; setSingleLine(true)
+            setTextColor(Color.WHITE); setHintTextColor(0xFFB6BCCB.toInt())
+            setText(query); minHeight = dp(if(tv()) 60 else 48)
+            setOnEditorActionListener { _, _, _ ->
+                query = text.toString().trim()
+                showLocalSearch(query)
+                true
+            }
+        }
+        root.addView(search)
         val scroller = ScrollView(this).apply { isFillViewport = true }
         body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroller.addView(body)
         root.addView(scroller,LinearLayout.LayoutParams(-1,0,1f))
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Home","Movies","ShortTV","Music","Settings").forEach { label ->
+        listOf("Home","Movies","ShortTV","Downloads","Me").forEach { label ->
             nav.addView(button(label) {
                 when(label) {
                     "Music" -> finish()
                     "ShortTV" -> startActivity(Intent(this,StoryHubActivity::class.java))
-                    "Settings" -> showSettings()
+                    "Downloads" -> showDownloads()
+                    "Me" -> showSettings()
                     "Movies" -> { selected = "Movies"; render() }
                     else -> { selected = "Trending"; render() }
                 }
@@ -120,6 +134,21 @@ class CinemaActivity : Activity() {
             rowScroll.addView(row)
             body.addView(rowScroll)
         }
+    }
+    private fun showLocalSearch(value:String) {
+        if (value.isBlank()) return
+        AlertDialog.Builder(this)
+            .setTitle("Search: $value")
+            .setMessage("Online title search requires an authorized catalog. Open ShortTV to browse locally imported episodes.")
+            .setPositiveButton("Open ShortTV") { _, _ ->
+                startActivity(Intent(this,StoryHubActivity::class.java))
+            }.setNegativeButton("Close",null).show()
+    }
+    private fun showDownloads() {
+        AlertDialog.Builder(this).setTitle("Downloads")
+            .setMessage("Existing audio downloads are managed in the Music player. Movie offline downloads require licensed providers.")
+            .setPositiveButton("Music downloads") { _, _ -> finish() }
+            .setNegativeButton("Close",null).show()
     }
     private fun showSettings() {
         val modes = arrayOf("Standard (PG-13 / TV-14)","Family Friendly (PG / TV-PG)")
