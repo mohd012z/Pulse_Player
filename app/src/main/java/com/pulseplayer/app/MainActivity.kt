@@ -1172,6 +1172,30 @@ class MainActivity : Activity() {
             background = panelBackground()
         }
         root.addView(dock)
+        // Persistent bottom destinations. Keep the existing music player and mini-player intact.
+        val bottomNavigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            contentDescription = "Pulse Player bottom navigation"
+        }
+        fun addDestination(label: String, click: () -> Unit) {
+            bottomNavigation.addView(button(label, click).apply {
+                isFocusable = true
+                contentDescription = label
+                minHeight = dp(if (isTelevisionUi()) 56 else 48)
+            }, LinearLayout.LayoutParams(0, dp(if (isTelevisionUi()) 60 else 50), 1f).apply {
+                marginStart = dp(2)
+                marginEnd = dp(2)
+            })
+        }
+        addDestination("♫ Music") { switchPlaylist("DEVICE") }
+        addDestination("🎬 Movies") { startActivity(Intent(this, StoryHubActivity::class.java)) }
+        addDestination("▣ ShortTV") { startActivity(Intent(this, StoryHubActivity::class.java)) }
+        addDestination("⇩ Files") { showPicker("Files", arrayOf("Import audio file", "Import audio folder")) { index ->
+            if (index == 0) openFilePicker() else openFolderPicker()
+        } }
+        addDestination("⚙ More") { showMoreMenu() }
+        root.addView(bottomNavigation)
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
@@ -1301,6 +1325,10 @@ class MainActivity : Activity() {
             })
         }
     }
+
+    private fun isTelevisionUi(): Boolean =
+        (getSystemService(UI_MODE_SERVICE) as android.app.UiModeManager)
+            .currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 }
