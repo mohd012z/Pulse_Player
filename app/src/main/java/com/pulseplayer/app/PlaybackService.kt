@@ -14,6 +14,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -44,6 +47,7 @@ class PlaybackService : MediaSessionService() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val effects = AudioEffectsManager()
+    private val pcmDsp = PulsePcmProcessor()
     private val preferences by lazy { getSharedPreferences("player_state", MODE_PRIVATE) }
     private lateinit var player: ExoPlayer
     private var session: MediaSession? = null
@@ -77,9 +81,22 @@ class PlaybackService : MediaSessionService() {
             preferences.getInt("custom_mid", 0),
             preferences.getInt("custom_treble", 0)
         )
-        effects.setPreset(preferences.getString("preset", "Flat") ?: "Flat")
         effects.setBass(preferences.getInt("bass", 0))
-        player = ExoPlayer.Builder(this)
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioOutputPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(false)
+                    .setEnableAudioTrackPlaybackParams(enableAudioOutputPlaybackParams)
+                    .setAudioProcessors(arrayOf(pcmDsp))
+                    .build()
+            }
+        }
+        pcmDsp.enabled = PulsePcmProcessor.available() && preferences.getBoolean("native_dsp", false)
+        player = ExoPlayer.Builder(this, renderers)
             .setHandleAudioBecomingNoisy(true)
             // Keep CPU/Wi-Fi available while network audio is actively playing.
             // ExoPlayer manages lock acquisition and release with playback state.

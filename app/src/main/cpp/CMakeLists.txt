@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(pulse_dsp LANGUAGES CXX)
+add_library(pulse_dsp SHARED pulse_dsp_jni.cpp)
+target_compile_features(pulse_dsp PRIVATE cxx_std_17)
+target_compile_options(pulse_dsp PRIVATE -Wall -Wextra)
