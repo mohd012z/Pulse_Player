@@ -101,6 +101,9 @@ class CinemaActivity : Activity() {
         hero.addView(text("PULSE CINEMA",if(tv()) 34f else 26f))
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
         hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
+        hero.addView(button("▶ Play a video from my device") {
+            startActivity(Intent(this,LocalVideoActivity::class.java))
+        })
         hero.addView(button("Browse Internet Archive films") {
             openArchive(ArchiveBrowserActivity.FILMS)
         })
