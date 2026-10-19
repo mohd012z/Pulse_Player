@@ -1,5 +1,6 @@
 package com.pulseplayer.app
 
+import com.pulseplayer.ui.dialogs.Phase1InspectorDialog
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -83,6 +84,7 @@ class MainActivity : Activity() {
     private var activeSpectrumSession = -1
     private var spectrumRequestPending = false
     private var spectrumRetryAtMs = 0L
+    private val powerSaving by lazy { PowerSavingManager(this) }
     private var customLow = 0
     private var customMid = 0
     private var customHigh = 0
@@ -129,7 +131,7 @@ class MainActivity : Activity() {
             if (controller?.isPlaying == true && spectrumView == null && !spectrumRequestPending &&
                 android.os.SystemClock.elapsedRealtime() >= spectrumRetryAtMs) startSpectrumIfPermitted()
             refreshNetworkSpeed()
-            clock.postDelayed(this, 750L)
+            clock.postDelayed(this, powerSaving.refreshIntervalMillis(controller?.isPlaying == true))
         }
     }
 
@@ -655,6 +657,10 @@ class MainActivity : Activity() {
     }
 
     private fun requestSpectrum() {
+        if (!powerSaving.allowSpectrum()) {
+            status("Spectrum disabled in Ultra Saving. Change Power Saving mode to enable it.")
+            return
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             AlertDialog.Builder(this)
                 .setTitle("Optional live audio visualizer")
@@ -952,6 +958,12 @@ class MainActivity : Activity() {
             "MY FM" -> "https://my.com.my/"
             else -> return
         }
+        if (destination in listOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+            val mode = powerSaving.effectiveMode()
+            if (mode != PowerSavingManager.Mode.OFF) {
+                status("$destination opens in its own app/browser; Pulse Player cannot control its video quality or battery usage. Power mode: ${mode.name}.")
+            }
+        }
         runCatching {
             if (destination in setOf("Spotify", "JOOX", "YouTube", "YouTube Music", "YouTube Shorts", "Short Drama")) {
                 startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
@@ -1087,7 +1099,9 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Download & Convert (local video)", "Authorized direct download", "Device performance profile"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song",
+        "Download & Convert (local video)", "Authorized direct download", "Device performance profile",
+        "Power saving mode", "Inspect media URL"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -1130,7 +1144,29 @@ class MainActivity : Activity() {
             9 -> startActivity(Intent(this, MediaExportActivity::class.java))
             10 -> startActivity(Intent(this, AuthorizedDownloadActivity::class.java))
             11 -> showPerformanceSettings()
+            12 -> showPowerSavingDialog()
+            13 -> Phase1InspectorDialog.show(this)
         }
+    }
+
+    private fun showPowerSavingDialog() {
+        val modes = PowerSavingManager.Mode.values()
+        val labels = arrayOf(
+            "Auto Smart · adapt to battery level",
+            "Eco · slower interface refresh",
+            "Ultra Saving · minimal optional UI activity",
+            "Off · normal performance"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Smart Power Saving")
+            .setSingleChoiceItems(labels, modes.indexOf(powerSaving.mode)) { dialog, selected ->
+                powerSaving.mode = modes[selected]
+                if (!powerSaving.allowSpectrum()) spectrumView?.stop()
+                status("Power mode: ${powerSaving.mode.name} · effective ${powerSaving.effectiveMode().name}")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showAudioMenu() = showPicker("Sound · local and radio only", arrayOf(
