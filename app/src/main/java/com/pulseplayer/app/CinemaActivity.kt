@@ -88,6 +88,9 @@ class CinemaActivity : Activity() {
         outState.putString("category",selected)
         super.onSaveInstanceState(outState)
     }
+    private fun openOnline(url: String) {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+    }
     private fun render() {
         body.removeAllViews()
         val hero = LinearLayout(this).apply {
@@ -101,6 +104,15 @@ class CinemaActivity : Activity() {
         hero.addView(text("PULSE CINEMA",if(tv()) 34f else 26f))
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
         hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
+        hero.addView(button("▶ YouTube · official online video") {
+            openOnline("https://www.youtube.com/")
+        })
+        hero.addView(button("▶ YouTube Shorts · online") {
+            openOnline("https://www.youtube.com/shorts")
+        })
+        hero.addView(button("▶ Online short drama search") {
+            openOnline("https://www.youtube.com/results?search_query=short+drama")
+        })
         hero.addView(button("▶ Play a video from my device") {
             startActivity(Intent(this,LocalVideoActivity::class.java))
         })
