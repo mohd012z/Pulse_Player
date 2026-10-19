@@ -930,7 +930,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
         "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Power saving mode", "Inspect media URL"
+        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Power saving mode", "Inspect media URL", "🎬 Short Drama & 📖 Novel"
     )) { index ->
         when (index) {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
@@ -971,6 +971,7 @@ class MainActivity : Activity() {
             8 -> shareCurrentTrack()
             9 -> showPowerSavingDialog()
             10 -> Phase1InspectorDialog.show(this)
+            11 -> startActivity(Intent(this, StoryHubActivity::class.java))
         }
     }
 
