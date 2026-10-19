@@ -28,6 +28,6 @@ class PulseCatalogPolicyTest {
 
     @Test fun filtersEveryItemBeforeDisplay() {
         val input = listOf(item(), item(rating = "18+"), item(category = "Nollywood"))
-        assertEquals(1, PulseCatalogPolicy.filter(input) { it }.size)
+        assertEquals(1, PulseCatalogPolicy.filter(input, { it }).size)
     }
 }
