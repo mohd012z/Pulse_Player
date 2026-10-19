@@ -8,9 +8,7 @@ import android.os.Bundle
 import android.os.Build
 import android.content.res.Configuration
 import android.view.WindowInsets
-import android.view.WindowManager
 import android.view.Gravity
-import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -75,6 +73,7 @@ class StoryHubActivity : Activity() {
             text = label
             isAllCaps = false
             minHeight = dp(if (isTelevision()) 64 else 50)
+            maxLines = 2
             isFocusable = true
             setOnClickListener { onClick() }
         }
