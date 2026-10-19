@@ -877,6 +877,19 @@ class MainActivity : Activity() {
                 station.name.contains(query, ignoreCase = true)
         }
 
+    /** Station discovery only: no guessed live video IDs or stream extraction. */
+    private fun showMalaysiaYouTubeRadio() {
+        val stations = arrayOf("ERA", "SINAR", "HITZ", "MY FM", "RAAGA", "Suria FM", "Fly FM", "Hot FM", "IKIM FM", "RTM Nasional FM", "RTM TraXX FM", "BFM 89.9")
+        showPicker("Malaysia YouTube Radio · find official live broadcasts", stations) { index ->
+            val query = stations[index] + " Malaysia official radio live"
+            val uri = Uri.Builder().scheme("https").authority("www.youtube.com").path("/results")
+                .appendQueryParameter("search_query", query).build()
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addCategory(Intent.CATEGORY_BROWSABLE) })
+            }.onFailure { status("Unable to open YouTube search: ${it.message}") }
+        }
+    }
+
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
@@ -936,8 +949,8 @@ class MainActivity : Activity() {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
+            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "Malaysia YouTube Radio", "JOOX", "Spotify")) {
+                if (it == 2) showMalaysiaYouTubeRadio() else openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[if (it > 2) it - 1 else it])
             }
             2 -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
