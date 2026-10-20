@@ -66,13 +66,11 @@ class CinemaActivity : Activity() {
         scroller.addView(body)
         root.addView(scroller,LinearLayout.LayoutParams(-1,0,1f))
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Music","Movies","ShortTV","Downloads","Me").forEach { label ->
+        listOf("Movies","ShortTV","Ratings").forEach { label ->
             nav.addView(button(label) {
                 when(label) {
-                    "Music" -> finish()
                     "ShortTV" -> startActivity(Intent(this,StoryHubActivity::class.java))
-                    "Downloads" -> showDownloads()
-                    "Me" -> showSettings()
+                    "Ratings" -> showSettings()
                     "Movies" -> { selected = "Movies"; render() }
                     else -> { selected = "Trending"; render() }
                 }
@@ -106,7 +104,7 @@ class CinemaActivity : Activity() {
         }
         hero.addView(text("PULSE CINEMA",if(tv()) 34f else 26f))
         hero.addView(text("Movies · Series · Anime · Short Drama · Novels",14f))
-        hero.addView(text("Browse public collections from Internet Archive or play your own episodes. Availability and rights vary by title.",13f))
+        hero.addView(text("Online video sources · public film collections · short drama. Availability varies by provider.",13f))
         hero.addView(button("▶ YouTube · official online video") {
             openProvider("YouTube")
         })
@@ -118,18 +116,6 @@ class CinemaActivity : Activity() {
         })
         hero.addView(button("▶ Play online video URL (MP4 / HLS / DASH)") {
             startActivity(Intent(this,LocalVideoActivity::class.java))
-        })
-        hero.addView(button("▶ Play a video from my device") {
-            startActivity(Intent(this,LocalVideoActivity::class.java))
-        })
-        hero.addView(button("Browse Internet Archive films") {
-            openArchive(ArchiveBrowserActivity.FILMS)
-        })
-        hero.addView(button("Browse Internet Archive animation") {
-            openArchive(ArchiveBrowserActivity.ANIMATION)
-        })
-        hero.addView(button("▶ Open my Short Drama episodes") {
-            startActivity(Intent(this,StoryHubActivity::class.java))
         })
         body.addView(hero)
         body.addView(text("Explore  •  $selected",19f))
