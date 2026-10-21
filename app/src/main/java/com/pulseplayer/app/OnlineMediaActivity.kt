@@ -44,6 +44,7 @@ class OnlineMediaActivity : Activity() {
     private val sessionStore by lazy { getSharedPreferences("pulse_browser_session", MODE_PRIVATE) }
     private var activeProvider = ""
     private var homeUrl = ""
+    private val ytDlp by lazy { YtDlpManager(this) }
 
     private fun allowedSessionUrl(value: String?): Boolean {
         val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return false
@@ -427,10 +428,8 @@ class OnlineMediaActivity : Activity() {
         if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
             AlertDialog.Builder(this)
                 .setTitle("YouTube download")
-                .setMessage("YouTube watch pages are streaming pages, not downloadable media files. For videos with offline access, use YouTube's official Download feature where available. Pulse Player can save direct, authorized MP3/MP4 files.")
-                .setPositiveButton("My uploads · Studio") { _, _ ->
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://studio.youtube.com/")))
-                }
+                .setMessage("Save the current YouTube / YT Music track to your music library. Pulse downloads the audio with its bundled engine (MP3/FLAC/M4A/OPUS) — no YouTube Premium needed.")
+                .setPositiveButton("⬇ Download this track") { _, _ -> startYtDownload(current) }
                 .setNeutralButton("Direct file URL") { _, _ -> showDirectMediaDownload() }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -442,23 +441,29 @@ class OnlineMediaActivity : Activity() {
         val input = android.widget.EditText(this).apply {
             setSingleLine(true)
             setText(detected)
-            hint = "Direct HTTPS MP3, M4A, MP4 or WEBM URL"
+            hint = "YouTube link, or a direct HTTPS MP3/M4A/MP4/WEBM URL"
             selectAll()
         }
         AlertDialog.Builder(this)
             .setTitle("Save media · auto-detected URL")
-            .setMessage("Paste a direct authorized HTTPS MP3/MP4 file URL. YouTube watch pages are not direct file links.")
+            .setMessage("Paste a YouTube / YT Music link (downloaded as audio), or a direct authorized HTTPS MP3/MP4 file URL.")
             .setView(input)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Continue") { _, _ ->
                 val raw = input.text.toString().trim()
+                // YouTube / YT Music links are streaming pages, not files: route
+                // them through the bundled yt-dlp engine instead of the file check.
+                if (YtDlpManager.isSupportedUrl(raw)) {
+                    startYtDownload(raw)
+                    return@setPositiveButton
+                }
                 val uri = runCatching { Uri.parse(raw) }.getOrNull()
                 val extension = uri?.lastPathSegment?.substringBefore('?')?.substringAfterLast('.', "")?.lowercase().orEmpty()
                 val allowed = mapOf("mp3" to "audio/mpeg", "m4a" to "audio/mp4",
                     "aac" to "audio/aac", "wav" to "audio/wav",
                     "mp4" to "video/mp4", "webm" to "video/webm")
                 if (uri?.scheme != "https" || uri.host.isNullOrBlank() || extension !in allowed) {
-                    Toast.makeText(this, "Not a direct media file. Paste an authorized HTTPS file link.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Not a direct media file. Paste a YouTube link or an authorized HTTPS file link.", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
                 AlertDialog.Builder(this)
@@ -469,6 +474,77 @@ class OnlineMediaActivity : Activity() {
                     .setNegativeButton("Cancel", null)
                     .show()
             }.show()
+    }
+
+    /** Download a YouTube / YT Music link as audio via the bundled yt-dlp engine,
+     *  then register it in the music library (MediaStore). */
+    private fun startYtDownload(url: String) {
+        if (!YtDlpManager.isSupportedUrl(url)) {
+            Toast.makeText(this, "Not a YouTube / YouTube Music link", Toast.LENGTH_LONG).show()
+            return
+        }
+        val formats = YtDlpManager.FORMATS.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("YouTube download · choose format")
+            .setMessage(url)
+            .setSingleChoiceItems(formats, 0) { d, which ->
+                d.dismiss()
+                val format = formats[which]
+                val thumb = android.widget.CheckBox(this).apply { text = "Save cover art thumbnail (jpg)" }
+                AlertDialog.Builder(this)
+                    .setTitle("Download as $format?")
+                    .setView(thumb)
+                    .setPositiveButton("Start") { _, _ -> startYtDownload(url, format, thumb.isChecked) }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun startYtDownload(url: String, format: String, withThumb: Boolean) {
+        val progressView = android.widget.TextView(this).apply {
+            textSize = 14f
+            setPadding(dp(12), dp(12), dp(12), dp(8))
+            text = "Starting…"
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Downloading…")
+            .setMessage(url)
+            .setView(progressView)
+            .setCancelable(false)
+            .setNegativeButton("Cancel") { d, _ -> ytDlp.cancel(); d.dismiss() }
+            .create()
+        dialog.show()
+        ytDlp.start(
+            url = url,
+            format = format,
+            writeThumbnail = withThumb,
+            onProgress = { p ->
+                runOnUiThread {
+                    val speedPart = p.speed?.let { " · $it" }.orEmpty()
+                    val etaPart = p.etaSeconds?.let { s -> " · ETA ${"%d:%02d".format(s / 60, s % 60)}" }.orEmpty()
+                    progressView.text = "Downloading… ${"%.1f".format(p.percent)}%$speedPart$etaPart"
+                }
+            },
+            onComplete = { files ->
+                kotlin.concurrent.thread {
+                    files.forEach { ytDlp.importToMediaStore(it) }
+                    runOnUiThread {
+                        dialog.dismiss()
+                        Toast.makeText(this,
+                            if (files.isNotEmpty()) "Saved ${files.size} file(s) to your music library" else "Download finished — no audio file found",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onError = { message ->
+                runOnUiThread {
+                    dialog.dismiss()
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            },
+        )
     }
 
     private fun enqueueMediaDownload(uri: Uri, extension: String, mime: String, music: Boolean) {
