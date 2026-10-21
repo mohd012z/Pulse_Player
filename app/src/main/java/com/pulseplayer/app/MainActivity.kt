@@ -878,6 +878,28 @@ class MainActivity : Activity() {
                 station.name.contains(query, ignoreCase = true)
         }
 
+    private fun showYouTubeEmbedDialog() {
+        val input = EditText(this).apply {
+            hint = "Paste YouTube video or playlist URL"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("YouTube · embedded player")
+            .setView(input)
+            .setPositiveButton("Play") { _, _ ->
+                val url = input.text.toString().trim()
+                if (YouTubeLinkParser.embedUrl(url) == null) {
+                    status("Invalid YouTube video or playlist URL")
+                } else {
+                    startActivity(Intent(this, YouTubePlayerActivity::class.java)
+                        .putExtra(YouTubePlayerActivity.EXTRA_URL, url))
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
@@ -937,8 +959,14 @@ class MainActivity : Activity() {
             0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
-                openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
+            1 -> showPicker("Online music · official services", arrayOf("YouTube · embedded link", "YouTube · official", "YouTube Music · official", "JOOX", "Spotify")) {
+                when (it) {
+                    0 -> showYouTubeEmbedDialog()
+                    1 -> openProvider("YouTube")
+                    2 -> openProvider("YouTube Music")
+                    3 -> openProvider("JOOX")
+                    4 -> openProvider("Spotify")
+                }
             }
             2 -> showYtDownloadDialog()
             3 -> showPicker("Malaysia radio", arrayOf(
