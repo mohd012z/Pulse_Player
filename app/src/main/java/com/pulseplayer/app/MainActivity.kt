@@ -33,6 +33,7 @@ import android.view.WindowInsets
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
@@ -97,6 +98,8 @@ class MainActivity : Activity() {
     private var scanning = false
     private var pendingShortcut: String? = null
     private var pendingPickedUri: Uri? = null
+    private val ytDlp by lazy { YtDlpManager(this) }
+    private var pendingStream: Pair<Uri, String>? = null
     private var seeking = false
     private var bassStrength = 0
 
@@ -195,6 +198,10 @@ class MainActivity : Activity() {
             pendingPickedUri?.let { uri ->
                 pendingPickedUri = null
                 playDocument(uri)
+            }
+            pendingStream?.let { (uri, name) ->
+                pendingStream = null
+                playStream(uri, name)
             }
             resolvePendingAction()
         }, uiExecutor)
@@ -796,6 +803,163 @@ class MainActivity : Activity() {
         status("Opened: $name")
     }
 
+    /** Play a resolved raw stream (ad-free YouTube) via media3. If the playback
+     *  service is not connected yet, queue it and start once the controller is ready. */
+    private fun playStream(uri: Uri, name: String) {
+        val c = controller ?: run { pendingStream = uri to name; return }
+        val item = MediaItem.Builder().setUri(uri)
+            .setMediaId(uri.toString())
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(name).build())
+            .build()
+        c.setMediaItem(item)
+        c.prepare()
+        c.play()
+        status("Playing (no ads): $name")
+    }
+
+    /** YouTube / YT Music audio download: format + optional thumbnail → URL → live progress. */
+    private fun showYtDownloadDialog() {
+        val fmt = arrayOf("MP3", "FLAC", "M4A", "OPUS")
+        var chosen = "MP3"
+        val thumb = CheckBox(this).apply { text = "Save cover art thumbnail (jpg)" }
+        val fmtView = TextView(this).apply {
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(10), dp(12), dp(6))
+            text = "Format: MP3"
+        }
+        fmtView.setOnClickListener {
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Choose audio format")
+                .setItems(fmt) { d, i ->
+                    chosen = fmt[i]
+                    fmtView.text = "Format: $chosen"
+                    d.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(fmtView)
+            addView(thumb, LinearLayout.LayoutParams(-1, -2))
+        }
+        val inputDialog = AlertDialog.Builder(this)
+            .setTitle("Download YouTube / YT Music audio")
+            .setMessage("Pick a format, paste a link, then Start. Saves to your music library (MediaStore).")
+            .setView(body)
+            .setNegativeButton("Close", null)
+            .setPositiveButton("Next") { _, _ ->
+                val urlEdit = EditText(this).apply {
+                    hint = "https://youtube.com/watch?v=…  or  https://youtu.be/…"
+                    setSingleLine(true)
+                    setPadding(dp(10), dp(8), dp(10), dp(8))
+                }
+                val urlDialog = AlertDialog.Builder(this)
+                    .setTitle("Paste the YouTube / YT Music link")
+                    .setView(urlEdit)
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Start download") { d, _ ->
+                        d.dismiss()
+                        startYtDownload(urlEdit.text.toString(), chosen, thumb.isChecked)
+                    }
+                    .show()
+            }
+            .show()
+    }
+
+    /** Ad-free in-app YouTube playback: yt-dlp resolves the raw audio stream,
+     *  media3 plays it directly (no YouTube UI, no ads). */
+    private fun showYtPlayDialog() {
+        val urlEdit = EditText(this).apply {
+            hint = "https://youtube.com/watch?v=…  or  https://youtu.be/…"
+            setSingleLine(true)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(urlEdit)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Play YouTube — no ads")
+            .setMessage("Paste a link. Pulse resolves the audio stream directly and plays it in-app, so no YouTube ads appear.")
+            .setView(body)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Play") { d, _ ->
+                d.dismiss()
+                startYtPlay(urlEdit.text.toString())
+            }
+            .show()
+    }
+
+    private fun startYtPlay(rawUrl: String) {
+        val url = rawUrl.trim()
+        if (!YtDlpManager.isSupportedUrl(url)) {
+            status("Not a YouTube / YouTube Music link")
+            return
+        }
+        status("Resolving stream (ad-free)…")
+        thread {
+            val streamUrl = try {
+                YtDlpManager.resolveStream(ytDlp.ensureBinary(), url)
+            } catch (e: Exception) {
+                clock.post { status("Could not resolve: ${e.message}") }
+                return@thread
+            }
+            clock.post {
+                playStream(Uri.parse(streamUrl), "YouTube audio (no ads)")
+            }
+        }
+    }
+
+    private fun startYtDownload(rawUrl: String, format: String, withThumb: Boolean) {
+        val url = rawUrl.trim()
+        val progressView = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(dp(12), dp(12), dp(12), dp(8))
+            text = "Starting…"
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Downloading…")
+            .setView(progressView)
+            .setCancelable(false)
+            .setNegativeButton("Cancel") { d, _ -> ytDlp.cancel(); d.dismiss() }
+            .create()
+        dialog.show()
+        ytDlp.start(
+            url = url,
+            format = format,
+            writeThumbnail = withThumb,
+            onProgress = { p ->
+                clock.post {
+                    val speedPart = p.speed?.let { " · $it" }.orEmpty()
+                    val etaPart = p.etaSeconds?.let { s -> " · ETA ${"%d:%02d".format(s / 60, s % 60)}" }.orEmpty()
+                    progressView.text = "Downloading… ${"%.1f".format(p.percent)}%$speedPart$etaPart"
+                }
+            },
+            onComplete = { files ->
+                thread {
+                    files.forEach { ytDlp.importToMediaStore(it) }
+                    clock.post {
+                        dialog.dismiss()
+                        val dir = runCatching { ytDlp.resolveDownloadDir() }.getOrNull()
+                        val count = files.size
+                        status(if (count > 0)
+                            "Saved $count file(s) to music library" + (dir?.let { " · ${it.absolutePath}" } ?: "")
+                        else "Download finished — no audio file found")
+                    }
+                }
+            },
+            onError = { message ->
+                clock.post {
+                    dialog.dismiss()
+                    status(message)
+                }
+            },
+        )
+    }
+
     private fun openFilePicker() {
         val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -1319,6 +1483,11 @@ class MainActivity : Activity() {
             setOnClickListener { showMusicFilters() }
         }
         root.addView(filtersButton, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
+        // YouTube / YouTube Music quick actions (download + ad-free in-app play).
+        root.addView(buttonRow(
+            button("⬇  Download YT / YT Music", { showYtDownloadDialog() }),
+            button("♫  Play YT — no ads", { showYtPlayDialog() })
+        ))
         libraryView = label("Music library", 12f, COLOR_MUTED)
         root.addView(libraryView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
         trackAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, arrayListOf<String>()) {
