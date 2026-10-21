@@ -453,7 +453,7 @@ class OnlineMediaActivity : Activity() {
             .setPositiveButton("Continue") { _, _ ->
                 val raw = input.text.toString().trim()
                 val uri = runCatching { Uri.parse(raw) }.getOrNull()
-                val extension = uri?.lastPathSegment?.substringBefore('?')?.substringAfterLast('.', "")?.lowercase().orEmpty()
+                val extension = uri?.lastPathSegment?.substringAfterLast('.', "")?.lowercase().orEmpty()
                 val allowed = mapOf("mp3" to "audio/mpeg", "m4a" to "audio/mp4",
                     "aac" to "audio/aac", "wav" to "audio/wav",
                     "mp4" to "video/mp4", "webm" to "video/webm")
@@ -481,8 +481,60 @@ class OnlineMediaActivity : Activity() {
             .setDestinationInExternalPublicDir(directory, filename)
         val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
         runCatching { manager.enqueue(request) }
-            .onSuccess { Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show() }
+            .onSuccess { downloadId ->
+                Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show()
+                watchDownloadStatus(manager, downloadId)
+            }
             .onFailure { Toast.makeText(this, "Download unavailable: ${it.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    /**
+     * Android DownloadManager enqueue() only confirms scheduling, not successful transfer.
+     * Query the actual transfer result and report failures to the user.
+     */
+    private fun watchDownloadStatus(manager: android.app.DownloadManager, downloadId: Long) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        val check = object : Runnable {
+            override fun run() {
+                if (isFinishing || isDestroyed) return
+                val status = runCatching {
+                    manager.query(android.app.DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                        if (!cursor.moveToFirst()) return@use null
+                        val state = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS))
+                        val reason = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_REASON))
+                        state to reason
+                    }
+                }.getOrNull()
+                when (status?.first) {
+                    android.app.DownloadManager.STATUS_SUCCESSFUL ->
+                        Toast.makeText(this@OnlineMediaActivity, "Download completed. Check Music or Downloads.", Toast.LENGTH_LONG).show()
+                    android.app.DownloadManager.STATUS_FAILED ->
+                        Toast.makeText(this@OnlineMediaActivity, "Download failed: ${downloadFailureReason(status.second)}", Toast.LENGTH_LONG).show()
+                    null -> Toast.makeText(this@OnlineMediaActivity, "Download record unavailable.", Toast.LENGTH_LONG).show()
+                    else -> if (android.os.SystemClock.elapsedRealtime() - startedAt < 30L * 60L * 1000L) {
+                        handler.postDelayed(this, 2000L)
+                    } else {
+                        Toast.makeText(this@OnlineMediaActivity, "Download still pending. Check Android Downloads for progress.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+        handler.postDelayed(check, 2000L)
+    }
+
+    private fun downloadFailureReason(reason: Int): String = when (reason) {
+        android.app.DownloadManager.ERROR_CANNOT_RESUME -> "Server does not support resuming this transfer"
+        android.app.DownloadManager.ERROR_DEVICE_NOT_FOUND -> "Download storage unavailable"
+        android.app.DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "Destination file already exists"
+        android.app.DownloadManager.ERROR_FILE_ERROR -> "Unable to write the downloaded file"
+        android.app.DownloadManager.ERROR_HTTP_DATA_ERROR -> "HTTP connection or response error"
+        android.app.DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Insufficient device storage"
+        android.app.DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Too many server redirects"
+        android.app.DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Server rejected the download (HTTP error)"
+        android.app.DownloadManager.ERROR_UNKNOWN -> "Unknown Android download error"
+        in 400..599 -> "HTTP $reason from the media server"
+        else -> "Android reason code $reason"
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
