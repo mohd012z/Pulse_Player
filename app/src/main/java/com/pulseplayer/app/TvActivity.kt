@@ -2,6 +2,7 @@ package com.pulseplayer.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.pm.ActivityInfo
 import android.content.Intent
@@ -47,6 +48,7 @@ class TvActivity : Activity() {
     private lateinit var cinemaSections: LinearLayout
     private lateinit var librarySection: LinearLayout
     private lateinit var nav: LinearLayout
+    private lateinit var movieHeading: TextView
     private var currentTab = "Music"
     private var generation = 0
     private lateinit var title: TextView
@@ -75,7 +77,7 @@ class TvActivity : Activity() {
     private fun button(value: String, action: () -> Unit): Button =
         Button(this).apply {
             text = value
-            textSize = 15f
+            textSize = 13f
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = surface()
@@ -90,7 +92,7 @@ class TvActivity : Activity() {
 
     private fun addButton(row: LinearLayout, text: String, action: () -> Unit): Button {
         val b = button(text, action)
-        row.addView(b, LinearLayout.LayoutParams(0, 58, 1f).apply {
+        row.addView(b, LinearLayout.LayoutParams(0, 44, 1f).apply {
             marginEnd = 7
         })
         return b
@@ -108,22 +110,23 @@ class TvActivity : Activity() {
             setPadding(24, 18, 24, 14)
             setBackgroundColor(this@TvActivity.background)
         }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val brand = label("♫  PULSE PLAYER", 27f, accent).apply {
+        // Header is branding + search only. Every navigation button is in the bottom dock.
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val brand = label("♫ PULSE PLAYER", 25f, accent).apply {
             setTypeface(null, Typeface.BOLD)
         }
-        header.addView(brand, LinearLayout.LayoutParams(0, 60, 1f))
-        header.addView(label("MUSIC  •  RADIO  •  YOUTUBE  •  MOVIES", 13f, Color.LTGRAY))
-        root.addView(header)
-
+        header.addView(brand, LinearLayout.LayoutParams(290, 58))
         search = EditText(this).apply {
             setSingleLine(true)
-            textSize = 17f
-            hint = "Search songs, artists or Malay movies on YouTube"
+            textSize = 16f
+            hint = "Search MP3 / artist / station / YouTube / movie Melayu…"
             setHintTextColor(Color.LTGRAY)
             setTextColor(Color.WHITE)
             background = surface()
-            setPadding(22, 4, 22, 4)
+            setPadding(20, 2, 20, 2)
             imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
             setOnEditorActionListener { _, _, _ ->
                 if (currentTab == "Movie Melayu" || currentTab == "YouTube") {
@@ -134,7 +137,8 @@ class TvActivity : Activity() {
                 true
             }
         }
-        root.addView(search, LinearLayout.LayoutParams(-1, 52).apply { bottomMargin = 9 })
+        header.addView(search, LinearLayout.LayoutParams(0, 50, 1f))
+        root.addView(header, LinearLayout.LayoutParams(-1, 62).apply { bottomMargin = 8 })
 
         // Reference-inspired featured hero and horizontal movie discovery shelves.
         // These are YouTube search categories, not an unverified film catalogue.
@@ -152,18 +156,19 @@ class TvActivity : Activity() {
             ).apply { cornerRadius = 22f }
         }
         val featureText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        featureText.addView(label("MOVIE MELAYU", 14f, accent))
-        featureText.addView(label("Filem Melayu • YouTube", 30f).apply {
+        movieHeading = label("FEATURED • MOVIE MELAYU", 14f, accent)
+        featureText.addView(movieHeading)
+        featureText.addView(label("Discover Movies & Series", 30f).apply {
             setTypeface(null, Typeface.BOLD)
         }, LinearLayout.LayoutParams(-1, 60))
-        featureText.addView(label("Browse Malay-language movies, drama and classics using official YouTube search.", 16f, Color.LTGRAY),
+        featureText.addView(label("Malay films, new releases, drama, sports, learning and more. Choose a category below.", 16f, Color.LTGRAY),
             LinearLayout.LayoutParams(-1, 70))
         featureText.addView(label("Select a category to discover videos", 15f, accent))
         hero.addView(featureText, LinearLayout.LayoutParams(0, -2, 3f))
-        hero.addView(label("♫  PULSE CINEMA", 26f, accent).apply {
+        hero.addView(label("▶  PULSE CINEMA", 26f, accent).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, -1, 2f))
-        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 188).apply { bottomMargin = 10 })
+        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 170).apply { bottomMargin = 10 })
 
         fun shelf(heading: String, queries: List<Pair<String, String>>) {
             cinemaSections.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
@@ -192,7 +197,9 @@ class TvActivity : Activity() {
             cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 130).apply { bottomMargin = 12 })
         }
 
-        shelf("Popular Movie Melayu • Discover", listOf(
+        shelf("Featured Categories", listOf(
+            "New Movies" to "filem terbaru trailer rasmi",
+            "Movie Melayu" to "filem Melayu penuh rasmi",
             "Drama" to "filem Melayu drama penuh rasmi",
             "Seram" to "filem Melayu seram penuh rasmi",
             "Aksi" to "filem Melayu aksi penuh rasmi",
@@ -200,7 +207,7 @@ class TvActivity : Activity() {
             "Klasik" to "filem Melayu klasik rasmi",
             "Sejarah" to "filem Melayu sejarah penuh rasmi"
         ))
-        shelf("YouTube Movie Melayu • Categories", listOf(
+        shelf("More to Explore", listOf(
             "Filem Penuh" to "filem Melayu penuh rasmi",
             "Drama Bersiri" to "drama Melayu episod penuh rasmi",
             "Filem Keluarga" to "filem Melayu keluarga rasmi",
@@ -251,14 +258,15 @@ class TvActivity : Activity() {
         addButton(player, "▶▶") { controller?.seekToNextMediaItem() }
         root.addView(player, LinearLayout.LayoutParams(-1, 58).apply { topMargin = 6 })
 
-        nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         addButton(nav, "⌂ Home") { showSection("Home") }
         addButton(nav, "♫ Music") { showSection("Music") }
         addButton(nav, "▣ Radio") { showSection("Radio") }
-        addButton(nav, "▶ YouTube") { openYouTubeSearch("muzik Malaysia") }
-        addButton(nav, "▤ Movie Melayu") { showSection("Movie Melayu") }
-        addButton(nav, "☰ More") { startActivity(Intent(this, MainActivity::class.java)) }
-        root.addView(nav, LinearLayout.LayoutParams(-1, 54).apply { topMargin = 5 })
+        addButton(nav, "▶ YouTube") { currentTab = "YouTube"; openYouTubeSearch("muzik Malaysia") }
+        addButton(nav, "▤ Movies") { showSection("Movie Melayu"); showMovieFilter() }
+        addButton(nav, "☷ Categories") { showMovieFilter() }
+        addButton(nav, "⋯ More") { startActivity(Intent(this, MainActivity::class.java)) }
+        root.addView(nav, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 5 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
         showSection("Home")
@@ -273,6 +281,33 @@ class TvActivity : Activity() {
             "Radio" -> loadRadio()
             "Movie Melayu" -> title.text = "Movie Melayu"
         }
+    }
+
+    private fun showMovieFilter() {
+        val filters = listOf(
+            "New Movies" to "filem terbaru rasmi trailer",
+            "Movie Melayu" to "filem Melayu penuh rasmi",
+            "Drama Melayu" to "drama Melayu episod penuh rasmi",
+            "Short Drama" to "short drama Melayu episod",
+            "Drama Korea" to "drama Korea official episodes",
+            "Al-Quran" to "tilawah Al Quran rasmi",
+            "Nasyid" to "nasyid Malaysia rasmi",
+            "Paranormal & Mistik" to "kisah mistik paranormal dokumentari Melayu",
+            "5-Minute Crafts" to "5 minute crafts official",
+            "MotoGP" to "MotoGP official highlights",
+            "Formula One" to "Formula 1 official highlights",
+            "Ceramah" to "ceramah agama Malaysia rasmi",
+            "Documentary" to "dokumentari Bahasa Melayu rasmi"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Explore videos")
+            .setItems(filters.map { it.first }.toTypedArray()) { _, index ->
+                currentTab = "Movie Melayu"
+                movieHeading.text = "FEATURED • ${filters[index].first.uppercase()}"
+                openYouTubeSearch(filters[index].second)
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun openYouTubeSearch(query: String) {
