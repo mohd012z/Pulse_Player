@@ -1202,11 +1202,11 @@ class MainActivity : Activity() {
                 }
             }
         }
-        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(40), 2f))
+        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(36), 2f))
         primaryTabs.addView(button("🎬 Movies") { showMovieCategories() },
-            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(5) })
+            LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
         primaryTabs.addView(button("⋮ More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(5) })
+            LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
         tabs.addView(primaryTabs)
         // Bottom navigation is attached after the mini-player, not above the library.
 
