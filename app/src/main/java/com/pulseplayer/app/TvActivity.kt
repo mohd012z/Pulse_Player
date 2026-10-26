@@ -182,7 +182,7 @@ class TvActivity : Activity() {
 
         fun shelf(heading: String, queries: List<Pair<String, String>>) {
             cinemaSections.addView(label(heading, 17f).apply { setTypeface(null, Typeface.BOLD) },
-                LinearLayout.LayoutParams(-1, 43))
+                LinearLayout.LayoutParams(-1, 30))
             val scroller = HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
             }
@@ -190,7 +190,7 @@ class TvActivity : Activity() {
             queries.forEachIndexed { index, item ->
                 val tile = button(item.first) { openYouTubeSearch(item.second) }
                 tile.gravity = Gravity.BOTTOM or Gravity.START
-                tile.setPadding(10, 7, 10, 9)
+                tile.setPadding(8, 5, 8, 6)
                 tile.background = GradientDrawable(
                     GradientDrawable.Orientation.TL_BR,
                     intArrayOf(
@@ -201,10 +201,10 @@ class TvActivity : Activity() {
                     cornerRadius = 16f
                     setStroke(1, Color.rgb(55, 79, 98))
                 }
-                tiles.addView(tile, LinearLayout.LayoutParams(160, 88).apply { marginEnd = 9 })
+                tiles.addView(tile, LinearLayout.LayoutParams(132, 74).apply { marginEnd = 8 })
             }
             scroller.addView(tiles)
-            cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 98).apply { bottomMargin = 9 })
+            cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 82).apply { bottomMargin = 7 })
         }
 
         shelf("Featured Categories", listOf(
@@ -321,9 +321,9 @@ class TvActivity : Activity() {
             isFocusable = true
             isFocusableInTouchMode = true
         }
-        val close = button("✕ Close YouTube") { closeEmbeddedYouTube() }
+        val close = button("✕ Close") { closeEmbeddedYouTube() }
         frame.addView(web, FrameLayout.LayoutParams(-1, -1))
-        frame.addView(close, FrameLayout.LayoutParams(190, 52, Gravity.TOP or Gravity.RIGHT).apply {
+        frame.addView(close, FrameLayout.LayoutParams(125, 42, Gravity.TOP or Gravity.RIGHT).apply {
             topMargin = 10
             rightMargin = 12
         })
