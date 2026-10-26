@@ -1203,7 +1203,7 @@ class MainActivity : Activity() {
             }
         }
         primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(36), 2f))
-        primaryTabs.addView(button("🎬 Movies") { showMovieCategories() },
+        primaryTabs.addView(button("🎬 Movies") { startActivity(Intent(this, MovieBrowseActivity::class.java)) },
             LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
         primaryTabs.addView(button("⋮ More") { showMoreMenu() },
             LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
