@@ -1,5 +1,11 @@
 package com.pulseplayer.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.ArrayAdapter
+import android.widget.ListView
+import kotlin.concurrent.thread
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
@@ -21,6 +27,9 @@ class TvActivity : Activity() {
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private lateinit var status: TextView
+    private lateinit var list: ListView
+    private var entries: List<androidx.media3.common.MediaItem> = emptyList()
+    private var showingRadio = true
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = refresh()
     }
@@ -58,9 +67,24 @@ class TvActivity : Activity() {
         button("Play / Pause") { toggle() }
         button("Previous track") { controller?.seekToPreviousMediaItem() }
         button("Next track") { controller?.seekToNextMediaItem() }
-        button("Open full music library and radio") { startActivity(Intent(this, MainActivity::class.java)) }
+        button("Browse radio stations") { loadRadio() }
+        button("Browse device music") { loadMusic() }
+        list = ListView(this).apply {
+            isFocusable = true
+            setBackgroundColor(Color.rgb(27, 35, 49))
+            setOnItemClickListener { _, _, position, _ ->
+                controller?.apply {
+                    setMediaItems(entries, position, 0L)
+                    prepare()
+                    play()
+                }
+            }
+        }
+        root.addView(list, LinearLayout.LayoutParams(700, 0, 1f))
+        button("Open advanced phone interface") { startActivity(Intent(this, MainActivity::class.java)) }
         setContentView(root)
         root.getChildAt(2).requestFocus()
+        loadRadio()
     }
 
     override fun onStart() {
@@ -75,6 +99,36 @@ class TvActivity : Activity() {
                 refresh()
             }.onFailure { status.text = "Playback connection failed: ${it.message}" }
         }, mainExecutor)
+    }
+
+    private fun displayItems(items: List<androidx.media3.common.MediaItem>) {
+        entries = items
+        list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items.map { it.mediaMetadata.title?.toString() ?: "Untitled" })
+    }
+
+    private fun loadRadio() {
+        showingRadio = true
+        displayItems(RadioRepository(this).stations().map { it.toMediaItem() })
+    }
+
+    private fun loadMusic() {
+        showingRadio = false
+        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+        if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(permission), 201)
+            return
+        }
+        thread(name = "TvMusicScan") {
+            val result = runCatching { MusicRepository(applicationContext).scan().map { it.toMediaItem() } }
+            runOnUiThread { if (!isFinishing && !isDestroyed && !showingRadio) {
+                result.onSuccess { displayItems(it) }.onFailure { status.text = "Library scan failed: ${it.message}" }
+            } }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 201 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) loadMusic()
     }
 
     private fun toggle() {
