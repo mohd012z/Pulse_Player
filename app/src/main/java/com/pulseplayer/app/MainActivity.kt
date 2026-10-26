@@ -1183,7 +1183,7 @@ class MainActivity : Activity() {
         toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
+        // Keep the header clean: all navigation and actions live in the bottom dock.
         root.addView(toolbar)
 
         // Adaptive two-row navigation: prevent the old duplicate radio shortcut and
@@ -1203,7 +1203,7 @@ class MainActivity : Activity() {
         categoryTabs.addView(button("★ My Radio") { switchPlaylist("MY RADIO") },
             LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
         tabs.addView(categoryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        root.addView(tabs)
+        // Bottom navigation is attached after the mini-player, not above the library.
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
         root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -1343,6 +1343,13 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.END
         }
         dock.addView(progressView)
+
+        // Single bottom control area: source, FX, Music, Radio, My Radio and More.
+        val bottomNav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        bottomNav.addView(button("⋮ More") { showMoreMenu() },
+            LinearLayout.LayoutParams(0, dp(46), 1f))
+        tabs.addView(bottomNav, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+        root.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
     }
 
     private fun seekRelative(delta: Long) {
