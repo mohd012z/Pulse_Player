@@ -31,6 +31,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".MovieBrowseActivity" android:exported="false" />
+
         <activity android:name=".TvActivity" android:exported="true" android:screenOrientation="landscape" android:banner="@drawable/tv_banner">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
