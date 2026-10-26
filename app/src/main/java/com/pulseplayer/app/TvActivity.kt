@@ -11,6 +11,8 @@ import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -98,7 +100,7 @@ class TvActivity : Activity() {
                 it.addListener(listener)
                 refresh()
             }.onFailure { status.text = "Playback connection failed: ${it.message}" }
-        }, mainExecutor)
+        }, java.util.concurrent.Executor { task -> Handler(Looper.getMainLooper()).post(task) })
     }
 
     private fun displayItems(items: List<androidx.media3.common.MediaItem>) {
