@@ -21,6 +21,15 @@ class LocalVideoActivity : Activity() {
     private var player: ExoPlayer? = null
     private var view: PlayerView? = null
     private val requestVideo = 8122
+    private var playingUri: Uri? = null
+    private var playingMime: String? = null
+
+    companion object {
+        private const val EXTRA_URI = "movie_uri"
+        private const val EXTRA_MIME = "movie_mime"
+        private const val EXTRA_POS = "movie_pos"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -63,6 +72,28 @@ class LocalVideoActivity : Activity() {
         view = PlayerView(this).apply { useController = true }
         layout.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(layout)
+        restorePlayingMovie(savedInstanceState)
+    }
+
+    private fun restorePlayingMovie(savedInstanceState: Bundle?) {
+        val saved = savedInstanceState ?: return
+        if (!saved.containsKey(EXTRA_URI)) return
+        val uri = runCatching { Uri.parse(saved.getString(EXTRA_URI) ?: return) }.getOrNull() ?: return
+        val mime = saved.getString(EXTRA_MIME)
+        val pos = saved.getLong(EXTRA_POS, 0L)
+        // Rotation (configChanges) normally keeps the same player instance; this is the
+        // safety net for process-death or unexpected recreation.
+        play(uri, mime, pos)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        val p = player
+        if (p != null && playingUri != null) {
+            outState.putString(EXTRA_URI, playingUri.toString())
+            outState.putString(EXTRA_MIME, playingMime)
+            outState.putLong(EXTRA_POS, p.currentPosition.coerceAtLeast(0L))
+        }
+        super.onSaveInstanceState(outState)
     }
     @Deprecated("Activity result API maintained for compatibility with existing Activity code")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -75,7 +106,9 @@ class LocalVideoActivity : Activity() {
         } // Some document providers only grant a temporary read permission.
         play(uri, null)
     }
-    private fun play(uri: Uri, mimeType: String?) {
+    private fun play(uri: Uri, mimeType: String?, startPositionMs: Long = 0L) {
+        playingUri = uri
+        playingMime = mimeType
         player?.release()
         player = ExoPlayer.Builder(this).build().also {
             view?.player = it
@@ -87,11 +120,14 @@ class LocalVideoActivity : Activity() {
             })
             it.setMediaItem(MediaItem.Builder().setUri(uri).apply { if (mimeType != null) setMimeType(mimeType) }.build())
             it.prepare()
+            if (startPositionMs > 0L) it.seekTo(startPositionMs)
             it.playWhenReady = true
         }
     }
     override fun onStop() {
-        player?.pause()
+        // Pause only when the user leaves the video screen — not during rotation,
+        // where the activity briefly passes through STOP while staying visible.
+        if (!isChangingConfigurations()) player?.pause()
         super.onStop()
     }
     override fun onDestroy() {
