@@ -21,6 +21,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -128,10 +130,81 @@ class TvActivity : Activity() {
         }
         root.addView(search, LinearLayout.LayoutParams(-1, 56).apply { bottomMargin = 14 })
 
-        val content = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val left = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        title = label("Your Music", 24f).apply { setTypeface(null, Typeface.BOLD) }
-        left.addView(title, LinearLayout.LayoutParams(-1, 52))
+        // Reference-inspired featured hero and horizontal movie discovery shelves.
+        // These are YouTube search categories, not an unverified film catalogue.
+        val content = ScrollView(this).apply { fillViewport = true }
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(26, 18, 26, 18)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(12, 27, 44), Color.rgb(43, 64, 77), Color.rgb(10, 23, 41))
+            ).apply { cornerRadius = 22f }
+        }
+        val featureText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        featureText.addView(label("MOVIE MELAYU", 14f, accent))
+        featureText.addView(label("Filem Melayu • YouTube", 30f).apply {
+            setTypeface(null, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(-1, 60))
+        featureText.addView(label("Browse Malay-language movies, drama and classics using official YouTube search.", 16f, Color.LTGRAY),
+            LinearLayout.LayoutParams(-1, 70))
+        val heroActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        addButton(heroActions, "▶  Search Movies") { openYouTubeSearch("filem Melayu penuh rasmi") }
+        addButton(heroActions, "☆  Classics") { openYouTubeSearch("filem Melayu klasik rasmi") }
+        featureText.addView(heroActions)
+        hero.addView(featureText, LinearLayout.LayoutParams(0, -2, 3f))
+        hero.addView(label("♫  PULSE CINEMA", 26f, accent).apply {
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(0, -1, 2f))
+        body.addView(hero, LinearLayout.LayoutParams(-1, 215).apply { bottomMargin = 12 })
+
+        fun shelf(heading: String, queries: List<Pair<String, String>>) {
+            body.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
+                LinearLayout.LayoutParams(-1, 43))
+            val scroller = HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+            }
+            val tiles = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            queries.forEachIndexed { index, item ->
+                val tile = button(item.first) { openYouTubeSearch(item.second) }
+                tile.gravity = Gravity.BOTTOM or Gravity.START
+                tile.setPadding(14, 12, 14, 14)
+                tile.background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.rgb(23 + index * 5, 44 + index * 3, 69 + index * 2),
+                        Color.rgb(12, 24, 41)
+                    )
+                ).apply {
+                    cornerRadius = 16f
+                    setStroke(1, Color.rgb(55, 79, 98))
+                }
+                tiles.addView(tile, LinearLayout.LayoutParams(220, 118).apply { marginEnd = 12 })
+            }
+            scroller.addView(tiles)
+            body.addView(scroller, LinearLayout.LayoutParams(-1, 130).apply { bottomMargin = 12 })
+        }
+
+        shelf("Popular Movie Melayu • Discover", listOf(
+            "Drama" to "filem Melayu drama penuh rasmi",
+            "Seram" to "filem Melayu seram penuh rasmi",
+            "Aksi" to "filem Melayu aksi penuh rasmi",
+            "Komedi" to "filem Melayu komedi penuh rasmi",
+            "Klasik" to "filem Melayu klasik rasmi",
+            "Sejarah" to "filem Melayu sejarah penuh rasmi"
+        ))
+        shelf("YouTube Movie Melayu • Categories", listOf(
+            "Filem Penuh" to "filem Melayu penuh rasmi",
+            "Drama Bersiri" to "drama Melayu episod penuh rasmi",
+            "Filem Keluarga" to "filem Melayu keluarga rasmi",
+            "Filem 90-an" to "filem Melayu 1990an rasmi",
+            "Filem 2000-an" to "filem Melayu 2000an rasmi"
+        ))
+
+        title = label("Music Library", 22f).apply { setTypeface(null, Typeface.BOLD) }
+        body.addView(title, LinearLayout.LayoutParams(-1, 48))
         results = ListView(this).apply {
             dividerHeight = 2
             setBackgroundColor(this@TvActivity.background)
@@ -144,25 +217,9 @@ class TvActivity : Activity() {
                 }
             }
         }
-        left.addView(results, LinearLayout.LayoutParams(-1, 0, 1f))
-        content.addView(left, LinearLayout.LayoutParams(0, -1, 3f).apply { marginEnd = 18 })
-
-        val right = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(18, 16, 18, 16)
-            background = surface()
-        }
-        right.addView(label("MOVIE MELAYU  •  YOUTUBE", 21f, accent).apply {
-            setTypeface(null, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(-1, 54))
-        right.addView(label("Find Malay films from YouTube's own search results. Availability depends on the uploader and region.", 16f, Color.LTGRAY),
-            LinearLayout.LayoutParams(-1, 90))
-        val genres = listOf("Filem Melayu penuh", "Drama Melayu", "Seram Melayu", "Komedi Melayu", "Aksi Melayu", "Filem Melayu klasik")
-        genres.forEach { query ->
-            val b = button("▶  $query") { openYouTubeSearch(query) }
-            right.addView(b, LinearLayout.LayoutParams(-1, 55).apply { bottomMargin = 9 })
-        }
-        content.addView(right, LinearLayout.LayoutParams(0, -1, 2f))
+        // ListView inside a scrolling home page needs a bounded height for remote navigation.
+        body.addView(results, LinearLayout.LayoutParams(-1, 240))
+        content.addView(body)
         root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
         val player = LinearLayout(this).apply {
@@ -191,7 +248,7 @@ class TvActivity : Activity() {
         root.addView(nav, LinearLayout.LayoutParams(-1, 60).apply { topMargin = 8 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
-        loadRadio()
+        loadMusic()
     }
 
     private fun openYouTubeSearch(query: String) {
