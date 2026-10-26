@@ -132,7 +132,7 @@ class TvActivity : Activity() {
 
         // Reference-inspired featured hero and horizontal movie discovery shelves.
         // These are YouTube search categories, not an unverified film catalogue.
-        val content = ScrollView(this).apply { fillViewport = true }
+        val content = ScrollView(this).apply { isFillViewport = true }
         val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         val hero = LinearLayout(this).apply {
