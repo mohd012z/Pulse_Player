@@ -38,6 +38,9 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.ImageView
+import android.view.Gravity
+import android.content.res.Configuration
 import android.text.Editable
 import android.text.TextWatcher
 import androidx.media3.common.C
@@ -1179,34 +1182,36 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER", 18f, COLOR_ACCENT, true)
-        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+        val brand = label("♫  PULSE PLAYER", 19f, COLOR_ACCENT, true)
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
-        toolbar.addView(button("⋮ More") { showMoreMenu() }, LinearLayout.LayoutParams(dp(92), dp(44)))
+        // Keep the header clean: all navigation and actions live in the bottom dock.
         root.addView(toolbar)
 
-        // Adaptive two-row navigation: prevent the old duplicate radio shortcut and
-        // preserve legible touch targets on narrow portrait displays.
+        // Phone and TV share a compact, bottom-only navigation model.
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val primaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        primaryTabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
+        sourceButton = button("♫ Music & Radio") {
+            showPicker("Music & Radio", arrayOf("Device music", "Imported folders", "Malaysia radio", "All radio stations")) {
+                when (it) {
+                    0 -> switchPlaylist("DEVICE")
+                    1 -> switchPlaylist("FOLDERS")
+                    2 -> switchPlaylist("MY RADIO")
+                    3 -> switchPlaylist("RADIO")
+                }
+            }
+        }
+        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(36), 2f))
+        primaryTabs.addView(button("🎬 Movies") { startActivity(Intent(this, MovieBrowseActivity::class.java)) },
+            LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
+        primaryTabs.addView(button("⋮ More") { showMoreMenu() },
+            LinearLayout.LayoutParams(0, dp(36), 1f).apply { leftMargin = dp(5) })
         tabs.addView(primaryTabs)
-        val categoryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        categoryTabs.addView(button("♫ Music") { switchPlaylist("DEVICE") },
-            LinearLayout.LayoutParams(0, dp(48), 1f))
-        categoryTabs.addView(button("📻 Radio") { switchPlaylist("RADIO") },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
-        categoryTabs.addView(button("★ My Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
-        tabs.addView(categoryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        root.addView(tabs)
+        // Bottom navigation is attached after the mini-player, not above the library.
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
-        root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        root.addView(sourceView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         filterView = EditText(this).apply {
             hint = "Search MP3 / artist / folder / station"
             setHintTextColor(0xFF8296A7L.toInt())
@@ -1222,20 +1227,52 @@ class MainActivity : Activity() {
             })
         }
         root.addView(filterView, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(7) })
-        libraryView = label("Music library", 12f, COLOR_MUTED)
+        libraryView = label("Tracks • Music Library", 16f, Color.WHITE, true)
         root.addView(libraryView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
         trackAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, arrayListOf<String>()) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = super.getView(position, convertView, parent) as TextView
-                view.setTextColor(Color.WHITE)
-                view.textSize = 13.5f
-                view.setPadding(dp(12), dp(10), dp(10), dp(10))
-                return view
+                val row = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(7), dp(3), dp(7), dp(3))
+                    background = panelBackground()
+                    val artwork = TextView(this@MainActivity).apply {
+                        text = "♫"
+                        textSize = 24f
+                        gravity = Gravity.CENTER
+                        setTextColor(COLOR_ACCENT)
+                        background = GradientDrawable(
+                            GradientDrawable.Orientation.TL_BR,
+                            intArrayOf(0xFF16445AL.toInt(), 0xFF112236L.toInt())
+                        ).apply { cornerRadius = dp(10).toFloat() }
+                        contentDescription = "Audio track artwork placeholder"
+                    }
+                    addView(artwork, LinearLayout.LayoutParams(dp(44), dp(44)))
+                    val title = TextView(this@MainActivity).apply {
+                        setTextColor(Color.WHITE)
+                        textSize = 14f
+                        maxLines = 2
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        setPadding(dp(12), 0, dp(6), 0)
+                    }
+                    addView(title, LinearLayout.LayoutParams(0, -2, 1f))
+                    val more = TextView(this@MainActivity).apply {
+                        text = "⋮"
+                        textSize = 22f
+                        gravity = Gravity.CENTER
+                        setTextColor(COLOR_MUTED)
+                        contentDescription = "Long press track for options"
+                    }
+                    addView(more, LinearLayout.LayoutParams(dp(24), dp(42)))
+                }
+                (row.getChildAt(1) as TextView).text = getItem(position) ?: "Unknown track"
+                row.contentDescription = getItem(position)
+                return row
             }
         }
         trackList = ListView(this).apply {
             adapter = trackAdapter
-            dividerHeight = dp(1)
+            dividerHeight = dp(2)
             setBackgroundColor(COLOR_BG)
             isFastScrollEnabled = true
             isVerticalScrollBarEnabled = true
@@ -1257,7 +1294,7 @@ class MainActivity : Activity() {
         lyricView.ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
         lyricView.isSelected = true
         lyricView.setOnClickListener { showLyricDialog() }
-        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
+        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(22)))
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))
@@ -1343,6 +1380,65 @@ class MainActivity : Activity() {
             gravity = android.view.Gravity.END
         }
         dock.addView(progressView)
+
+        root.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            root.setPadding(dp(12), dp(2), dp(12), dp(2))
+            toolbar.visibility = View.GONE
+            sourceView.visibility = View.GONE
+            lyricView.visibility = View.GONE
+            statusView.visibility = View.GONE
+            libraryView.visibility = View.GONE
+            filterView.layoutParams = (filterView.layoutParams as LinearLayout.LayoutParams).apply { height = dp(36); topMargin = 0 }
+            dock.setPadding(dp(6), dp(2), dp(6), dp(2))
+            seekBar.layoutParams = (seekBar.layoutParams as LinearLayout.LayoutParams).apply { height = dp(20) }
+        }
+    }
+
+    private fun openVideoSearch(query: String) {
+        // Keep discovery inside Pulse Player; YouTube may restrict WebView playback.
+        val web = android.webkit.WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = true
+            webViewClient = android.webkit.WebViewClient()
+            webChromeClient = android.webkit.WebChromeClient()
+            loadUrl(Uri.parse("https://www.youtube.com/results").buildUpon()
+                .appendQueryParameter("search_query", query).build().toString())
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Pulse Player • YouTube")
+            .setView(web)
+            .setPositiveButton("Close", null)
+            .create()
+        dialog.setOnDismissListener { web.stopLoading(); web.destroy() }
+        dialog.show()
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.82).toInt())
+    }
+
+    private fun showMovieCategories() {
+        val categories = listOf(
+            "New Movies" to "filem baru rasmi trailer filem penuh",
+            "Movie Melayu" to "filem Melayu penuh rasmi",
+            "Drama Melayu" to "drama Melayu episod penuh rasmi",
+            "Short Drama" to "short drama Melayu episod",
+            "Drama Korea" to "drama Korea official episodes",
+            "Al-Quran" to "bacaan Al Quran tilawah rasmi",
+            "Nasyid" to "nasyid Malaysia rasmi",
+            "Paranormal & Mistik" to "kisah paranormal mistik dokumentari Melayu",
+            "5-Minute Crafts" to "5 minute crafts official",
+            "MotoGP" to "MotoGP official highlights",
+            "Formula One" to "Formula 1 official highlights",
+            "Ceramah" to "ceramah agama Malaysia rasmi",
+            "Documentary" to "dokumentari Bahasa Melayu rasmi"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Discover videos • Choose category")
+            .setItems(categories.map { it.first }.toTypedArray()) { _, index ->
+                openVideoSearch(categories[index].second)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun seekRelative(delta: Long) {
