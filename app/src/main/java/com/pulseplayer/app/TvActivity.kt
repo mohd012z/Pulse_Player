@@ -42,6 +42,10 @@ class TvActivity : Activity() {
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private var entries: List<MediaItem> = emptyList()
+    private var unfilteredEntries: List<MediaItem> = emptyList()
+    private lateinit var cinemaSections: LinearLayout
+    private lateinit var librarySection: LinearLayout
+    private lateinit var nav: LinearLayout
     private var currentTab = "Music"
     private var generation = 0
     private lateinit var title: TextView
@@ -134,6 +138,8 @@ class TvActivity : Activity() {
         // These are YouTube search categories, not an unverified film catalogue.
         val content = ScrollView(this).apply { isFillViewport = true }
         val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        cinemaSections = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        librarySection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -150,18 +156,15 @@ class TvActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, 60))
         featureText.addView(label("Browse Malay-language movies, drama and classics using official YouTube search.", 16f, Color.LTGRAY),
             LinearLayout.LayoutParams(-1, 70))
-        val heroActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        addButton(heroActions, "▶  Search Movies") { openYouTubeSearch("filem Melayu penuh rasmi") }
-        addButton(heroActions, "☆  Classics") { openYouTubeSearch("filem Melayu klasik rasmi") }
-        featureText.addView(heroActions)
+        featureText.addView(label("Choose a category below to search YouTube", 15f, accent))
         hero.addView(featureText, LinearLayout.LayoutParams(0, -2, 3f))
         hero.addView(label("♫  PULSE CINEMA", 26f, accent).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, -1, 2f))
-        body.addView(hero, LinearLayout.LayoutParams(-1, 215).apply { bottomMargin = 12 })
+        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 215).apply { bottomMargin = 12 })
 
         fun shelf(heading: String, queries: List<Pair<String, String>>) {
-            body.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
+            cinemaSections.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
                 LinearLayout.LayoutParams(-1, 43))
             val scroller = HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
@@ -184,7 +187,7 @@ class TvActivity : Activity() {
                 tiles.addView(tile, LinearLayout.LayoutParams(220, 118).apply { marginEnd = 12 })
             }
             scroller.addView(tiles)
-            body.addView(scroller, LinearLayout.LayoutParams(-1, 130).apply { bottomMargin = 12 })
+            cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 130).apply { bottomMargin = 12 })
         }
 
         shelf("Popular Movie Melayu • Discover", listOf(
@@ -204,7 +207,7 @@ class TvActivity : Activity() {
         ))
 
         title = label("Music Library", 22f).apply { setTypeface(null, Typeface.BOLD) }
-        body.addView(title, LinearLayout.LayoutParams(-1, 48))
+        librarySection.addView(title, LinearLayout.LayoutParams(-1, 48))
         results = ListView(this).apply {
             dividerHeight = 2
             setBackgroundColor(this@TvActivity.background)
@@ -218,7 +221,9 @@ class TvActivity : Activity() {
             }
         }
         // ListView inside a scrolling home page needs a bounded height for remote navigation.
-        body.addView(results, LinearLayout.LayoutParams(-1, 240))
+        librarySection.addView(results, LinearLayout.LayoutParams(-1, 240))
+        body.addView(cinemaSections)
+        body.addView(librarySection)
         content.addView(body)
         root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
@@ -235,20 +240,28 @@ class TvActivity : Activity() {
         addButton(player, "▶▶") { controller?.seekToNextMediaItem() }
         root.addView(player, LinearLayout.LayoutParams(-1, 64).apply { topMargin = 12 })
 
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        addButton(nav, "♫ Music") { currentTab = "Music"; loadMusic() }
-        addButton(nav, "▣ Radio") { currentTab = "Radio"; loadRadio() }
-        addButton(nav, "▶ YouTube") { currentTab = "YouTube"; openYouTubeSearch("muzik Malaysia") }
-        addButton(nav, "▤ Movie Melayu") {
-            currentTab = "Movie Melayu"
-            title.text = "Movie Melayu • Open YouTube results"
-            openYouTubeSearch("filem Melayu penuh rasmi")
-        }
+        nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        addButton(nav, "⌂ Home") { showSection("Home") }
+        addButton(nav, "♫ Music") { showSection("Music") }
+        addButton(nav, "▣ Radio") { showSection("Radio") }
+        addButton(nav, "▶ YouTube") { openYouTubeSearch("muzik Malaysia") }
+        addButton(nav, "▤ Movie Melayu") { showSection("Movie Melayu") }
         addButton(nav, "☰ More") { startActivity(Intent(this, MainActivity::class.java)) }
         root.addView(nav, LinearLayout.LayoutParams(-1, 60).apply { topMargin = 8 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
-        loadMusic()
+        showSection("Home")
+    }
+
+    private fun showSection(section: String) {
+        currentTab = section
+        cinemaSections.visibility = if (section == "Home" || section == "Movie Melayu") View.VISIBLE else View.GONE
+        librarySection.visibility = if (section == "Movie Melayu") View.GONE else View.VISIBLE
+        when (section) {
+            "Home", "Music" -> loadMusic()
+            "Radio" -> loadRadio()
+            "Movie Melayu" -> title.text = "Movie Melayu"
+        }
     }
 
     private fun openYouTubeSearch(query: String) {
@@ -261,6 +274,7 @@ class TvActivity : Activity() {
 
     private fun showItems(items: List<MediaItem>) {
         entries = items
+        unfilteredEntries = items
         results.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
             items.map { it.mediaMetadata.title?.toString() ?: "Untitled" })
     }
@@ -270,11 +284,13 @@ class TvActivity : Activity() {
             if (currentTab == "Radio") loadRadio() else loadMusic()
             return
         }
-        val filtered = entries.filter {
+        val filtered = unfilteredEntries.filter {
             it.mediaMetadata.title?.toString()?.contains(query, ignoreCase = true) == true ||
                 it.mediaMetadata.artist?.toString()?.contains(query, ignoreCase = true) == true
         }
-        showItems(filtered)
+        entries = filtered
+        results.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1,
+            filtered.map { it.mediaMetadata.title?.toString() ?: "Untitled" })
     }
 
     private fun loadRadio() {
