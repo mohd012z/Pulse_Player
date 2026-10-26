@@ -1186,26 +1186,25 @@ class MainActivity : Activity() {
         // Keep the header clean: all navigation and actions live in the bottom dock.
         root.addView(toolbar)
 
-        // Compact bottom-only navigation. My Radio remains available through Sources.
+        // Phone and TV share a compact, bottom-only navigation model.
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val primaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sourceButton = button("Source ▾") { showPlaylistDialog() }
-        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(38), 1f))
-        primaryTabs.addView(button("♫ Music") { switchPlaylist("DEVICE") },
-            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
-        primaryTabs.addView(button("📻 Radio") { switchPlaylist("RADIO") },
-            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
-        primaryTabs.addView(button("🎬 Movie") { showMovieCategories() },
-            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
+        sourceButton = button("♫ Music & Radio") {
+            showPicker("Music & Radio", arrayOf("Device music", "Imported folders", "Malaysia radio", "All radio stations")) {
+                when (it) {
+                    0 -> switchPlaylist("DEVICE")
+                    1 -> switchPlaylist("FOLDERS")
+                    2 -> switchPlaylist("MY RADIO")
+                    3 -> switchPlaylist("RADIO")
+                }
+            }
+        }
+        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(40), 2f))
+        primaryTabs.addView(button("🎬 Movies") { showMovieCategories() },
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(5) })
+        primaryTabs.addView(button("⋮ More") { showMoreMenu() },
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(5) })
         tabs.addView(primaryTabs)
-        val secondaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        secondaryTabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(38), 1f))
-        secondaryTabs.addView(button("▶ YouTube") { openVideoSearch("video Malaysia rasmi") },
-            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
-        secondaryTabs.addView(button("⋮ More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
-        tabs.addView(secondaryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         // Bottom navigation is attached after the mini-player, not above the library.
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
@@ -1351,12 +1350,24 @@ class MainActivity : Activity() {
     }
 
     private fun openVideoSearch(query: String) {
-        val url = Uri.parse("https://www.youtube.com/results").buildUpon()
-            .appendQueryParameter("search_query", query).build()
-        val intent = Intent(Intent.ACTION_VIEW, url)
-        runCatching { startActivity(intent) }.onFailure {
-            status("No compatible app found for YouTube search")
+        // Keep discovery inside Pulse Player; YouTube may restrict WebView playback.
+        val web = android.webkit.WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = true
+            webViewClient = android.webkit.WebViewClient()
+            webChromeClient = android.webkit.WebChromeClient()
+            loadUrl(Uri.parse("https://www.youtube.com/results").buildUpon()
+                .appendQueryParameter("search_query", query).build().toString())
         }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Pulse Player • YouTube")
+            .setView(web)
+            .setPositiveButton("Close", null)
+            .create()
+        dialog.setOnDismissListener { web.stopLoading(); web.destroy() }
+        dialog.show()
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.82).toInt())
     }
 
     private fun showMovieCategories() {
