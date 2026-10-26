@@ -3,6 +3,7 @@ package com.pulseplayer.app
 import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
+import android.content.pm.ActivityInfo
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -97,6 +98,7 @@ class TvActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -106,11 +108,11 @@ class TvActivity : Activity() {
             setPadding(24, 18, 24, 14)
             setBackgroundColor(this@TvActivity.background)
         }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val brand = label("♫  PULSE PLAYER", 27f, accent).apply {
             setTypeface(null, Typeface.BOLD)
         }
-        header.addView(brand, LinearLayout.LayoutParams(0, 64, 1f))
+        header.addView(brand, LinearLayout.LayoutParams(0, 60, 1f))
         header.addView(label("MUSIC  •  RADIO  •  YOUTUBE  •  MOVIES", 13f, Color.LTGRAY))
         root.addView(header)
 
@@ -132,11 +134,11 @@ class TvActivity : Activity() {
                 true
             }
         }
-        root.addView(search, LinearLayout.LayoutParams(-1, 56).apply { bottomMargin = 14 })
+        root.addView(search, LinearLayout.LayoutParams(-1, 52).apply { bottomMargin = 9 })
 
         // Reference-inspired featured hero and horizontal movie discovery shelves.
         // These are YouTube search categories, not an unverified film catalogue.
-        val content = ScrollView(this).apply { isFillViewport = true }
+        val content = ScrollView(this).apply { isFillViewport = true; isFocusable = false }
         val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         cinemaSections = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         librarySection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -156,12 +158,12 @@ class TvActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, 60))
         featureText.addView(label("Browse Malay-language movies, drama and classics using official YouTube search.", 16f, Color.LTGRAY),
             LinearLayout.LayoutParams(-1, 70))
-        featureText.addView(label("Choose a category below to search YouTube", 15f, accent))
+        featureText.addView(label("Select a category to discover videos", 15f, accent))
         hero.addView(featureText, LinearLayout.LayoutParams(0, -2, 3f))
         hero.addView(label("♫  PULSE CINEMA", 26f, accent).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, -1, 2f))
-        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 215).apply { bottomMargin = 12 })
+        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 188).apply { bottomMargin = 10 })
 
         fun shelf(heading: String, queries: List<Pair<String, String>>) {
             cinemaSections.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
@@ -203,7 +205,16 @@ class TvActivity : Activity() {
             "Drama Bersiri" to "drama Melayu episod penuh rasmi",
             "Filem Keluarga" to "filem Melayu keluarga rasmi",
             "Filem 90-an" to "filem Melayu 1990an rasmi",
-            "Filem 2000-an" to "filem Melayu 2000an rasmi"
+            "Filem 2000-an" to "filem Melayu 2000an rasmi",
+            "Drama Korea" to "drama Korea official episodes",
+            "Short Drama" to "short drama Melayu episod",
+            "Nasyid" to "nasyid Malaysia rasmi",
+            "Al-Quran" to "tilawah al quran rasmi",
+            "Paranormal" to "kisah mistik paranormal dokumentari Melayu",
+            "5-Minute Crafts" to "5 minute crafts official",
+            "MotoGP" to "MotoGP official highlights",
+            "Formula 1" to "Formula 1 official highlights",
+            "Ceramah" to "ceramah agama Malaysia rasmi"
         ))
 
         title = label("Music Library", 22f).apply { setTypeface(null, Typeface.BOLD) }
@@ -238,7 +249,7 @@ class TvActivity : Activity() {
         addButton(player, "◀◀") { controller?.seekToPreviousMediaItem() }
         addButton(player, "▶ / ❚❚") { toggle() }
         addButton(player, "▶▶") { controller?.seekToNextMediaItem() }
-        root.addView(player, LinearLayout.LayoutParams(-1, 64).apply { topMargin = 12 })
+        root.addView(player, LinearLayout.LayoutParams(-1, 58).apply { topMargin = 6 })
 
         nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         addButton(nav, "⌂ Home") { showSection("Home") }
@@ -247,7 +258,7 @@ class TvActivity : Activity() {
         addButton(nav, "▶ YouTube") { openYouTubeSearch("muzik Malaysia") }
         addButton(nav, "▤ Movie Melayu") { showSection("Movie Melayu") }
         addButton(nav, "☰ More") { startActivity(Intent(this, MainActivity::class.java)) }
-        root.addView(nav, LinearLayout.LayoutParams(-1, 60).apply { topMargin = 8 })
+        root.addView(nav, LinearLayout.LayoutParams(-1, 54).apply { topMargin = 5 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
         showSection("Home")
@@ -301,7 +312,7 @@ class TvActivity : Activity() {
     }
 
     private fun loadMusic() {
-        currentTab = "Music"
+        if (currentTab != "Home") currentTab = "Music"
         title.text = "Your Music"
         val permission = if (Build.VERSION.SDK_INT >= 33)
             Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
@@ -313,7 +324,7 @@ class TvActivity : Activity() {
         thread(name = "TvMusicScan") {
             val songs = runCatching { MusicRepository(applicationContext).scan().map { it.toMediaItem() } }
             runOnUiThread {
-                if (!isFinishing && !isDestroyed && generation == request && currentTab == "Music") {
+                if (!isFinishing && !isDestroyed && generation == request && (currentTab == "Music" || currentTab == "Home")) {
                     songs.onSuccess { showItems(it) }
                         .onFailure { status.text = "Music scan failed: ${it.message}" }
                 }
