@@ -1182,8 +1182,8 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        val brand = label("♫  PULSE PLAYER", 22f, COLOR_ACCENT, true)
-        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+        val brand = label("♫  PULSE PLAYER", 19f, COLOR_ACCENT, true)
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
             gravity = android.view.Gravity.CENTER_VERTICAL
         })
         // Keep the header clean: all navigation and actions live in the bottom dock.
@@ -1234,7 +1234,7 @@ class MainActivity : Activity() {
                 val row = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(9), dp(5), dp(9), dp(5))
+                    setPadding(dp(7), dp(3), dp(7), dp(3))
                     background = panelBackground()
                     val artwork = TextView(this@MainActivity).apply {
                         text = "♫"
@@ -1247,7 +1247,7 @@ class MainActivity : Activity() {
                         ).apply { cornerRadius = dp(10).toFloat() }
                         contentDescription = "Audio track artwork placeholder"
                     }
-                    addView(artwork, LinearLayout.LayoutParams(dp(54), dp(54)))
+                    addView(artwork, LinearLayout.LayoutParams(dp(44), dp(44)))
                     val title = TextView(this@MainActivity).apply {
                         setTextColor(Color.WHITE)
                         textSize = 14f
@@ -1263,7 +1263,7 @@ class MainActivity : Activity() {
                         setTextColor(COLOR_MUTED)
                         contentDescription = "Long press track for options"
                     }
-                    addView(more, LinearLayout.LayoutParams(dp(28), dp(48)))
+                    addView(more, LinearLayout.LayoutParams(dp(24), dp(42)))
                 }
                 (row.getChildAt(1) as TextView).text = getItem(position) ?: "Unknown track"
                 row.contentDescription = getItem(position)
@@ -1272,7 +1272,7 @@ class MainActivity : Activity() {
         }
         trackList = ListView(this).apply {
             adapter = trackAdapter
-            dividerHeight = dp(5)
+            dividerHeight = dp(2)
             setBackgroundColor(COLOR_BG)
             isFastScrollEnabled = true
             isVerticalScrollBarEnabled = true
@@ -1294,7 +1294,7 @@ class MainActivity : Activity() {
         lyricView.ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
         lyricView.isSelected = true
         lyricView.setOnClickListener { showLyricDialog() }
-        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
+        root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(22)))
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))
@@ -1383,9 +1383,15 @@ class MainActivity : Activity() {
 
         root.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            root.setPadding(dp(24), dp(5), dp(24), dp(5))
+            root.setPadding(dp(12), dp(2), dp(12), dp(2))
+            toolbar.visibility = View.GONE
+            sourceView.visibility = View.GONE
             lyricView.visibility = View.GONE
-            statusView.maxLines = 1
+            statusView.visibility = View.GONE
+            libraryView.visibility = View.GONE
+            filterView.layoutParams = (filterView.layoutParams as LinearLayout.LayoutParams).apply { height = dp(36); topMargin = 0 }
+            dock.setPadding(dp(6), dp(2), dp(6), dp(2))
+            seekBar.layoutParams = (seekBar.layoutParams as LinearLayout.LayoutParams).apply { height = dp(20) }
         }
     }
 
