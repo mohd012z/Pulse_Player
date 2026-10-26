@@ -1186,23 +1186,26 @@ class MainActivity : Activity() {
         // Keep the header clean: all navigation and actions live in the bottom dock.
         root.addView(toolbar)
 
-        // Adaptive two-row navigation: prevent the old duplicate radio shortcut and
-        // preserve legible touch targets on narrow portrait displays.
+        // Compact bottom-only navigation. My Radio remains available through Sources.
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val primaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        sourceButton = button("DEVICE ▾") { showPlaylistDialog() }
-        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        primaryTabs.addView(button("♫ FX") { selectMixPreset() },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
+        sourceButton = button("Source ▾") { showPlaylistDialog() }
+        primaryTabs.addView(sourceButton, LinearLayout.LayoutParams(0, dp(38), 1f))
+        primaryTabs.addView(button("♫ Music") { switchPlaylist("DEVICE") },
+            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
+        primaryTabs.addView(button("📻 Radio") { switchPlaylist("RADIO") },
+            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
+        primaryTabs.addView(button("🎬 Movie") { showMovieCategories() },
+            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
         tabs.addView(primaryTabs)
-        val categoryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        categoryTabs.addView(button("♫ Music") { switchPlaylist("DEVICE") },
-            LinearLayout.LayoutParams(0, dp(48), 1f))
-        categoryTabs.addView(button("📻 Radio") { switchPlaylist("RADIO") },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
-        categoryTabs.addView(button("★ My Radio") { switchPlaylist("MY RADIO") },
-            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) })
-        tabs.addView(categoryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+        val secondaryTabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        secondaryTabs.addView(button("♫ FX") { selectMixPreset() },
+            LinearLayout.LayoutParams(0, dp(38), 1f))
+        secondaryTabs.addView(button("▶ YouTube") { openVideoSearch("video Malaysia rasmi") },
+            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
+        secondaryTabs.addView(button("⋮ More") { showMoreMenu() },
+            LinearLayout.LayoutParams(0, dp(38), 1f).apply { leftMargin = dp(4) })
+        tabs.addView(secondaryTabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         // Bottom navigation is attached after the mini-player, not above the library.
 
         sourceView = label("DEVICE · 0 items", 12f, COLOR_ACCENT, true)
@@ -1344,12 +1347,41 @@ class MainActivity : Activity() {
         }
         dock.addView(progressView)
 
-        // Single bottom control area: source, FX, Music, Radio, My Radio and More.
-        val bottomNav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        bottomNav.addView(button("⋮ More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(46), 1f))
-        tabs.addView(bottomNav, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
-        root.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+        root.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+    }
+
+    private fun openVideoSearch(query: String) {
+        val url = Uri.parse("https://www.youtube.com/results").buildUpon()
+            .appendQueryParameter("search_query", query).build()
+        val intent = Intent(Intent.ACTION_VIEW, url)
+        runCatching { startActivity(intent) }.onFailure {
+            status("No compatible app found for YouTube search")
+        }
+    }
+
+    private fun showMovieCategories() {
+        val categories = listOf(
+            "New Movies" to "filem baru rasmi trailer filem penuh",
+            "Movie Melayu" to "filem Melayu penuh rasmi",
+            "Drama Melayu" to "drama Melayu episod penuh rasmi",
+            "Short Drama" to "short drama Melayu episod",
+            "Drama Korea" to "drama Korea official episodes",
+            "Al-Quran" to "bacaan Al Quran tilawah rasmi",
+            "Nasyid" to "nasyid Malaysia rasmi",
+            "Paranormal & Mistik" to "kisah paranormal mistik dokumentari Melayu",
+            "5-Minute Crafts" to "5 minute crafts official",
+            "MotoGP" to "MotoGP official highlights",
+            "Formula One" to "Formula 1 official highlights",
+            "Ceramah" to "ceramah agama Malaysia rasmi",
+            "Documentary" to "dokumentari Bahasa Melayu rasmi"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Discover videos • Choose category")
+            .setItems(categories.map { it.first }.toTypedArray()) { _, index ->
+                openVideoSearch(categories[index].second)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun seekRelative(delta: Long) {
