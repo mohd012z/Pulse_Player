@@ -271,7 +271,7 @@ class TvActivity : Activity() {
         nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         addButton(nav, "⌂ Home") { showSection("Home") }
         addButton(nav, "♫ Music & Radio") { showAudioPicker() }
-        addButton(nav, "▤ Movies") { showSection("Movie Melayu"); showMovieFilter() }
+        addButton(nav, "▤ Movies") { startActivity(Intent(this, MovieBrowseActivity::class.java)) }
         addButton(nav, "⋯ More") { showTvMore() }
         root.addView(nav, LinearLayout.LayoutParams(-1, 42).apply { topMargin = 4 })
         setContentView(root)
