@@ -3,6 +3,10 @@ package com.pulseplayer.app
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.widget.FrameLayout
 import android.content.ComponentName
 import android.content.pm.ActivityInfo
 import android.content.Intent
@@ -49,6 +53,8 @@ class TvActivity : Activity() {
     private lateinit var librarySection: LinearLayout
     private lateinit var nav: LinearLayout
     private lateinit var movieHeading: TextView
+    private var youtubeView: WebView? = null
+    private var youtubeOverlay: FrameLayout? = null
     private var currentTab = "Music"
     private var generation = 0
     private lateinit var title: TextView
@@ -260,12 +266,9 @@ class TvActivity : Activity() {
 
         nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         addButton(nav, "⌂ Home") { showSection("Home") }
-        addButton(nav, "♫ Music") { showSection("Music") }
-        addButton(nav, "▣ Radio") { showSection("Radio") }
-        addButton(nav, "▶ YouTube") { currentTab = "YouTube"; openYouTubeSearch("muzik Malaysia") }
+        addButton(nav, "♫ Music & Radio") { showAudioPicker() }
         addButton(nav, "▤ Movies") { showSection("Movie Melayu"); showMovieFilter() }
-        addButton(nav, "☷ Categories") { showMovieFilter() }
-        addButton(nav, "⋯ More") { startActivity(Intent(this, MainActivity::class.java)) }
+        addButton(nav, "⋯ More") { showTvMore() }
         root.addView(nav, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 5 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
@@ -281,6 +284,60 @@ class TvActivity : Activity() {
             "Radio" -> loadRadio()
             "Movie Melayu" -> title.text = "Movie Melayu"
         }
+    }
+
+    private fun showAudioPicker() {
+        AlertDialog.Builder(this).setTitle("Music & Radio")
+            .setItems(arrayOf("Local music", "Radio stations")) { _, choice ->
+                showSection(if (choice == 0) "Music" else "Radio")
+            }.show()
+    }
+
+    private fun showTvMore() {
+        AlertDialog.Builder(this).setTitle("Pulse Player • More")
+            .setItems(arrayOf("Audio FX & equalizer", "Full music player", "YouTube captions help")) { _, choice ->
+                when (choice) {
+                    0, 1 -> startActivity(Intent(this, MainActivity::class.java))
+                    2 -> AlertDialog.Builder(this).setTitle("Subtitles")
+                        .setMessage("When available, select CC or Subtitles in the embedded YouTube player. YouTube controls automatic caption availability, language and advertising.")
+                        .setPositiveButton("OK", null).show()
+                }
+            }.show()
+    }
+
+    private fun showEmbeddedYouTube(query: String) {
+        closeEmbeddedYouTube()
+        val frame = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val web = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = true
+            webViewClient = WebViewClient()
+            webChromeClient = WebChromeClient()
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
+        val close = button("✕ Close YouTube") { closeEmbeddedYouTube() }
+        frame.addView(web, FrameLayout.LayoutParams(-1, -1))
+        frame.addView(close, FrameLayout.LayoutParams(190, 52, Gravity.TOP or Gravity.RIGHT).apply {
+            topMargin = 10
+            rightMargin = 12
+        })
+        (window.decorView as android.view.ViewGroup).addView(frame,
+            android.view.ViewGroup.LayoutParams(-1, -1))
+        youtubeView = web
+        youtubeOverlay = frame
+        val url = Uri.parse("https://www.youtube.com/results").buildUpon()
+            .appendQueryParameter("search_query", query).build().toString()
+        web.loadUrl(url)
+        close.requestFocus()
+    }
+
+    private fun closeEmbeddedYouTube() {
+        youtubeView?.apply { stopLoading(); loadUrl("about:blank"); destroy() }
+        youtubeView = null
+        youtubeOverlay?.let { (it.parent as? android.view.ViewGroup)?.removeView(it) }
+        youtubeOverlay = null
     }
 
     private fun showMovieFilter() {
@@ -311,11 +368,7 @@ class TvActivity : Activity() {
     }
 
     private fun openYouTubeSearch(query: String) {
-        val q = query.trim().ifBlank { "filem Melayu penuh rasmi" }
-        val url = Uri.parse("https://www.youtube.com/results").buildUpon()
-            .appendQueryParameter("search_query", q).build()
-        runCatching { startActivity(Intent(Intent.ACTION_VIEW, url)) }
-            .onFailure { status.text = "Install a browser or YouTube app to open results" }
+        showEmbeddedYouTube(query.trim().ifBlank { "filem Melayu penuh rasmi" })
     }
 
     private fun showItems(items: List<MediaItem>) {
@@ -403,6 +456,16 @@ class TvActivity : Activity() {
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { controller?.seekToPreviousMediaItem(); return true }
         }
         return super.onKeyDown(code, event)
+    }
+
+    override fun onBackPressed() {
+        if (youtubeOverlay != null) { closeEmbeddedYouTube(); return }
+        super.onBackPressed()
+    }
+
+    override fun onDestroy() {
+        closeEmbeddedYouTube()
+        super.onDestroy()
     }
 
     override fun onStop() {
