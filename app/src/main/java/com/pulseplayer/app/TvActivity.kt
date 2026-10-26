@@ -83,7 +83,11 @@ class TvActivity : Activity() {
     private fun button(value: String, action: () -> Unit): Button =
         Button(this).apply {
             text = value
-            textSize = 13f
+            textSize = 12f
+            minHeight = 0
+            minimumHeight = 0
+            minWidth = 0
+            minimumWidth = 0
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = surface()
@@ -98,7 +102,7 @@ class TvActivity : Activity() {
 
     private fun addButton(row: LinearLayout, text: String, action: () -> Unit): Button {
         val b = button(text, action)
-        row.addView(b, LinearLayout.LayoutParams(0, 44, 1f).apply {
+        row.addView(b, LinearLayout.LayoutParams(0, 38, 1f).apply {
             marginEnd = 7
         })
         return b
@@ -164,20 +168,20 @@ class TvActivity : Activity() {
         val featureText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         movieHeading = label("FEATURED • MOVIE MELAYU", 14f, accent)
         featureText.addView(movieHeading)
-        featureText.addView(label("Discover Movies & Series", 30f).apply {
+        featureText.addView(label("Discover Movies & Series", 23f).apply {
             setTypeface(null, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(-1, 60))
+        }, LinearLayout.LayoutParams(-1, 32))
         featureText.addView(label("Malay films, new releases, drama, sports, learning and more. Choose a category below.", 16f, Color.LTGRAY),
-            LinearLayout.LayoutParams(-1, 70))
+            LinearLayout.LayoutParams(-1, 48))
         featureText.addView(label("Select a category to discover videos", 15f, accent))
         hero.addView(featureText, LinearLayout.LayoutParams(0, -2, 3f))
-        hero.addView(label("▶  PULSE CINEMA", 26f, accent).apply {
+        hero.addView(label("▶  PULSE CINEMA", 20f, accent).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, -1, 2f))
-        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 170).apply { bottomMargin = 10 })
+        cinemaSections.addView(hero, LinearLayout.LayoutParams(-1, 138).apply { bottomMargin = 8 })
 
         fun shelf(heading: String, queries: List<Pair<String, String>>) {
-            cinemaSections.addView(label(heading, 22f).apply { setTypeface(null, Typeface.BOLD) },
+            cinemaSections.addView(label(heading, 17f).apply { setTypeface(null, Typeface.BOLD) },
                 LinearLayout.LayoutParams(-1, 43))
             val scroller = HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
@@ -186,7 +190,7 @@ class TvActivity : Activity() {
             queries.forEachIndexed { index, item ->
                 val tile = button(item.first) { openYouTubeSearch(item.second) }
                 tile.gravity = Gravity.BOTTOM or Gravity.START
-                tile.setPadding(14, 12, 14, 14)
+                tile.setPadding(10, 7, 10, 9)
                 tile.background = GradientDrawable(
                     GradientDrawable.Orientation.TL_BR,
                     intArrayOf(
@@ -197,10 +201,10 @@ class TvActivity : Activity() {
                     cornerRadius = 16f
                     setStroke(1, Color.rgb(55, 79, 98))
                 }
-                tiles.addView(tile, LinearLayout.LayoutParams(220, 118).apply { marginEnd = 12 })
+                tiles.addView(tile, LinearLayout.LayoutParams(160, 88).apply { marginEnd = 9 })
             }
             scroller.addView(tiles)
-            cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 130).apply { bottomMargin = 12 })
+            cinemaSections.addView(scroller, LinearLayout.LayoutParams(-1, 98).apply { bottomMargin = 9 })
         }
 
         shelf("Featured Categories", listOf(
@@ -262,14 +266,14 @@ class TvActivity : Activity() {
         addButton(player, "◀◀") { controller?.seekToPreviousMediaItem() }
         addButton(player, "▶ / ❚❚") { toggle() }
         addButton(player, "▶▶") { controller?.seekToNextMediaItem() }
-        root.addView(player, LinearLayout.LayoutParams(-1, 58).apply { topMargin = 6 })
+        root.addView(player, LinearLayout.LayoutParams(-1, 49).apply { topMargin = 4 })
 
         nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         addButton(nav, "⌂ Home") { showSection("Home") }
         addButton(nav, "♫ Music & Radio") { showAudioPicker() }
         addButton(nav, "▤ Movies") { showSection("Movie Melayu"); showMovieFilter() }
         addButton(nav, "⋯ More") { showTvMore() }
-        root.addView(nav, LinearLayout.LayoutParams(-1, 48).apply { topMargin = 5 })
+        root.addView(nav, LinearLayout.LayoutParams(-1, 42).apply { topMargin = 4 })
         setContentView(root)
         nav.getChildAt(0).requestFocus()
         showSection("Home")
