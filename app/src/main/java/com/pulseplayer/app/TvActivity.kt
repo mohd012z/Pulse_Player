@@ -98,7 +98,7 @@ class TvActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 18, 24, 14)
-            setBackgroundColor(background)
+            setBackgroundColor(this@TvActivity.background)
         }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val brand = label("♫  PULSE PLAYER", 27f, accent).apply {
@@ -134,7 +134,7 @@ class TvActivity : Activity() {
         left.addView(title, LinearLayout.LayoutParams(-1, 52))
         results = ListView(this).apply {
             dividerHeight = 2
-            setBackgroundColor(background)
+            setBackgroundColor(this@TvActivity.background)
             isFocusable = true
             setOnItemClickListener { _, _, position, _ ->
                 controller?.apply {
