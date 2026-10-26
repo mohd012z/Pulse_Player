@@ -60,7 +60,7 @@ class TvActivity : Activity() {
         button("Next track") { controller?.seekToNextMediaItem() }
         button("Open full music library and radio") { startActivity(Intent(this, MainActivity::class.java)) }
         setContentView(root)
-        root.findFocus()?.requestFocus()
+        root.getChildAt(2).requestFocus()
     }
 
     override fun onStart() {
