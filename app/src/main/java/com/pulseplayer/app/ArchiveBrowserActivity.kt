@@ -47,7 +47,15 @@ class ArchiveBrowserActivity : Activity() {
         setContentView(root)
         val requested = intent.getStringExtra(EXTRA_URL) ?: FILMS
         val uri = Uri.parse(requested)
-        browser.loadUrl(if (uri.scheme == "https" && uri.host == "archive.org") requested else FILMS)
+        // WebView.saveState/restoreState keeps the loaded page (and its scroll position)
+        // alive across rotation / process death.
+        if (savedInstanceState == null || browser.restoreState(savedInstanceState) == null) {
+            browser.loadUrl(if (uri.scheme == "https" && uri.host == "archive.org") requested else FILMS)
+        }
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        browser.saveState(outState)
     }
     override fun onBackPressed() {
         if (browser.canGoBack()) browser.goBack() else super.onBackPressed()
