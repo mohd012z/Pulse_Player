@@ -54,17 +54,48 @@ class StoryHubActivity : Activity() {
             root.setPadding(dp(12), dp(12), dp(12), dp(12))
         }
         setContentView(root)
-        showHub()
+        if (!restoreState(savedInstanceState)) showHub()
+    }
+
+    private fun restoreState(saved: Bundle?): Boolean {
+        if (saved == null || !saved.containsKey("story_screen")) return false
+        val screen = saved.getString("story_screen") ?: "hub"
+        saved.getStringArray("story_videos")?.forEach { s ->
+            runCatching { Uri.parse(s) }.getOrNull()?.let { if (!videos.contains(it)) videos.add(it) }
+        }
+        videoIndex = saved.getInt("story_index", 0).coerceIn(0, maxOf(0, videos.size - 1))
+        val novel = saved.getString("story_novel")?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        when (screen) {
+            "drama" -> showDrama()
+            "novel" -> if (novel != null) showNovel(novel) else showHub()
+            "player" -> if (videos.isNotEmpty()) playEpisode() else showDrama()
+            else -> showHub()
+        }
+        return true
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // configChanges keeps this instance alive across rotation; re-render the current
+        // screen so programmatic layouts (video size, text spacing) adapt to new metrics.
         when (currentScreen) {
             "drama" -> showDrama()
             "novel" -> activeNovel?.let { showNovel(it) } ?: showHub()
             "player" -> playEpisode()
             else -> showHub()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Safety net for process death: with configChanges the rotation itself keeps the
+        // same instance, but on recreation the imported episodes and player position
+        // survive via the bundle (content URIs are re-resolvable).
+        outState.putStringArray("story_videos",
+            Array(videos.size) { videos[it].toString() })
+        outState.putInt("story_index", videoIndex)
+        outState.putString("story_screen", currentScreen)
+        outState.putString("story_novel", activeNovel?.toString())
+        super.onSaveInstanceState(outState)
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
