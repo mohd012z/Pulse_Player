@@ -12,6 +12,8 @@ object CrossfadeEnvelope {
         require(validDuration(durationMs)) { "Duration outside 0..12000 ms" }
         if (durationMs == 0L) return 0f to 1f
         val fraction = (elapsedMs.toDouble() / durationMs).coerceIn(0.0, 1.0)
+        if (fraction <= 0.0) return 1f to 0f
+        if (fraction >= 1.0) return 0f to 1f
         return cos(fraction * PI / 2).toFloat() to sin(fraction * PI / 2).toFloat()
     }
     fun eligible(
