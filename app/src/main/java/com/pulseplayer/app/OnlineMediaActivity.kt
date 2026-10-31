@@ -739,6 +739,14 @@ class OnlineMediaActivity : Activity() {
     }
 
     private fun enqueueMediaDownload(uri: Uri, extension: String, mime: String, music: Boolean) {
+        // Do not trust a media extension alone: reject mismatched caller MIME metadata.
+        val expectedMime = mapOf("mp3" to "audio/mpeg", "m4a" to "audio/mp4",
+            "aac" to "audio/aac", "wav" to "audio/wav",
+            "mp4" to "video/mp4", "webm" to "video/webm")[extension]
+        if (uri.scheme != "https" || uri.host.isNullOrBlank() || expectedMime != mime) {
+            Toast.makeText(this, "Invalid HTTPS media download", Toast.LENGTH_LONG).show()
+            return
+        }
         val filename = "Pulse_" + System.currentTimeMillis() + "." + extension
         val directory = if (music) android.os.Environment.DIRECTORY_MUSIC else android.os.Environment.DIRECTORY_DOWNLOADS
         val request = android.app.DownloadManager.Request(uri)
@@ -809,6 +817,7 @@ class OnlineMediaActivity : Activity() {
         android.app.DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Too many server redirects"
         android.app.DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Server rejected the download (HTTP error)"
         android.app.DownloadManager.ERROR_UNKNOWN -> "Unknown Android download error"
+        android.app.DownloadManager.ERROR_BLOCKED -> "Download blocked by Android or network policy"
         in 400..599 -> "HTTP $reason from the media server"
         else -> "Android reason code $reason"
     }
