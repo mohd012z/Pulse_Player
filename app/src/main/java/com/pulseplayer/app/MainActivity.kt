@@ -1594,7 +1594,7 @@ class MainActivity : Activity() {
         }
         this.text = text
         setAllCaps(false)
-        textSize = 11f
+        textSize = if (DeviceFormFactor.isTelevision(this@MainActivity)) 16f else 11f
         setTextColor(Color.WHITE)
         background = GradientDrawable().apply {
             setColor(0xFF2A3849L.toInt())
@@ -1611,7 +1611,7 @@ class MainActivity : Activity() {
     private fun buttonRow(vararg buttons: Button) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         buttons.forEachIndexed { index, button ->
-            addView(button, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            addView(button, LinearLayout.LayoutParams(0, dp(if (DeviceFormFactor.isTelevision(this@MainActivity)) 60 else 44), 1f).apply {
                 if (index != 0) leftMargin = dp(4)
                 topMargin = dp(6)
             })
