@@ -592,8 +592,8 @@ class MainActivity : Activity() {
 
     private fun refreshLyricsIfNeeded() {
         val item = controller?.currentMediaItem
-        val id = item?.mediaId?.takeIf { it.isNotBlank() }
-            ?: item?.localConfiguration?.uri?.toString()
+        val id = item?.localConfiguration?.uri?.toString()
+            ?: item?.mediaId?.takeIf { it.isNotBlank() && it != "DEFAULT_MEDIA_ID" }
         if (lyricsTrackId == id) return
         lyricsTrackId = id
         lyricLines = emptyList()
@@ -1398,7 +1398,13 @@ class MainActivity : Activity() {
         lyricView.isSelected = true
         lyricView.setOnClickListener { showLyricDialog() }
         root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
-        if (tvMode) lyricView.visibility = View.GONE
+        if (tvMode) {
+            lyricView.textSize = 18f
+            lyricView.gravity = android.view.Gravity.CENTER
+            lyricView.isFocusable = true
+            lyricView.isFocusableInTouchMode = false
+            lyricView.contentDescription = "Synchronized lyrics. Press OK to view or import LRC."
+        }
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))
