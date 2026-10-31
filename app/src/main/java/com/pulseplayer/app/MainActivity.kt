@@ -1233,8 +1233,25 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun showCrossfadeSettings() {
+        val durations = intArrayOf(0, 2, 4, 6, 8, 12)
+        val options = durations.map { seconds ->
+            if (seconds == 0) "Off" else "${seconds} seconds"
+        }.toTypedArray()
+        val prefs = getSharedPreferences("player_state", MODE_PRIVATE)
+        val selected = prefs.getInt("crossfade_seconds", 0)
+        showPicker("Crossfade · currently ${if (selected == 0) "Off" else "${selected}s"}", options) { index ->
+            val seconds = durations[index]
+            prefs.edit().putInt("crossfade_seconds", seconds).apply()
+            status(
+                if (seconds == 0) "Crossfade disabled"
+                else "Crossfade preference: ${seconds}s saved; audio overlap not yet enabled"
+            )
+        }
+    }
+
     private fun showPlaybackMenu() = showPicker("Playback options", arrayOf(
-        "Toggle shuffle", "Cycle repeat", "Change speed", "Sleep timer", "Seek back 10s", "Seek forward 10s"
+        "Toggle shuffle", "Cycle repeat", "Change speed", "Sleep timer", "Seek back 10s", "Seek forward 10s", "Crossfade settings"
     )) {
         val c = controller
         when (it) {
@@ -1266,6 +1283,7 @@ class MainActivity : Activity() {
             }
             4 -> seekRelative(-10_000L)
             5 -> seekRelative(10_000L)
+            6 -> showCrossfadeSettings()
         }
     }
 
