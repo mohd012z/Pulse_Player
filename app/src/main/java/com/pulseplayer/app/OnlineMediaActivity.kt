@@ -149,6 +149,8 @@ class OnlineMediaActivity : Activity() {
         historyStore.edit().putLong("position:$videoId", seconds.toLong()).apply()
     }
 
+    private var awaitingCastReturn = false
+
     private fun openYouTubeForCasting() {
         val current = browser?.url?.let { runCatching { Uri.parse(it) }.getOrNull() }
         val videoId = current?.let { youtubeId(it) }
@@ -167,7 +169,9 @@ class OnlineMediaActivity : Activity() {
                 .onFailure {
                     Toast.makeText(this, "No app available to open YouTube", Toast.LENGTH_LONG).show()
                 }
+                .onSuccess { awaitingCastReturn = true }
         } else {
+            awaitingCastReturn = true
             Toast.makeText(this, "Use the Cast icon in YouTube to select your TV", Toast.LENGTH_LONG).show()
         }
     }
@@ -792,6 +796,11 @@ class OnlineMediaActivity : Activity() {
     override fun onResume() {
         super.onResume()
         browser?.onResume()
+        if (awaitingCastReturn) {
+            awaitingCastReturn = false
+            browser?.requestFocus()
+            Toast.makeText(this, "Returned from YouTube · Pulse Player ready", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDestroy() {
