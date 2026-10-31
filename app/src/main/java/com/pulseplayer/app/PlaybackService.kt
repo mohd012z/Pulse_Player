@@ -49,11 +49,15 @@ class PlaybackService : MediaSessionService() {
     private val preferences by lazy { getSharedPreferences("player_state", MODE_PRIVATE) }
     private lateinit var player: ExoPlayer
     private var session: MediaSession? = null
+    private var crossfadePreloader: CrossfadePreloader? = null
+    private var preloadToken: Long = -1L
+    private var preloadItemIndex: Int = -1
     private var sleepTask: Runnable? = null
     private var sleepUntilMillis: Long = 0L
 
     private val checkpoint = object : Runnable {
         override fun run() {
+            refreshCrossfadePreload()
             persistState()
             handler.postDelayed(this, 15_000L)
         }
@@ -82,6 +86,7 @@ class PlaybackService : MediaSessionService() {
                         effects.attach(audioSessionId)
                     }
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        clearPreload()
                         persistState()
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -222,6 +227,47 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private fun clearPreload() {
+        crossfadePreloader?.release()
+        crossfadePreloader = null
+        preloadToken = -1L
+        preloadItemIndex = -1
+    }
+
+    private fun refreshCrossfadePreload() {
+        if (!::player.isInitialized) return
+        val seconds = preferences.getInt("crossfade_seconds", 0)
+        if (seconds == 0 || !player.isPlaying || player.mediaItemCount < 2) {
+            clearPreload()
+            return
+        }
+        val next = CrossfadeQueuePolicy.nextIndex(
+            player.currentMediaItemIndex,
+            player.mediaItemCount,
+            player.repeatMode,
+            player.shuffleModeEnabled,
+            if (player.hasNextMediaItem()) player.nextMediaItemIndex else null
+        )
+        if (next == null) {
+            clearPreload()
+            return
+        }
+        if (next == preloadItemIndex) return
+        clearPreload()
+        val item = player.getMediaItemAt(next)
+        val uri = item.localConfiguration?.uri
+        if (uri?.scheme != "content" && uri?.scheme != "file") return
+        try {
+            val preloader = CrossfadePreloader(this)
+            preloadToken = preloader.prepare(item)
+            preloadItemIndex = next
+            crossfadePreloader = preloader
+        } catch (error: RuntimeException) {
+            Log.w("PulsePlayer", "Crossfade preload skipped", error)
+            clearPreload()
+        }
+    }
+
     private fun scheduleSleep(minutes: Int) {
         sleepTask?.let(handler::removeCallbacks)
         sleepTask = null
@@ -279,6 +325,7 @@ class PlaybackService : MediaSessionService() {
         sleepTask?.let(handler::removeCallbacks)
         sleepTask = null
         persistState()
+        clearPreload()
         session?.release()
         session = null
         effects.release()
