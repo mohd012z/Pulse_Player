@@ -31,6 +31,8 @@ class PlaybackService : MediaSessionService() {
         const val CMD_SET_CUSTOM = "com.pulseplayer.command.CUSTOM_EQ"
         const val CMD_SET_SLEEP = "com.pulseplayer.command.SLEEP"
         const val CMD_STATUS = "com.pulseplayer.command.STATUS"
+        const val CMD_SET_CROSSFADE = "com.pulseplayer.command.CROSSFADE"
+        const val ARG_CROSSFADE_SECONDS = "crossfade_seconds"
         const val ARG_PRESET = "preset"
         const val ARG_BASS = "bass"
         const val ARG_CUSTOM_BASS = "custom_bass"
@@ -131,6 +133,7 @@ class PlaybackService : MediaSessionService() {
                     .add(SessionCommand(CMD_SET_CUSTOM, Bundle.EMPTY))
                     .add(SessionCommand(CMD_SET_SLEEP, Bundle.EMPTY))
                     .add(SessionCommand(CMD_STATUS, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_SET_CROSSFADE, Bundle.EMPTY))
                     .build()
                 builder.setAvailableSessionCommands(commands)
             }
@@ -185,6 +188,13 @@ class PlaybackService : MediaSessionService() {
                         true
                     }
                 }
+                CMD_SET_CROSSFADE -> {
+                    val seconds = args.getInt(ARG_CROSSFADE_SECONDS, -1)
+                    if (seconds !in listOf(0, 2, 4, 6, 8, 12)) false else {
+                        preferences.edit().putInt("crossfade_seconds", seconds).apply()
+                        true
+                    }
+                }
                 CMD_STATUS -> true
                 else -> false
             }
@@ -197,6 +207,7 @@ class PlaybackService : MediaSessionService() {
                 putInt(ARG_CUSTOM_MID, effects.customMidDb)
                 putInt(ARG_CUSTOM_TREBLE, effects.customTrebleDb)
                 putInt(ARG_AUDIO_SESSION_ID, player.audioSessionId)
+                putInt(ARG_CROSSFADE_SECONDS, preferences.getInt("crossfade_seconds", 0))
                 val left = (sleepUntilMillis - android.os.SystemClock.elapsedRealtime())
                     .coerceAtLeast(0L)
                 putInt(ARG_MINUTES, if (left == 0L) 0 else ((left + 59_999L) / 60_000L).toInt())
