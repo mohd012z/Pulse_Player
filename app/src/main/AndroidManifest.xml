@@ -17,6 +17,7 @@
         android:allowBackup="true"
         android:label="Pulse Player"
         android:icon="@drawable/ic_launcher"
+        android:banner="@drawable/ic_launcher"
         android:theme="@style/Theme.PulsePlayer"
         android:supportsRtl="true">
 

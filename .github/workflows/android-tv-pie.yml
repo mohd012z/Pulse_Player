@@ -1,0 +1,41 @@
+name: Build Android TV Pie APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/android-tv-pie.yml'
+  push:
+    branches:
+      - feature/android-tv-pie-apk
+
+jobs:
+  android-tv-pie:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # The runner already includes the Android SDK; Gradle resolves required packages.
+      - name: Android SDK availability
+        run: test -d "$ANDROID_HOME" && test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Build Android 9 TV APK
+        run: |
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug -PtvPieBuild=true
+      - name: Verify APK
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          unzip -t app/build/outputs/apk/debug/app-debug.apk | tail -1
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulse-player-android-tv-pie-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
