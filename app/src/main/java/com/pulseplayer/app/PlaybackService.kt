@@ -82,11 +82,15 @@ class PlaybackService : MediaSessionService() {
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         persistState()
                     }
+                    override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                        persistState()
+                    }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         Log.i("PulsePlayer", "isPlaying=$isPlaying state=$playbackState suppression=$playbackSuppressionReason")
                         persistState()
                     }
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_ENDED) persistState()
                         Log.i("PulsePlayer", "playbackState=$playbackState playWhenReady=$playWhenReady")
                     }
                     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -235,7 +239,11 @@ class PlaybackService : MediaSessionService() {
             .putString("uri", uri)
             .putString("title", item?.mediaMetadata?.title?.toString())
             .putString("artist", item?.mediaMetadata?.artist?.toString())
-            .putLong("position", player.currentPosition.coerceAtLeast(0L))
+            .putLong("position", player.currentPosition.coerceAtLeast(0L).let { pos ->
+                val duration = player.duration
+                if (player.playbackState == Player.STATE_ENDED && duration > 0L && duration != C.TIME_UNSET) 0L
+                else pos
+            })
             .putInt("repeat", player.repeatMode)
             .putBoolean("shuffle", player.shuffleModeEnabled)
             .putFloat("speed", player.playbackParameters.speed)

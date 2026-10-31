@@ -17,6 +17,7 @@
         android:allowBackup="true"
         android:label="Pulse Player"
         android:icon="@drawable/ic_launcher"
+        android:banner="@drawable/ic_launcher"
         android:theme="@style/Theme.PulsePlayer"
         android:supportsRtl="true">
 
@@ -27,6 +28,9 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>

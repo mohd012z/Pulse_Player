@@ -26,6 +26,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.KeyEvent
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -591,8 +592,8 @@ class MainActivity : Activity() {
 
     private fun refreshLyricsIfNeeded() {
         val item = controller?.currentMediaItem
-        val id = item?.mediaId?.takeIf { it.isNotBlank() }
-            ?: item?.localConfiguration?.uri?.toString()
+        val id = item?.localConfiguration?.uri?.toString()
+            ?: item?.mediaId?.takeIf { it.isNotBlank() && it != "DEFAULT_MEDIA_ID" }
         if (lyricsTrackId == id) return
         lyricsTrackId = id
         lyricLines = emptyList()
@@ -1367,7 +1368,13 @@ class MainActivity : Activity() {
         lyricView.isSelected = true
         lyricView.setOnClickListener { showLyricDialog() }
         root.addView(lyricView, LinearLayout.LayoutParams(-1, dp(28)))
-        if (tvMode) lyricView.visibility = View.GONE
+        if (tvMode) {
+            lyricView.textSize = 18f
+            lyricView.gravity = android.view.Gravity.CENTER
+            lyricView.isFocusable = true
+            lyricView.isFocusableInTouchMode = false
+            lyricView.contentDescription = "Synchronized lyrics. Press OK to view or import LRC."
+        }
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(6))
@@ -1514,20 +1521,61 @@ class MainActivity : Activity() {
             showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
             }
-        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("▣", "Watch") { showMoviesDialog() },
-            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("♬", "Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
-        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         // Discovery and station tuner are accessible without displacing the five main tabs.
         bottomNav.addView(navButton("☰", "More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         root.addView(bottomNav)
         if (tvMode) {
             bottomNav.isFocusable = false
             sourceButton.requestFocus()
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (DeviceFormFactor.isTelevision(this) && event.action == KeyEvent.ACTION_DOWN) {
+            val player = controller
+            if (player != null) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                        if (event.repeatCount == 0) {
+                            if (player.isPlaying) player.pause() else { player.prepare(); player.play() }
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                        if (event.repeatCount == 0) { player.prepare(); player.play() }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        if (event.repeatCount == 0) player.pause()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                        if (event.repeatCount == 0 && player.hasNextMediaItem()) player.seekToNextMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                        if (event.repeatCount == 0 && player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                        if (event.repeatCount == 0) seekRelative(10_000L)
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                        if (event.repeatCount == 0) seekRelative(-10_000L)
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun seekRelative(delta: Long) {
@@ -1564,7 +1612,7 @@ class MainActivity : Activity() {
         }
         this.text = text
         setAllCaps(false)
-        textSize = 11f
+        textSize = if (DeviceFormFactor.isTelevision(this@MainActivity)) 16f else 11f
         setTextColor(Color.WHITE)
         background = GradientDrawable().apply {
             setColor(0xFF2A3849L.toInt())
@@ -1581,7 +1629,7 @@ class MainActivity : Activity() {
     private fun buttonRow(vararg buttons: Button) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         buttons.forEachIndexed { index, button ->
-            addView(button, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            addView(button, LinearLayout.LayoutParams(0, dp(if (DeviceFormFactor.isTelevision(this@MainActivity)) 60 else 44), 1f).apply {
                 if (index != 0) leftMargin = dp(4)
                 topMargin = dp(6)
             })
