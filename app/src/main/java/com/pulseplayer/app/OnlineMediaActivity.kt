@@ -420,6 +420,28 @@ class OnlineMediaActivity : Activity() {
         root.addView(providerNote)
         val web = WebView(this)
         browser = web
+        // Handle standard direct-media download links across providers.
+        web.setDownloadListener { url, _, _, _, _ ->
+            val uri = runCatching { Uri.parse(url) }.getOrNull()
+            val extension = uri?.lastPathSegment?.substringAfterLast('.', "")?.lowercase().orEmpty()
+            val allowed = mapOf("mp3" to "audio/mpeg", "m4a" to "audio/mp4",
+                "aac" to "audio/aac", "wav" to "audio/wav",
+                "mp4" to "video/mp4", "webm" to "video/webm")
+            if (uri?.scheme == "https" && !uri.host.isNullOrBlank() && extension in allowed) {
+                AlertDialog.Builder(this)
+                    .setTitle("Download direct media file")
+                    .setMessage("Save this authorized media file at original quality? Source: " + uri.host)
+                    .setPositiveButton("Downloads") { _, _ ->
+                        enqueueMediaDownload(uri!!, extension, allowed.getValue(extension), false)
+                    }
+                    .setNeutralButton("Music") { _, _ ->
+                        enqueueMediaDownload(uri!!, extension, allowed.getValue(extension), true)
+                    }
+                    .setNegativeButton("Cancel", null).show()
+            } else {
+                Toast.makeText(this, "Unsupported direct HTTPS media link", Toast.LENGTH_LONG).show()
+            }
+        }
         web.settings.javaScriptEnabled = true
         // Observe HTML5 playback state without injecting play commands or bypassing provider controls.
         web.addJavascriptInterface(object {
@@ -625,7 +647,10 @@ class OnlineMediaActivity : Activity() {
     }
 
     private fun showDirectMediaDownload() {
-        val detected = browser?.url.orEmpty()
+        val detected = browser?.url.orEmpty().takeIf { url ->
+            val uri = runCatching { Uri.parse(url) }.getOrNull()
+            uri?.lastPathSegment?.substringAfterLast('.', "")?.lowercase() in setOf("mp3", "m4a", "aac", "wav", "mp4", "webm")
+        }.orEmpty()
         val input = android.widget.EditText(this).apply {
             setSingleLine(true)
             setText(detected)
