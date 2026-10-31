@@ -142,6 +142,12 @@ class OnlineMediaActivity : Activity() {
         }
     }
 
+    private fun savePlaybackPosition(videoId: String, seconds: Double) {
+        if (!videoId.matches(Regex("[A-Za-z0-9_-]{11}")) ||
+            !seconds.isFinite() || seconds < 0.0 || seconds > 86400.0) return
+        historyStore.edit().putLong("position:$videoId", seconds.toLong()).apply()
+    }
+
     private fun showContinueWatching() {
         val items = readHistory()
         if (items.length() == 0) {
@@ -155,8 +161,15 @@ class OnlineMediaActivity : Activity() {
         if (entries.isEmpty()) return
         AlertDialog.Builder(this)
             .setTitle("Continue Watching · Recently opened")
-            .setItems(entries.map { "YouTube · $it" }.toTypedArray()) { _, index ->
-                browser?.loadUrl("https://www.youtube.com/watch?v=${entries[index]}")
+            .setItems(entries.map { id ->
+                val position = historyStore.getLong("position:$id", 0L)
+                if (position > 0) "YouTube · $id · resume at ${position}s" else "YouTube · $id"
+            }.toTypedArray()) { _, index ->
+                val id = entries[index]
+                val position = historyStore.getLong("position:$id", 0L).coerceIn(0L, 86400L)
+                val target = "https://www.youtube.com/watch?v=$id" +
+                    if (position > 0) "&t=${position}s" else ""
+                browser?.loadUrl(target)
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -387,6 +400,17 @@ class OnlineMediaActivity : Activity() {
                   document.addEventListener('ended',report,true);
                   report();
                 })();""", null)
+                // Read-only HTML5 position observation; provider restrictions are respected.
+                val observedUri = url?.let { runCatching { Uri.parse(it) }.getOrNull() }
+                val observedId = observedUri?.let { youtubeId(it) }
+                if (observedId != null) {
+                    view?.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video');return v && isFinite(v.currentTime) ? v.currentTime : -1;})()"
+                    ) { raw ->
+                        val seconds = raw?.toDoubleOrNull()
+                        if (seconds != null && view.url == url) savePlaybackPosition(observedId, seconds)
+                    }
+                }
                 url?.let { pageUrl ->
                     val pageUri = runCatching { Uri.parse(pageUrl) }.getOrNull()
                     if (pageUri != null && youtubeId(pageUri) != null) {
