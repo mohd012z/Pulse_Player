@@ -182,8 +182,13 @@ class OnlineMediaActivity : Activity() {
                 else null
             } else providers[name]
         } ?: run { finish(); return }
+        val movieQuery = intent.getStringExtra("movie_search_query")
+            ?.takeIf { name in setOf("Movie Melayu", "Movie Indonesia") && it.length in 1..300 }
+        val resolvedUrl = if (movieQuery != null) {
+            "https://www.youtube.com/results?search_query=" + Uri.encode(movieQuery)
+        } else url
         activeProvider = name
-        homeUrl = url
+        homeUrl = resolvedUrl
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF10141F.toInt())
