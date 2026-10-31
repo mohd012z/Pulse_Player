@@ -397,7 +397,11 @@ class OnlineMediaActivity : Activity() {
         web.addJavascriptInterface(object {
             @android.webkit.JavascriptInterface
             fun report(playing: Boolean) {
-                runOnUiThread { providerVideoPlaying = playing }
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed && allowedSessionUrl(browser?.url)) {
+                        providerVideoPlaying = playing
+                    }
+                }
             }
         }, "PulsePlaybackObserver")
         web.settings.domStorageEnabled = true
