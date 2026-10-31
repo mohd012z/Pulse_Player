@@ -375,7 +375,7 @@ class OnlineMediaActivity : Activity() {
                 .setNegativeButton("Cancel", null).show()
         }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
-        val downloadButton = toolbarButton("Download", "Download available media") { showMediaDownloadOptions() }
+        val downloadButton = toolbarButton("Download", "Download and manage media") { showDownloadMenu() }
         compactButton.setOnLongClickListener {
             Toast.makeText(this, "Use the Home gesture for floating MINI where supported", Toast.LENGTH_LONG).show()
             true
@@ -630,6 +630,61 @@ class OnlineMediaActivity : Activity() {
         browser?.evaluateJavascript("(function(){var v=document.querySelector('video,audio');if(v){$script}})();", null)
     }
 
+    private fun showDownloadMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("Downloads")
+            .setItems(arrayOf("Save media file", "Manage downloads")) { _, choice ->
+                if (choice == 0) showMediaDownloadOptions() else showDownloadManager()
+            }
+            .setNegativeButton("Close", null).show()
+    }
+
+    private fun showDownloadManager() {
+        val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
+        val saved = getSharedPreferences("pulse_download_ids", MODE_PRIVATE)
+        val ids = saved.getString("ids", "").orEmpty().split(",")
+            .mapNotNull { it.toLongOrNull() }.distinct().takeLast(40)
+        if (ids.isEmpty()) {
+            AlertDialog.Builder(this).setTitle("Downloads")
+                .setMessage("No Pulse Player downloads queued on this device.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val rows = ids.reversed().map { id ->
+            val info = runCatching {
+                manager.query(android.app.DownloadManager.Query().setFilterById(id))?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@use "Not found"
+                    val status = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS))
+                    val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                    val total = cursor.getLong(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                    val state = when (status) {
+                        android.app.DownloadManager.STATUS_SUCCESSFUL -> "Completed"
+                        android.app.DownloadManager.STATUS_FAILED -> "Failed"
+                        android.app.DownloadManager.STATUS_RUNNING -> "Downloading"
+                        android.app.DownloadManager.STATUS_PAUSED -> "Paused by Android"
+                        else -> "Pending"
+                    }
+                    "$state · $downloaded / ${if (total > 0) total.toString() else "unknown"} bytes"
+                }
+            }.getOrNull() ?: "Unavailable"
+            "#$id · $info"
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Pulse downloads")
+            .setItems(rows) { _, selected ->
+                val id = ids.reversed()[selected]
+                AlertDialog.Builder(this).setTitle("Download #$id")
+                    .setMessage("Cancel removes this transfer from Android DownloadManager. Completed files may also be deleted.")
+                    .setPositiveButton("Cancel / remove") { _, _ ->
+                        runCatching { manager.remove(id) }
+                        showDownloadManager()
+                    }
+                    .setNeutralButton("Refresh") { _, _ -> showDownloadManager() }
+                    .setNegativeButton("Back", null).show()
+            }
+            .setPositiveButton("Refresh") { _, _ -> showDownloadManager() }
+            .setNegativeButton("Close", null).show()
+    }
+
     private fun showMediaDownloadOptions() {
         val current = browser?.url.orEmpty()
         val host = runCatching { Uri.parse(current).host?.lowercase().orEmpty() }.getOrDefault("")
@@ -694,6 +749,9 @@ class OnlineMediaActivity : Activity() {
         val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
         runCatching { manager.enqueue(request) }
             .onSuccess { downloadId ->
+                val prefs = getSharedPreferences("pulse_download_ids", MODE_PRIVATE)
+                val current = prefs.getString("ids", "").orEmpty().split(",").mapNotNull { it.toLongOrNull() }
+                prefs.edit().putString("ids", (current + downloadId).distinct().takeLast(40).joinToString(",")).apply()
                 Toast.makeText(this, "Download queued: $directory/$filename", Toast.LENGTH_LONG).show()
                 watchDownloadStatus(manager, downloadId)
             }
