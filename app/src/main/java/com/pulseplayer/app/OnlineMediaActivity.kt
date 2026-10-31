@@ -135,7 +135,7 @@ class OnlineMediaActivity : Activity() {
             "strong,small{display:block;padding:5px 8px;overflow-wrap:anywhere}small{color:#b6c3cd}" +
             "</style></head><body><h2>Recently watched videos</h2>" +
             "<div class=\"grid\">$cards</div>" +
-            "<script>document.querySelector(\\".grid a\\")?.focus();</script></body></html>"
+            "<script>document.querySelector(\'.grid a\')?.focus();</script></body></html>"
         browser?.apply { isFocusable = true; isFocusableInTouchMode = true
             loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
             requestFocus()
