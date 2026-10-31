@@ -1053,16 +1053,32 @@ class MainActivity : Activity() {
 
     private fun showMoviesDialog() {
         val options = arrayOf(
-            "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports",
+            "Mirror Cast", "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
             "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia",
             "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat",
             "Netflix on YouTube", "Netflix Movies"
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
-            if (options[index] == "Misteri Indonesia") showIndonesianMystery()
+            if (options[index] == "Mirror Cast") showMirrorCastHelp()
+            else if (options[index] == "Misteri Indonesia") showIndonesianMystery()
             else if (options[index] in listOf("Movie Melayu", "Movie Indonesia")) showMovieFilters(options[index])
             else openProvider(options[index])
+        }
+    }
+
+    private fun showMirrorCastHelp() {
+        val choices = arrayOf("Open Android Cast settings", "Choose audio output", "Connection help")
+        showPicker("Mirror Cast · Android system", choices) { index ->
+            when (index) {
+                0 -> runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
+                    .onFailure { status("Cast settings unavailable on this Android device") }
+                1 -> chooseAudioOutput()
+                2 -> AlertDialog.Builder(this)
+                    .setTitle("Mirror Cast help")
+                    .setMessage("Connect your phone and TV to the same Wi-Fi when required. Open Cast settings and choose a supported receiver. Some Android devices support Miracast or vendor-specific screen sharing instead. Audio output selection does not mirror video. DRM-protected content may not display. Pulse Player cannot force a connection or bypass provider restrictions.")
+                    .setPositiveButton("OK", null).show()
+            }
         }
     }
 
