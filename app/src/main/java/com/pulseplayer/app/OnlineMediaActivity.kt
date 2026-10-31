@@ -328,17 +328,23 @@ class OnlineMediaActivity : Activity() {
         val external = toolbarButton("Official app", "Open official app") {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
-        val mirrorButton = toolbarButton("Mirror", "Open Android screen casting settings") {
+        val mirrorButton = toolbarButton("Mirror", "Open screen mirroring and routing options") {
+            val options = arrayOf("Screen mirror · Android Cast settings", "Audio output · Android settings", "Compatibility and troubleshooting")
             AlertDialog.Builder(this)
-                .setTitle("Mirror screen to TV")
-                .setMessage("Open Android Cast settings and select a compatible display. Screen mirroring is managed by Android and may not be supported by your TV. Protected video may not display.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Open Cast settings") { _, _ ->
-                    runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
-                        .onFailure {
-                            Toast.makeText(this, "Cast settings unavailable on this device", Toast.LENGTH_LONG).show()
-                        }
-                }.show()
+                .setTitle("Mirror Cast")
+                .setItems(options) { _, selected ->
+                    when (selected) {
+                        0 -> runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
+                            .onFailure { Toast.makeText(this, "Cast settings unavailable on this device", Toast.LENGTH_LONG).show() }
+                        1 -> runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                            .onFailure { Toast.makeText(this, "Audio output settings unavailable", Toast.LENGTH_LONG).show() }
+                        2 -> AlertDialog.Builder(this)
+                            .setTitle("Connection help")
+                            .setMessage("Screen mirroring requires compatible phone and TV casting protocols. Use the same Wi-Fi when required, enable screen sharing on the TV, then select the receiver in Android settings. Audio routing is separate from video mirroring. DRM-protected playback may be blocked. No protected playback is bypassed.")
+                            .setPositiveButton("OK", null).show()
+                    }
+                }
+                .setNegativeButton("Cancel", null).show()
         }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
         val downloadButton = toolbarButton("Download", "Download available media") { showMediaDownloadOptions() }
