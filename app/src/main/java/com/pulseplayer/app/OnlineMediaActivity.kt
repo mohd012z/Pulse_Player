@@ -130,11 +130,16 @@ class OnlineMediaActivity : Activity() {
             "<style>body{background:#10141f;color:white;font-family:sans-serif;margin:16px}" +
             ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}" +
             "a{color:white;text-decoration:none;background:#1b2331;border-radius:12px;overflow:hidden;padding:8px}" +
-            "a:focus{outline:4px solid #75e2c0}img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
+            "a{display:block;min-height:180px}a:focus,a:focus-visible{outline:5px solid #75e2c0;outline-offset:3px;transform:scale(1.025)}" +
+            "img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
             "strong,small{display:block;padding:5px 8px;overflow-wrap:anywhere}small{color:#b6c3cd}" +
             "</style></head><body><h2>Recently watched videos</h2>" +
-            "<div class=\"grid\">$cards</div></body></html>"
-        browser?.loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
+            "<div class=\"grid\">$cards</div>" +
+            "<script>document.querySelector(\\".grid a\\")?.focus();</script></body></html>"
+        browser?.apply { isFocusable = true; isFocusableInTouchMode = true
+            loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
+            requestFocus()
+        }
     }
 
     private fun showContinueWatching() {
@@ -167,7 +172,7 @@ class OnlineMediaActivity : Activity() {
             val entry = items.optJSONObject(i)
             val date = java.text.DateFormat.getDateTimeInstance().format(
                 java.util.Date(entry?.optLong("visitedAt") ?: 0L))
-            "$date · ${entry?.optString("id").orEmpty()}"
+            "$date · ${entry?.optString("title")?.takeIf { it.isNotBlank() } ?: entry?.optString("id").orEmpty()}"
         }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Watch history")
