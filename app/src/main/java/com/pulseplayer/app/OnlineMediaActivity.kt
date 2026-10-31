@@ -80,11 +80,20 @@ class OnlineMediaActivity : Activity() {
         return id?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
     }
 
-    private fun rememberVideo(uri: Uri) {
+    private fun rememberVideo(uri: Uri, title: String? = null) {
         val id = youtubeId(uri) ?: return
         val old = readHistory()
+        val previous = (0 until old.length()).mapNotNull { old.optJSONObject(it) }
+            .firstOrNull { it.optString("id") == id }
+        val cleanedTitle = title?.trim()?.take(160)?.takeIf {
+            it.isNotBlank() && it != "YouTube" && it != "YouTube - YouTube"
+        }
         val next = JSONArray()
-        next.put(JSONObject().put("id", id).put("visitedAt", System.currentTimeMillis()))
+        next.put(JSONObject()
+            .put("id", id)
+            .put("title", cleanedTitle ?: previous?.optString("title").orEmpty())
+            .put("posterUrl", "https://i.ytimg.com/vi/$id/hqdefault.jpg")
+            .put("visitedAt", System.currentTimeMillis()))
         for (i in 0 until old.length()) {
             val item = old.optJSONObject(i) ?: continue
             if (item.optString("id") != id && next.length() < 100) next.put(item)
@@ -92,28 +101,39 @@ class OnlineMediaActivity : Activity() {
         historyStore.edit().putString("videos", next.toString()).apply()
     }
 
+    private fun escapeHtml(value: String): String = value
+        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\\"", "&quot;").replace("'", "&#39;")
+
     private fun showPosterGrid() {
         val items = readHistory()
-        val ids = (0 until minOf(items.length(), 60)).mapNotNull { index ->
-            items.optJSONObject(index)?.optString("id")
-                ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+        val entries = (0 until minOf(items.length(), 60)).mapNotNull { index ->
+            items.optJSONObject(index)?.takeIf {
+                it.optString("id").matches(Regex("[A-Za-z0-9_-]{11}"))
+            }
         }
-        if (ids.isEmpty()) {
+        if (entries.isEmpty()) {
             Toast.makeText(this, "Watch videos to populate the poster grid", Toast.LENGTH_SHORT).show()
             return
         }
-        val cards = ids.joinToString("") { id ->
-            "<a href=\"https://www.youtube.com/watch?v=$id\"><img loading=\"lazy\" " +
-                "alt=\"Video thumbnail\" src=\"https://i.ytimg.com/vi/$id/hqdefault.jpg\"/>" +
-                "<span>Play video</span></a>"
+        val cards = entries.joinToString("") { entry ->
+            val id = entry.optString("id")
+            val title = escapeHtml(entry.optString("title").ifBlank { "YouTube video · $id" })
+            val poster = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+            val date = java.text.DateFormat.getDateInstance().format(
+                java.util.Date(entry.optLong("visitedAt").coerceAtLeast(0L)))
+            "<a href=\\"https://www.youtube.com/watch?v=$id\\" aria-label=\\"$title\\">" +
+                "<img loading=\\"lazy\\" alt=\\"Thumbnail: $title\\" src=\\"$poster\\"/>" +
+                "<strong>$title</strong><small>Watched ${escapeHtml(date)}</small></a>"
         }
-        val html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+        val html = "<!doctype html><html><head><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\">" +
             "<style>body{background:#10141f;color:white;font-family:sans-serif;margin:16px}" +
             ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}" +
             "a{color:white;text-decoration:none;background:#1b2331;border-radius:12px;overflow:hidden;padding:8px}" +
             "a:focus{outline:4px solid #75e2c0}img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
-            "span{display:block;padding:8px}</style></head><body><h2>Recently watched videos</h2>" +
-            "<div class=\"grid\">$cards</div></body></html>"
+            "strong,small{display:block;padding:5px 8px;overflow-wrap:anywhere}small{color:#b6c3cd}" +
+            "</style></head><body><h2>Recently watched videos</h2>" +
+            "<div class=\\"grid\\">$cards</div></body></html>"
         browser?.loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
     }
 
@@ -362,7 +382,21 @@ class OnlineMediaActivity : Activity() {
                   document.addEventListener('ended',report,true);
                   report();
                 })();""", null)
-                url?.let { runCatching { rememberVideo(Uri.parse(it)) } }
+                url?.let { pageUrl ->
+                    val pageUri = runCatching { Uri.parse(pageUrl) }.getOrNull()
+                    if (pageUri != null && youtubeId(pageUri) != null) {
+                        rememberVideo(pageUri)
+                        view?.evaluateJavascript("document.title") { jsonTitle ->
+                            val title = runCatching {
+                                JSONArray("[$jsonTitle]").optString(0)
+                            }.getOrNull()
+                            // Ignore stale asynchronous title callbacks after navigation.
+                            if (view.url == pageUrl && !isFinishing && !isDestroyed) {
+                                rememberVideo(pageUri, title)
+                            }
+                        }
+                    }
+                }
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
