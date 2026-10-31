@@ -1544,15 +1544,15 @@ class MainActivity : Activity() {
             showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify")[it])
             }
-        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("▣", "Watch") { showMoviesDialog() },
-            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         bottomNav.addView(navButton("♬", "Studio") {
             startActivity(Intent(this, AiPulseStudioActivity::class.java))
-        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+        }, LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         // Discovery and station tuner are accessible without displacing the five main tabs.
         bottomNav.addView(navButton("☰", "More") { showMoreMenu() },
-            LinearLayout.LayoutParams(0, dp(42), 1f).apply { leftMargin = dp(3) })
+            LinearLayout.LayoutParams(0, if (tvMode) dp(76) else dp(42), 1f).apply { leftMargin = dp(3) })
         root.addView(bottomNav)
         if (tvMode) {
             bottomNav.isFocusable = false
