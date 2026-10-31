@@ -1269,36 +1269,6 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        if (DeviceFormFactor.isTelevision(this) &&
-            event.action == android.view.KeyEvent.ACTION_DOWN) {
-            // Preserve directional navigation and text entry; handle media keys only.
-            when (event.keyCode) {
-                android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                    controller?.let { if (it.isPlaying) it.pause() else { it.prepare(); it.play() } }
-                    return controller != null
-                }
-                android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                    controller?.let { it.prepare(); it.play() }
-                    return controller != null
-                }
-                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                    controller?.pause()
-                    return controller != null
-                }
-                android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                    controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() }
-                    return controller != null
-                }
-                android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                    controller?.let { if (it.hasPreviousMediaItem()) it.seekToPreviousMediaItem() }
-                    return controller != null
-                }
-            }
-        }
-        return super.dispatchKeyEvent(event)
-    }
-
     private fun buildUi() {
         val tvMode = DeviceFormFactor.isTelevision(this)
         val root = LinearLayout(this).apply {
