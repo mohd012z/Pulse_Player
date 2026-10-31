@@ -419,9 +419,9 @@ class OnlineMediaActivity : Activity() {
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
         if (savedInstanceState == null) {
             val last = sessionStore.getString("page:$name", null)
-            web.loadUrl(if (allowedSessionUrl(last)) last!! else url)
+            web.loadUrl(if (allowedSessionUrl(last)) last!! else resolvedUrl)
         } else if (web.restoreState(savedInstanceState) == null) {
-            web.loadUrl(url)
+            web.loadUrl(resolvedUrl)
         }
     }
 
