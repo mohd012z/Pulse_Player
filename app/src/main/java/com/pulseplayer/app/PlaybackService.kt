@@ -55,9 +55,15 @@ class PlaybackService : MediaSessionService() {
     private var sleepTask: Runnable? = null
     private var sleepUntilMillis: Long = 0L
 
-    private val checkpoint = object : Runnable {
+    private val preloadMonitor = object : Runnable {
         override fun run() {
             refreshCrossfadePreload()
+            handler.postDelayed(this, 1_000L)
+        }
+    }
+
+    private val checkpoint = object : Runnable {
+        override fun run() {
             persistState()
             handler.postDelayed(this, 15_000L)
         }
@@ -120,6 +126,7 @@ class PlaybackService : MediaSessionService() {
             .setCallback(sessionCallback)
             .build()
         handler.postDelayed(checkpoint, 15_000L)
+        handler.post(preloadMonitor)
     }
 
     private val sessionCallback = object : MediaSession.Callback {
@@ -237,7 +244,10 @@ class PlaybackService : MediaSessionService() {
     private fun refreshCrossfadePreload() {
         if (!::player.isInitialized) return
         val seconds = preferences.getInt("crossfade_seconds", 0)
-        if (seconds == 0 || !player.isPlaying || player.mediaItemCount < 2) {
+        if (seconds == 0 || !player.isPlaying || player.mediaItemCount < 2 ||
+            !CrossfadeEnvelope.eligible(player.duration, player.currentPosition,
+                seconds * 1_000L, player.hasNextMediaItem(), player.isPlaying,
+                player.isCurrentMediaItemSeekable)) {
             clearPreload()
             return
         }
@@ -322,6 +332,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(checkpoint)
+        handler.removeCallbacks(preloadMonitor)
         sleepTask?.let(handler::removeCallbacks)
         sleepTask = null
         persistState()
