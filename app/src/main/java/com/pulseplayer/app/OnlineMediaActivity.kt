@@ -773,7 +773,7 @@ class OnlineMediaActivity : Activity() {
         (container.parent as? ViewGroup)?.removeView(container)
         val callback = fullscreenCallback
         fullscreenCallback = null
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        requestedOrientation = previousOrientation
         callback?.onCustomViewHidden()
     }
 
