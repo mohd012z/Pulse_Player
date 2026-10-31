@@ -139,11 +139,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedOrientation = if (DeviceFormFactor.isTelevision(this)) {
-            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER
-        }
+        requestedOrientation = DeviceFormFactor.preferredOrientation(this)
         window.statusBarColor = COLOR_BG
         window.navigationBarColor = COLOR_BG
         buildUi()
