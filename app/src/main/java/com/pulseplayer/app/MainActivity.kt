@@ -1238,15 +1238,20 @@ class MainActivity : Activity() {
         val options = durations.map { seconds ->
             if (seconds == 0) "Off" else "${seconds} seconds"
         }.toTypedArray()
-        val prefs = getSharedPreferences("player_state", MODE_PRIVATE)
-        val selected = prefs.getInt("crossfade_seconds", 0)
-        showPicker("Crossfade · currently ${if (selected == 0) "Off" else "${selected}s"}", options) { index ->
-            val seconds = durations[index]
-            prefs.edit().putInt("crossfade_seconds", seconds).apply()
-            status(
-                if (seconds == 0) "Crossfade disabled"
-                else "Crossfade preference: ${seconds}s saved; audio overlap not yet enabled"
-            )
+        customCommand(PlaybackService.CMD_STATUS) { extras, ok ->
+            val selected = if (ok) extras.getInt(PlaybackService.ARG_CROSSFADE_SECONDS, 0) else 0
+            showPicker("Crossfade · ${if (selected == 0) "Off" else "${selected}s"}", options) { index ->
+                val seconds = durations[index]
+                customCommand(PlaybackService.CMD_SET_CROSSFADE, Bundle().apply {
+                    putInt(PlaybackService.ARG_CROSSFADE_SECONDS, seconds)
+                }) { _, success ->
+                    status(
+                        if (!success) "Could not save crossfade setting"
+                        else if (seconds == 0) "Crossfade disabled"
+                        else "Crossfade ${seconds}s saved; audio overlap pending"
+                    )
+                }
+            }
         }
     }
 
