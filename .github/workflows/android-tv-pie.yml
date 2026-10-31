@@ -28,6 +28,15 @@ jobs:
       - name: Build Android 9 TV APK
         run: |
           gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug -PtvPieBuild=true
+      - name: Verify Android 9 manifest and TV launcher
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" > /tmp/tv-badging.txt
+          grep -q "sdkVersion:'28'" /tmp/tv-badging.txt
+          grep -q "leanback-launchable-activity:" /tmp/tv-badging.txt
+          cat /tmp/tv-badging.txt | grep -E "sdkVersion|leanback-launchable-activity|native-code"
       - name: Verify APK
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
