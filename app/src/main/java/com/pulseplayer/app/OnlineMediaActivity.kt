@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.util.Rational
 import android.content.res.Configuration
 import android.content.Intent
+import android.provider.Settings
 import android.graphics.Color
 import android.content.pm.ActivityInfo
 import android.view.View
@@ -327,6 +328,18 @@ class OnlineMediaActivity : Activity() {
         val external = toolbarButton("Official app", "Open official app") {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
+        val mirrorButton = toolbarButton("Mirror", "Open Android screen casting settings") {
+            AlertDialog.Builder(this)
+                .setTitle("Mirror screen to TV")
+                .setMessage("Open Android Cast settings and select a compatible display. Screen mirroring is managed by Android and may not be supported by your TV. Protected video may not display.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Open Cast settings") { _, _ ->
+                    runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
+                        .onFailure {
+                            Toast.makeText(this, "Cast settings unavailable on this device", Toast.LENGTH_LONG).show()
+                        }
+                }.show()
+        }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
         val downloadButton = toolbarButton("Download", "Download available media") { showMediaDownloadOptions() }
         compactButton.setOnLongClickListener {
@@ -343,6 +356,7 @@ class OnlineMediaActivity : Activity() {
             firstRow.addView(posterButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(continueButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
+            firstRow.addView(mirrorButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(external, LinearLayout.LayoutParams(dp(if (tvMode) 160 else 114), dp(if (tvMode) 68 else 38)))
             firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(if (tvMode) 150 else 64), dp(if (tvMode) 68 else 38)))
         }
@@ -357,6 +371,7 @@ class OnlineMediaActivity : Activity() {
             secondRow.addView(posterButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(continueButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
+            secondRow.addView(mirrorButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(downloadButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             top.addView(secondRow)
