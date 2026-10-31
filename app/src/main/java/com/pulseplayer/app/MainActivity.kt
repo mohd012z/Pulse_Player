@@ -1053,7 +1053,7 @@ class MainActivity : Activity() {
 
     private fun showMoviesDialog() {
         val options = arrayOf(
-            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
+            "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
             "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia",
             "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat",
@@ -1087,7 +1087,7 @@ class MainActivity : Activity() {
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
-            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports" -> "https://www.youtube.com/"
+            "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports" -> "https://www.youtube.com/"
             "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)" -> "https://www.youtube.com/"
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
             "BFM 89.9" -> "https://www.bfm.my/"
@@ -1096,7 +1096,7 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
+            if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
                 startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
             } else {
                 if (destination in listOf("Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat", "Netflix on YouTube", "Netflix Movies")) {
