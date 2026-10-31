@@ -1061,7 +1061,28 @@ class MainActivity : Activity() {
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
             if (options[index] == "Misteri Indonesia") showIndonesianMystery()
+            else if (options[index] in listOf("Movie Melayu", "Movie Indonesia")) showMovieFilters(options[index])
             else openProvider(options[index])
+        }
+    }
+
+    private fun showMovieFilters(provider: String) {
+        val genres = arrayOf("All genres", "Action", "Comedy", "Horror", "Romance", "Drama", "Family", "Documentary")
+        showPicker("$provider · Genre", genres) { genreIndex ->
+            val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+            val years = arrayOf("All years", "Latest ($currentYear)", "Previous year (${currentYear - 1})",
+                "2020–2024", "2010–2019", "Before 2010")
+            showPicker("$provider · Release year", years) { yearIndex ->
+                val sourceOptions = arrayOf("Official-source search (recommended)", "All search results")
+                showPicker("$provider · Source", sourceOptions) { sourceIndex ->
+                    val query = MovieSearchPolicy.query(
+                        provider, genreIndex, yearIndex, sourceIndex == 0, currentYear
+                    )
+                    startActivity(Intent(this, OnlineMediaActivity::class.java)
+                        .putExtra("provider", provider)
+                        .putExtra("movie_search_query", query))
+                }
+            }
         }
     }
 
