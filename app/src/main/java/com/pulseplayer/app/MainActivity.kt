@@ -26,6 +26,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.KeyEvent
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -1558,6 +1559,47 @@ class MainActivity : Activity() {
             bottomNav.isFocusable = false
             sourceButton.requestFocus()
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (DeviceFormFactor.isTelevision(this) && event.action == KeyEvent.ACTION_DOWN) {
+            val player = controller
+            if (player != null) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                        if (event.repeatCount == 0) {
+                            if (player.isPlaying) player.pause() else { player.prepare(); player.play() }
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                        if (event.repeatCount == 0) { player.prepare(); player.play() }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        if (event.repeatCount == 0) player.pause()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                        if (event.repeatCount == 0 && player.hasNextMediaItem()) player.seekToNextMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                        if (event.repeatCount == 0 && player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                        if (event.repeatCount == 0) seekRelative(10_000L)
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                        if (event.repeatCount == 0) seekRelative(-10_000L)
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun seekRelative(delta: Long) {
