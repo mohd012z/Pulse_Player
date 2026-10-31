@@ -747,6 +747,13 @@ class OnlineMediaActivity : Activity() {
             .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(directory, filename)
         val manager = getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager
+        // Forward only the cookie for the exact HTTPS origin already loaded in this WebView.
+        // Do not send browsing credentials to unrelated direct-download hosts.
+        val page = runCatching { Uri.parse(browser?.url.orEmpty()) }.getOrNull()
+        if (page?.scheme == "https" && page.host.equals(uri.host, ignoreCase = true)) {
+            val cookie = android.webkit.CookieManager.getInstance().getCookie(uri.toString())
+            if (!cookie.isNullOrBlank()) request.addRequestHeader("Cookie", cookie)
+        }
         runCatching { manager.enqueue(request) }
             .onSuccess { downloadId ->
                 val prefs = getSharedPreferences("pulse_download_ids", MODE_PRIVATE)
