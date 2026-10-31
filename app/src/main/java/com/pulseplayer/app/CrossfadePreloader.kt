@@ -5,6 +5,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 
@@ -18,9 +19,10 @@ class CrossfadePreloader(private val context: Context) {
     private var secondary: ExoPlayer? = null
     private var preparedItem: MediaItem? = null
     private var generation = 0L
+    private var failed = false
 
     val isPrepared: Boolean
-        get() = secondary?.playbackState == Player.STATE_READY && preparedItem != null
+        get() = !failed && secondary?.playbackState == Player.STATE_READY && preparedItem != null
 
     fun prepare(item: MediaItem): Long {
         cancel()
@@ -30,14 +32,25 @@ class CrossfadePreloader(private val context: Context) {
         val player = ExoPlayer.Builder(context).build()
         secondary = player
         preparedItem = item
-        player.setAudioAttributes(
-            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false
-        )
-        player.volume = 0f
-        player.playWhenReady = false
-        player.setMediaItem(item)
-        player.prepare()
+        try {
+            player.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    failed = true
+                    preparedItem = null
+                }
+            })
+            player.setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false
+            )
+            player.volume = 0f
+            player.playWhenReady = false
+            player.setMediaItem(item)
+            player.prepare()
+        } catch (error: RuntimeException) {
+            cancel()
+            throw error
+        }
         return token
     }
 
@@ -47,6 +60,7 @@ class CrossfadePreloader(private val context: Context) {
     fun cancel() {
         generation++
         preparedItem = null
+        failed = false
         secondary?.release()
         secondary = null
     }
