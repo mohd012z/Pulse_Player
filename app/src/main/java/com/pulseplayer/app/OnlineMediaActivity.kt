@@ -103,7 +103,7 @@ class OnlineMediaActivity : Activity() {
 
     private fun escapeHtml(value: String): String = value
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        .replace("\\"", "&quot;").replace("'", "&#39;")
+        .replace("\"", "&quot;").replace("'", "&#39;")
 
     private fun showPosterGrid() {
         val items = readHistory()
@@ -122,18 +122,18 @@ class OnlineMediaActivity : Activity() {
             val poster = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
             val date = java.text.DateFormat.getDateInstance().format(
                 java.util.Date(entry.optLong("visitedAt").coerceAtLeast(0L)))
-            "<a href=\\"https://www.youtube.com/watch?v=$id\\" aria-label=\\"$title\\">" +
-                "<img loading=\\"lazy\\" alt=\\"Thumbnail: $title\\" src=\\"$poster\\"/>" +
+            "<a href=\"https://www.youtube.com/watch?v=$id\" aria-label=\"$title\">" +
+                "<img loading=\"lazy\" alt=\"Thumbnail: $title\" src=\"$poster\"/>" +
                 "<strong>$title</strong><small>Watched ${escapeHtml(date)}</small></a>"
         }
-        val html = "<!doctype html><html><head><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\">" +
+        val html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
             "<style>body{background:#10141f;color:white;font-family:sans-serif;margin:16px}" +
             ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}" +
             "a{color:white;text-decoration:none;background:#1b2331;border-radius:12px;overflow:hidden;padding:8px}" +
             "a:focus{outline:4px solid #75e2c0}img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
             "strong,small{display:block;padding:5px 8px;overflow-wrap:anywhere}small{color:#b6c3cd}" +
             "</style></head><body><h2>Recently watched videos</h2>" +
-            "<div class=\\"grid\\">$cards</div></body></html>"
+            "<div class=\"grid\">$cards</div></body></html>"
         browser?.loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
     }
 
