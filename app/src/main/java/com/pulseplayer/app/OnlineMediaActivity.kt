@@ -242,11 +242,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedOrientation = if (DeviceFormFactor.isTelevision(this)) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_USER
-        }
+        requestedOrientation = DeviceFormFactor.preferredOrientation(this)
         // Dedicated browser screen: avoid OEM edge-to-edge status icons obscuring controls.
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
@@ -506,11 +502,7 @@ class OnlineMediaActivity : Activity() {
                 fullscreenContainer = container
                 addContentView(container, ViewGroup.LayoutParams(-1, -1))
                 // Allow both portrait short dramas and landscape movies without forcing a reload.
-                requestedOrientation = if (DeviceFormFactor.isTelevision(this@OnlineMediaActivity)) {
-                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_USER
-                }
+                requestedOrientation = DeviceFormFactor.preferredOrientation(this@OnlineMediaActivity)
             }
 
             override fun onHideCustomView() {
@@ -756,7 +748,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (pipEnabled && fullscreenView == null && providerVideoPlaying) enterFloatingMini()
+        if (!awaitingCastReturn && pipEnabled && fullscreenView == null && providerVideoPlaying) enterFloatingMini()
     }
 
     override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
