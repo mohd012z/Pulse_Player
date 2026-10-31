@@ -37,14 +37,28 @@ jobs:
           grep -q "sdkVersion:'28'" /tmp/tv-badging.txt
           grep -q "leanback-launchable-activity:" /tmp/tv-badging.txt
           cat /tmp/tv-badging.txt | grep -E "sdkVersion|leanback-launchable-activity|native-code"
-      - name: Verify APK
+      - name: Verify APK signature, archive and checksum
         run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -1
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          test -x "$BUILD_TOOLS/apksigner"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | grep -q "sdkVersion:'28'"
+          (cd "$(dirname "$APK")" && sha256sum "$(basename "$APK")" > SHA256SUMS.txt)
+          (cd "$(dirname "$APK")" && sha256sum -c SHA256SUMS.txt)
+      - name: Verify artifact metadata
+        run: |
+          set -euo pipefail
           test -s app/build/outputs/apk/debug/app-debug.apk
-          unzip -t app/build/outputs/apk/debug/app-debug.apk | tail -1
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/debug/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: pulse-player-android-tv-pie-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
