@@ -45,7 +45,12 @@ jobs:
           unzip -t "$APK" | tail -1
           BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
           test -x "$BUILD_TOOLS/apksigner"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          # Android 9 (API 28) must accept the signing scheme; inspect schemes explicitly.
+          "$BUILD_TOOLS/apksigner" verify --min-sdk-version 28 --verbose --print-certs "$APK" | tee /tmp/tv-apk-signature.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/tv-apk-signature.txt
+          # Preserve a machine-readable certificate fingerprint for later update checks.
+          grep -m1 "Signer #1 certificate SHA-256 digest:" /tmp/tv-apk-signature.txt > app/build/outputs/apk/debug/SIGNER_SHA256.txt
+          test -s app/build/outputs/apk/debug/SIGNER_SHA256.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" | grep -q "sdkVersion:'28'"
           (cd "$(dirname "$APK")" && sha256sum "$(basename "$APK")" > SHA256SUMS.txt)
           (cd "$(dirname "$APK")" && sha256sum -c SHA256SUMS.txt)
@@ -54,11 +59,13 @@ jobs:
           set -euo pipefail
           test -s app/build/outputs/apk/debug/app-debug.apk
           test -s app/build/outputs/apk/debug/SHA256SUMS.txt
+          test -s app/build/outputs/apk/debug/SIGNER_SHA256.txt
       - uses: actions/upload-artifact@v4
         with:
           name: pulse-player-android-tv-pie-apk
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/SHA256SUMS.txt
+            app/build/outputs/apk/debug/SIGNER_SHA256.txt
           if-no-files-found: error
           retention-days: 14
