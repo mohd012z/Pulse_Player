@@ -817,7 +817,6 @@ class OnlineMediaActivity : Activity() {
         android.app.DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Too many server redirects"
         android.app.DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Server rejected the download (HTTP error)"
         android.app.DownloadManager.ERROR_UNKNOWN -> "Unknown Android download error"
-        android.app.DownloadManager.ERROR_BLOCKED -> "Download blocked by Android or network policy"
         in 400..599 -> "HTTP $reason from the media server"
         else -> "Android reason code $reason"
     }
