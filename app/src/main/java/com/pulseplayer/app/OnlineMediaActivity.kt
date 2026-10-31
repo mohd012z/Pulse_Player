@@ -141,6 +141,8 @@ class OnlineMediaActivity : Activity() {
             "JOOX" to "https://www.joox.com/",
             "Spotify" to "https://open.spotify.com/",
             "YouTube Movies" to "https://www.youtube.com/results?search_query=official+full+movies",
+            "Movie Melayu" to "https://www.youtube.com/results?search_query=filem+melayu+penuh+rasmi",
+            "Movie Indonesia" to "https://www.youtube.com/results?search_query=film+indonesia+full+movie+resmi",
             "Public Domain Movies" to "https://www.youtube.com/results?search_query=public+domain+full+movies",
             "Live TV" to "https://www.youtube.com/results?search_query=official+live+tv+channel",
             "Live Sports" to "https://www.youtube.com/results?search_query=official+live+sports",
