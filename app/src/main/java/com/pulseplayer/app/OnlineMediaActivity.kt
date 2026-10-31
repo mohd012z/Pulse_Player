@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.util.Rational
 import android.content.res.Configuration
 import android.content.Intent
+import android.provider.Settings
 import android.graphics.Color
 import android.content.pm.ActivityInfo
 import android.view.View
@@ -80,16 +81,126 @@ class OnlineMediaActivity : Activity() {
         return id?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
     }
 
-    private fun rememberVideo(uri: Uri) {
+    private fun rememberVideo(uri: Uri, title: String? = null) {
         val id = youtubeId(uri) ?: return
         val old = readHistory()
+        val previous = (0 until old.length()).mapNotNull { old.optJSONObject(it) }
+            .firstOrNull { it.optString("id") == id }
+        val cleanedTitle = title?.trim()?.take(160)?.takeIf {
+            it.isNotBlank() && it != "YouTube" && it != "YouTube - YouTube"
+        }
         val next = JSONArray()
-        next.put(JSONObject().put("id", id).put("visitedAt", System.currentTimeMillis()))
+        next.put(JSONObject()
+            .put("id", id)
+            .put("title", cleanedTitle ?: previous?.optString("title").orEmpty())
+            .put("posterUrl", "https://i.ytimg.com/vi/$id/hqdefault.jpg")
+            .put("visitedAt", System.currentTimeMillis()))
         for (i in 0 until old.length()) {
             val item = old.optJSONObject(i) ?: continue
             if (item.optString("id") != id && next.length() < 100) next.put(item)
         }
         historyStore.edit().putString("videos", next.toString()).apply()
+    }
+
+    private fun escapeHtml(value: String): String = value
+        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\"", "&quot;").replace("'", "&#39;")
+
+    private fun showPosterGrid() {
+        val items = readHistory()
+        val entries = (0 until minOf(items.length(), 60)).mapNotNull { index ->
+            items.optJSONObject(index)?.takeIf {
+                it.optString("id").matches(Regex("[A-Za-z0-9_-]{11}"))
+            }
+        }
+        if (entries.isEmpty()) {
+            Toast.makeText(this, "Watch videos to populate the poster grid", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cards = entries.joinToString("") { entry ->
+            val id = entry.optString("id")
+            val title = escapeHtml(entry.optString("title").ifBlank { "YouTube video · $id" })
+            val poster = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+            val date = java.text.DateFormat.getDateInstance().format(
+                java.util.Date(entry.optLong("visitedAt").coerceAtLeast(0L)))
+            "<a href=\"https://www.youtube.com/watch?v=$id\" aria-label=\"$title\">" +
+                "<img loading=\"lazy\" alt=\"Thumbnail: $title\" src=\"$poster\"/>" +
+                "<strong>$title</strong><small>Watched ${escapeHtml(date)}</small></a>"
+        }
+        val html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+            "<style>body{background:#10141f;color:white;font-family:sans-serif;margin:16px}" +
+            ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}" +
+            "a{color:white;text-decoration:none;background:#1b2331;border-radius:12px;overflow:hidden;padding:8px}" +
+            "a{display:block;min-height:180px}a:focus,a:focus-visible{outline:5px solid #75e2c0;outline-offset:3px;transform:scale(1.025)}" +
+            "img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
+            "strong,small{display:block;padding:5px 8px;overflow-wrap:anywhere}small{color:#b6c3cd}" +
+            "</style></head><body><h2>Recently watched videos</h2>" +
+            "<div class=\"grid\">$cards</div>" +
+            "<script>document.querySelector(\'.grid a\')?.focus();</script></body></html>"
+        browser?.apply { isFocusable = true; isFocusableInTouchMode = true
+            loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
+            requestFocus()
+        }
+    }
+
+    private fun savePlaybackPosition(videoId: String, seconds: Double) {
+        if (!videoId.matches(Regex("[A-Za-z0-9_-]{11}")) ||
+            !seconds.isFinite() || seconds < 0.0 || seconds > 86400.0) return
+        historyStore.edit().putLong("position:$videoId", seconds.toLong()).apply()
+    }
+
+    private var awaitingCastReturn = false
+
+    private fun openYouTubeForCasting() {
+        val current = browser?.url?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        val videoId = current?.let { youtubeId(it) }
+        val destination = if (videoId != null) {
+            val seconds = historyStore.getLong("position:$videoId", 0L).coerceIn(0L, 86400L)
+            "https://www.youtube.com/watch?v=$videoId" +
+                if (seconds > 0L) "&t=${seconds}s" else ""
+        } else "https://www.youtube.com/"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(destination)).apply {
+            setPackage("com.google.android.youtube")
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        val launched = runCatching { startActivity(intent) }.isSuccess
+        if (!launched) {
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(destination))) }
+                .onFailure {
+                    Toast.makeText(this, "No app available to open YouTube", Toast.LENGTH_LONG).show()
+                }
+                .onSuccess { awaitingCastReturn = true }
+        } else {
+            awaitingCastReturn = true
+            Toast.makeText(this, "Use the Cast icon in YouTube to select your TV", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showContinueWatching() {
+        val items = readHistory()
+        if (items.length() == 0) {
+            Toast.makeText(this, "No videos to continue", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val entries = (0 until minOf(items.length(), 24)).mapNotNull { index ->
+            items.optJSONObject(index)?.optString("id")
+                ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+        }
+        if (entries.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle("Continue Watching · Recently opened")
+            .setItems(entries.map { id ->
+                val position = historyStore.getLong("position:$id", 0L)
+                if (position > 0) "YouTube · $id · resume at ${position}s" else "YouTube · $id"
+            }.toTypedArray()) { _, index ->
+                val id = entries[index]
+                val position = historyStore.getLong("position:$id", 0L).coerceIn(0L, 86400L)
+                val target = "https://www.youtube.com/watch?v=$id" +
+                    if (position > 0) "&t=${position}s" else ""
+                browser?.loadUrl(target)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showWatchHistory() {
@@ -102,7 +213,7 @@ class OnlineMediaActivity : Activity() {
             val entry = items.optJSONObject(i)
             val date = java.text.DateFormat.getDateTimeInstance().format(
                 java.util.Date(entry?.optLong("visitedAt") ?: 0L))
-            "$date · ${entry?.optString("id").orEmpty()}"
+            "$date · ${entry?.optString("title")?.takeIf { it.isNotBlank() } ?: entry?.optString("id").orEmpty()}"
         }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Watch history")
@@ -131,16 +242,20 @@ class OnlineMediaActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        requestedOrientation = DeviceFormFactor.preferredOrientation(this)
         // Dedicated browser screen: avoid OEM edge-to-edge status icons obscuring controls.
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
             "YouTube" to "https://www.youtube.com/",
+            "RTM Klik" to "https://rtmklik.rtm.gov.my/",
+            "Vidio" to "https://www.vidio.com/",
             "YouTube Music" to "https://music.youtube.com/",
             "YouTube Shorts" to "https://www.youtube.com/shorts",
             "JOOX" to "https://www.joox.com/",
             "Spotify" to "https://open.spotify.com/",
             "YouTube Movies" to "https://www.youtube.com/results?search_query=official+full+movies",
+            "Movie Melayu" to "https://www.youtube.com/results?search_query=filem+melayu+penuh+rasmi",
+            "Movie Indonesia" to "https://www.youtube.com/results?search_query=film+indonesia+full+movie+resmi",
             "Public Domain Movies" to "https://www.youtube.com/results?search_query=public+domain+full+movies",
             "Live TV" to "https://www.youtube.com/results?search_query=official+live+tv+channel",
             "Live Sports" to "https://www.youtube.com/results?search_query=official+live+sports",
@@ -180,8 +295,13 @@ class OnlineMediaActivity : Activity() {
                 else null
             } else providers[name]
         } ?: run { finish(); return }
+        val movieQuery = intent.getStringExtra("movie_search_query")
+            ?.takeIf { name in setOf("Movie Melayu", "Movie Indonesia") && it.length in 1..300 }
+        val resolvedUrl = if (movieQuery != null) {
+            "https://www.youtube.com/results?search_query=" + Uri.encode(movieQuery)
+        } else url
         activeProvider = name
-        homeUrl = url
+        homeUrl = resolvedUrl
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF10141F.toInt())
@@ -230,8 +350,29 @@ class OnlineMediaActivity : Activity() {
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
         val historyButton = toolbarButton("History", "Watch history") { showWatchHistory() }
+        val continueButton = toolbarButton("Continue", "Continue recently opened videos") { showContinueWatching() }
+        val posterButton = toolbarButton("Posters", "Browse recently watched video thumbnails") { showPosterGrid() }
         val external = toolbarButton("Official app", "Open official app") {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }
+        val mirrorButton = toolbarButton("Mirror", "Open screen mirroring and routing options") {
+            val options = arrayOf("YouTube Cast · Open official YouTube app", "Screen mirror · Android Cast settings", "Audio output · Android settings", "Compatibility and troubleshooting")
+            AlertDialog.Builder(this)
+                .setTitle("Mirror Cast")
+                .setItems(options) { _, selected ->
+                    when (selected) {
+                        0 -> openYouTubeForCasting()
+                        1 -> runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
+                            .onFailure { Toast.makeText(this, "Cast settings unavailable on this device", Toast.LENGTH_LONG).show() }
+                        2 -> runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                            .onFailure { Toast.makeText(this, "Audio output settings unavailable", Toast.LENGTH_LONG).show() }
+                        3 -> AlertDialog.Builder(this)
+                            .setTitle("Connection help")
+                            .setMessage("For YouTube, open the official YouTube app, tap its Cast icon, and choose a supported TV on the same network. Screen mirroring requires compatible phone and TV casting protocols. Use the same Wi-Fi when required, enable screen sharing on the TV, then select the receiver in Android settings. Audio routing is separate from video mirroring. DRM-protected playback may be blocked. No protected playback is bypassed.")
+                            .setPositiveButton("OK", null).show()
+                    }
+                }
+                .setNegativeButton("Cancel", null).show()
         }
         val compactButton = toolbarButton("Mini", "Floating mini player") { enterFloatingMini() }
         val downloadButton = toolbarButton("Download", "Download available media") { showMediaDownloadOptions() }
@@ -246,7 +387,10 @@ class OnlineMediaActivity : Activity() {
         firstRow.addView(back, LinearLayout.LayoutParams(dp(if (tvMode) 130 else if (isTablet) 88 else 70), dp(if (tvMode) 68 else 38)))
         firstRow.addView(title, LinearLayout.LayoutParams(0, dp(if (tvMode) 68 else 38), 1f))
         if (isTablet) {
+            firstRow.addView(posterButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
+            firstRow.addView(continueButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
+            firstRow.addView(mirrorButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(external, LinearLayout.LayoutParams(dp(if (tvMode) 160 else 114), dp(if (tvMode) 68 else 38)))
             firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(if (tvMode) 150 else 64), dp(if (tvMode) 68 else 38)))
         }
@@ -258,7 +402,10 @@ class OnlineMediaActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
+            secondRow.addView(posterButton, LinearLayout.LayoutParams(0, dp(36), 1f))
+            secondRow.addView(continueButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
+            secondRow.addView(mirrorButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(downloadButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             top.addView(secondRow)
@@ -278,7 +425,11 @@ class OnlineMediaActivity : Activity() {
         web.addJavascriptInterface(object {
             @android.webkit.JavascriptInterface
             fun report(playing: Boolean) {
-                runOnUiThread { providerVideoPlaying = playing }
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed && allowedSessionUrl(browser?.url)) {
+                        providerVideoPlaying = playing
+                    }
+                }
             }
         }, "PulsePlaybackObserver")
         web.settings.domStorageEnabled = true
@@ -302,7 +453,32 @@ class OnlineMediaActivity : Activity() {
                   document.addEventListener('ended',report,true);
                   report();
                 })();""", null)
-                url?.let { runCatching { rememberVideo(Uri.parse(it)) } }
+                // Read-only HTML5 position observation; provider restrictions are respected.
+                val observedUri = url?.let { runCatching { Uri.parse(it) }.getOrNull() }
+                val observedId = observedUri?.let { youtubeId(it) }
+                if (observedId != null) {
+                    view?.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video');return v && isFinite(v.currentTime) ? v.currentTime : -1;})()"
+                    ) { raw ->
+                        val seconds = raw?.toDoubleOrNull()
+                        if (seconds != null && view.url == url) savePlaybackPosition(observedId, seconds)
+                    }
+                }
+                url?.let { pageUrl ->
+                    val pageUri = runCatching { Uri.parse(pageUrl) }.getOrNull()
+                    if (pageUri != null && youtubeId(pageUri) != null) {
+                        rememberVideo(pageUri)
+                        view?.evaluateJavascript("document.title") { jsonTitle ->
+                            val title = runCatching {
+                                JSONArray("[$jsonTitle]").optString(0)
+                            }.getOrNull()
+                            // Ignore stale asynchronous title callbacks after navigation.
+                            if (view.url == pageUrl && !isFinishing && !isDestroyed) {
+                                rememberVideo(pageUri, title)
+                            }
+                        }
+                    }
+                }
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
@@ -326,7 +502,7 @@ class OnlineMediaActivity : Activity() {
                 fullscreenContainer = container
                 addContentView(container, ViewGroup.LayoutParams(-1, -1))
                 // Allow both portrait short dramas and landscape movies without forcing a reload.
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                requestedOrientation = DeviceFormFactor.preferredOrientation(this@OnlineMediaActivity)
             }
 
             override fun onHideCustomView() {
@@ -412,9 +588,9 @@ class OnlineMediaActivity : Activity() {
         // Open embedded content directly; do not interrupt every launch with a warning dialog.
         if (savedInstanceState == null) {
             val last = sessionStore.getString("page:$name", null)
-            web.loadUrl(if (allowedSessionUrl(last)) last!! else url)
+            web.loadUrl(if (allowedSessionUrl(last)) last!! else resolvedUrl)
         } else if (web.restoreState(savedInstanceState) == null) {
-            web.loadUrl(url)
+            web.loadUrl(resolvedUrl)
         }
     }
 
@@ -572,7 +748,7 @@ class OnlineMediaActivity : Activity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (pipEnabled && fullscreenView == null && providerVideoPlaying) enterFloatingMini()
+        if (!awaitingCastReturn && pipEnabled && fullscreenView == null && providerVideoPlaying) enterFloatingMini()
     }
 
     override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
@@ -597,7 +773,7 @@ class OnlineMediaActivity : Activity() {
         (container.parent as? ViewGroup)?.removeView(container)
         val callback = fullscreenCallback
         fullscreenCallback = null
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        requestedOrientation = previousOrientation
         callback?.onCustomViewHidden()
     }
 
@@ -620,6 +796,11 @@ class OnlineMediaActivity : Activity() {
     override fun onResume() {
         super.onResume()
         browser?.onResume()
+        if (awaitingCastReturn) {
+            awaitingCastReturn = false
+            browser?.requestFocus()
+            Toast.makeText(this, "Returned from YouTube · Pulse Player ready", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDestroy() {
