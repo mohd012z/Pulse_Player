@@ -92,6 +92,31 @@ class OnlineMediaActivity : Activity() {
         historyStore.edit().putString("videos", next.toString()).apply()
     }
 
+    private fun showPosterGrid() {
+        val items = readHistory()
+        val ids = (0 until minOf(items.length(), 60)).mapNotNull { index ->
+            items.optJSONObject(index)?.optString("id")
+                ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+        }
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "Watch videos to populate the poster grid", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cards = ids.joinToString("") { id ->
+            "<a href=\"https://www.youtube.com/watch?v=$id\"><img loading=\"lazy\" " +
+                "alt=\"Video thumbnail\" src=\"https://i.ytimg.com/vi/$id/hqdefault.jpg\"/>" +
+                "<span>Play video</span></a>"
+        }
+        val html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+            "<style>body{background:#10141f;color:white;font-family:sans-serif;margin:16px}" +
+            ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}" +
+            "a{color:white;text-decoration:none;background:#1b2331;border-radius:12px;overflow:hidden;padding:8px}" +
+            "a:focus{outline:4px solid #75e2c0}img{width:100%;aspect-ratio:16/9;object-fit:cover}" +
+            "span{display:block;padding:8px}</style></head><body><h2>Recently watched videos</h2>" +
+            "<div class=\"grid\">$cards</div></body></html>"
+        browser?.loadDataWithBaseURL("https://www.youtube.com/", html, "text/html", "UTF-8", null)
+    }
+
     private fun showContinueWatching() {
         val items = readHistory()
         if (items.length() == 0) {
@@ -260,6 +285,7 @@ class OnlineMediaActivity : Activity() {
         }
         val historyButton = toolbarButton("History", "Watch history") { showWatchHistory() }
         val continueButton = toolbarButton("Continue", "Continue recently opened videos") { showContinueWatching() }
+        val posterButton = toolbarButton("Posters", "Browse recently watched video thumbnails") { showPosterGrid() }
         val external = toolbarButton("Official app", "Open official app") {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
@@ -276,6 +302,7 @@ class OnlineMediaActivity : Activity() {
         firstRow.addView(back, LinearLayout.LayoutParams(dp(if (tvMode) 130 else if (isTablet) 88 else 70), dp(if (tvMode) 68 else 38)))
         firstRow.addView(title, LinearLayout.LayoutParams(0, dp(if (tvMode) 68 else 38), 1f))
         if (isTablet) {
+            firstRow.addView(posterButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(continueButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(external, LinearLayout.LayoutParams(dp(if (tvMode) 160 else 114), dp(if (tvMode) 68 else 38)))
@@ -289,6 +316,7 @@ class OnlineMediaActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
+            secondRow.addView(posterButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(continueButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
