@@ -92,6 +92,26 @@ class OnlineMediaActivity : Activity() {
         historyStore.edit().putString("videos", next.toString()).apply()
     }
 
+    private fun showContinueWatching() {
+        val items = readHistory()
+        if (items.length() == 0) {
+            Toast.makeText(this, "No videos to continue", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val entries = (0 until minOf(items.length(), 24)).mapNotNull { index ->
+            items.optJSONObject(index)?.optString("id")
+                ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{11}")) }
+        }
+        if (entries.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle("Continue Watching · Recently opened")
+            .setItems(entries.map { "YouTube · $it" }.toTypedArray()) { _, index ->
+                browser?.loadUrl("https://www.youtube.com/watch?v=${entries[index]}")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showWatchHistory() {
         val items = readHistory()
         if (items.length() == 0) {
@@ -136,6 +156,8 @@ class OnlineMediaActivity : Activity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         val providers = mapOf(
             "YouTube" to "https://www.youtube.com/",
+            "RTM Klik" to "https://rtmklik.rtm.gov.my/",
+            "Vidio" to "https://www.vidio.com/",
             "YouTube Music" to "https://music.youtube.com/",
             "YouTube Shorts" to "https://www.youtube.com/shorts",
             "JOOX" to "https://www.joox.com/",
@@ -237,6 +259,7 @@ class OnlineMediaActivity : Activity() {
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
         val historyButton = toolbarButton("History", "Watch history") { showWatchHistory() }
+        val continueButton = toolbarButton("Continue", "Continue recently opened videos") { showContinueWatching() }
         val external = toolbarButton("Official app", "Open official app") {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
@@ -253,6 +276,7 @@ class OnlineMediaActivity : Activity() {
         firstRow.addView(back, LinearLayout.LayoutParams(dp(if (tvMode) 130 else if (isTablet) 88 else 70), dp(if (tvMode) 68 else 38)))
         firstRow.addView(title, LinearLayout.LayoutParams(0, dp(if (tvMode) 68 else 38), 1f))
         if (isTablet) {
+            firstRow.addView(continueButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(historyButton, LinearLayout.LayoutParams(dp(if (tvMode) 130 else 94), dp(if (tvMode) 68 else 38)))
             firstRow.addView(external, LinearLayout.LayoutParams(dp(if (tvMode) 160 else 114), dp(if (tvMode) 68 else 38)))
             firstRow.addView(downloadButton, LinearLayout.LayoutParams(dp(if (tvMode) 150 else 64), dp(if (tvMode) 68 else 38)))
@@ -265,6 +289,7 @@ class OnlineMediaActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
+            secondRow.addView(continueButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(historyButton, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(external, LinearLayout.LayoutParams(0, dp(36), 1f))
             secondRow.addView(downloadButton, LinearLayout.LayoutParams(0, dp(36), 1f))
