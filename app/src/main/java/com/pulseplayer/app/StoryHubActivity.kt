@@ -256,6 +256,18 @@ class StoryHubActivity : Activity() {
         scroll.requestFocus()
     }
 
+    /** Persist SAF read access for both episode and novel imports. */
+    private fun persistDocumentReadGrant(uri: Uri, resultFlags: Int) {
+        val persisted = StoryUriGrantPolicy.persistReadGrant(
+            resultFlags, Intent.FLAG_GRANT_READ_URI_PERMISSION
+        ) { granted -> contentResolver.takePersistableUriPermission(uri, granted) }
+        if (!persisted) {
+            android.widget.Toast.makeText(
+                this, "Document access may expire after restart", android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         activeVideo?.pause()
@@ -272,12 +284,15 @@ class StoryHubActivity : Activity() {
             }
             data.data?.let { chosen.add(it) }
             chosen.distinct().forEach { uri ->
-                runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                persistDocumentReadGrant(uri, data.flags)
                 if (!videos.contains(uri)) videos.add(uri)
             }
             showDrama()
         } else if (requestCode == requestNovel) {
-            data.data?.let { showNovel(it) }
+            data.data?.let { uri ->
+                persistDocumentReadGrant(uri, data.flags)
+                showNovel(uri)
+            }
         }
     }
 }
