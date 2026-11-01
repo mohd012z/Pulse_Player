@@ -31,6 +31,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -934,18 +935,16 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
-        "Import / file manager", "Online music services", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Power saving mode", "Inspect media URL", "🎬 Short Drama & 📖 Novel"
-    )) { index ->
-        when (index) {
-            0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
+    private fun showMoreMenu() = showPicker("Pulse Player · More", MoreMenuContract.labels()) { index ->
+        when (MoreMenuContract.actionAt(index)) {
+            MoreMenuContract.Action.IMPORT -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+            MoreMenuContract.Action.ONLINE -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
             }
-            2 -> showPicker("Malaysia radio", arrayOf(
+            MoreMenuContract.Action.YOUTUBE -> showYtDownloadDialog()
+            MoreMenuContract.Action.RADIO -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
                 "RTM official radio (stations)", "BFM 89.9 official player",
                 "ERA official player", "MY FM official player"
@@ -961,24 +960,116 @@ class MainActivity : Activity() {
                     7 -> openProvider("MY FM")
                 }
             }
-            3 -> showAudioMenu()
-            4 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
+            MoreMenuContract.Action.AUDIO -> showAudioMenu()
+            MoreMenuContract.Action.LYRICS -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
                 when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog() }
             }
-            5 -> requestSpectrum()
-            6 -> showPlaybackMenu()
-            7 -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
+            MoreMenuContract.Action.SPECTRUM -> requestSpectrum()
+            MoreMenuContract.Action.PLAYBACK -> showPlaybackMenu()
+            MoreMenuContract.Action.CONNECTION -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
                 when (it) {
                     0 -> openSystemSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
                     1 -> chooseAudioOutput()
                     2 -> openSystemSettings(Settings.ACTION_WIFI_SETTINGS)
                 }
             }
-            8 -> shareCurrentTrack()
-            9 -> showPowerSavingDialog()
-            10 -> Phase1InspectorDialog.show(this)
-            11 -> startActivity(Intent(this, StoryHubActivity::class.java))
+            MoreMenuContract.Action.SHARE -> shareCurrentTrack()
+            MoreMenuContract.Action.POWER -> showPowerSavingDialog()
+            MoreMenuContract.Action.INSPECT -> Phase1InspectorDialog.show(this)
+            MoreMenuContract.Action.STORY -> startActivity(Intent(this, StoryHubActivity::class.java))
+            null -> Unit
         }
+    }
+
+    private val ytDlp by lazy { YtDlpManager(this) }
+
+    private fun showYtDownloadDialog() {
+        val formats = YtDlpManager.FORMATS.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("YouTube / YouTube Music — download audio")
+            .setMessage("Audio only (no video). Works with watch, shorts, live and playlist links. " +
+                "Saved to Downloads/PulsePlayer. Use only on videos you have rights to.")
+            .setSingleChoiceItems(formats, 0) { dialog, which ->
+                dialog.dismiss()
+                showYtUrlDialog(formats[which])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showYtUrlDialog(format: String) {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+        }
+        val urlBox = EditText(this).apply {
+            hint = "https://www.youtube.com/watch?v=…"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            root.addView(this, LinearLayout.LayoutParams(-1, -2))
+        }
+        val thumbBox = CheckBox(this).apply {
+            text = "Save cover image too (thumbnail)"
+            root.addView(this, LinearLayout.LayoutParams(-1, -2))
+        }
+        val progressView = TextView(this).apply {
+            visibility = View.GONE
+            text = "Starting…"
+            root.addView(this, LinearLayout.LayoutParams(-1, -2))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Download $format")
+            .setView(root)
+            .setPositiveButton("Download") { d, _ ->
+                val url = urlBox.text.toString().trim()
+                if (!YtDlpManager.isSupportedUrl(url)) {
+                    status("Enter a YouTube / YouTube Music link")
+                    return@setPositiveButton
+                }
+                progressView.visibility = View.VISIBLE
+                ytDlp.start(url, format, thumbBox.isChecked,
+                    onProgress = { p ->
+                        clock.post {
+                            val speedPart = p.speed?.let { " · $it" } ?: ""
+                            val etaPart = p.etaSeconds?.let {
+                                " · ETA ${"%.0f".format(it / 60.0)}m${"%.0f".format(it % 60.0)}s"
+                            } ?: ""
+                            progressView.text = "Downloading… ${"%.0f".format(p.percent)}%$speedPart$etaPart"
+                        }
+                    },
+                    onComplete = { files ->
+                        thread {
+                            files.forEach { ytDlp.importToMediaStore(it) }
+                            val dirText = runCatching { ytDlp.resolveDownloadDir() }
+                                .getOrNull()?.absolutePath ?: "Pulse Player downloads"
+                            val playUri = runCatching {
+                                files.firstOrNull()?.let {
+                                    ytDlp.mediaStoreUriFor(it) ?: Uri.fromFile(it)
+                                }
+                            }.getOrNull()
+                            clock.post {
+                                AlertDialog.Builder(this)
+                                    .setTitle(files.firstOrNull()?.name ?: "Downloaded")
+                                    .setMessage("$dirText\n${files.size} file(s) saved. Play it now?")
+                                    .setPositiveButton("Play") { dd, _ ->
+                                        dd.dismiss()
+                                        playUri?.let { playDocument(it) }
+                                    }
+                                    .setNeutralButton("OK", null)
+                                    .show()
+                            }
+                        }
+                    },
+                    onError = { message ->
+                        clock.post {
+                            progressView.text = message
+                            status(message)
+                        }
+                    }
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .setCancelable(false)
+            .show()
     }
 
     private fun showPowerSavingDialog() {
