@@ -897,9 +897,15 @@ class MainActivity : Activity() {
             }
         }
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-            })
+            if (destination in setOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+                startActivity(Intent(this, ProviderBrowserActivity::class.java).apply {
+                    putExtra(ProviderBrowserActivity.EXTRA_PROVIDER, destination)
+                })
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                })
+            }
         }.onFailure {
             status("Cannot open $destination: ${it.message}")
         }
@@ -929,19 +935,16 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showMoreMenu() = showPicker("Pulse Player · More", arrayOf(
-        "Import / file manager", "Online music services", "YouTube / YT Music — download", "Malaysian radio", "Audio mixer / effects",
-        "Lyrics / subtitles", "Live audio spectrum", "Playback preferences", "Bluetooth / Wi-Fi / output", "Share current song", "Power saving mode", "Inspect media URL"
-    )) { index ->
-        when (index) {
-            0 -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
+    private fun showMoreMenu() = showPicker("Pulse Player · More", MoreMenuContract.labels()) { index ->
+        when (MoreMenuContract.actionAt(index)) {
+            MoreMenuContract.Action.IMPORT -> showPicker("Import music", arrayOf("Open audio file", "Import folder", "Remove saved folder permissions")) {
                 when (it) { 0 -> openFilePicker(); 1 -> openFolderPicker(); 2 -> clearFolders() }
             }
-            1 -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
+            MoreMenuContract.Action.ONLINE -> showPicker("Online music · official services", arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")) {
                 openProvider(arrayOf("YouTube", "YouTube Music", "JOOX", "Spotify")[it])
             }
-            2 -> showYtDownloadDialog()
-            3 -> showPicker("Malaysia radio", arrayOf(
+            MoreMenuContract.Action.YOUTUBE -> showYtDownloadDialog()
+            MoreMenuContract.Action.RADIO -> showPicker("Malaysia radio", arrayOf(
                 "Play Malaysia radio list", "Auto-discover MY stations & save", "All saved radio", "Add HTTPS stream",
                 "RTM official radio (stations)", "BFM 89.9 official player",
                 "ERA official player", "MY FM official player"
@@ -957,22 +960,24 @@ class MainActivity : Activity() {
                     7 -> openProvider("MY FM")
                 }
             }
-            4 -> showAudioMenu()
-            5 -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
+            MoreMenuContract.Action.AUDIO -> showAudioMenu()
+            MoreMenuContract.Action.LYRICS -> showPicker("Lyrics / subtitles", arrayOf("Import local .lrc for playing track", "View lyrics")) {
                 when (it) { 0 -> lyricsForCurrent(); 1 -> showLyricDialog() }
             }
-            6 -> requestSpectrum()
-            7 -> showPlaybackMenu()
-            8 -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
+            MoreMenuContract.Action.SPECTRUM -> requestSpectrum()
+            MoreMenuContract.Action.PLAYBACK -> showPlaybackMenu()
+            MoreMenuContract.Action.CONNECTION -> showPicker("Connection options", arrayOf("Android Bluetooth settings", "Change audio output", "Android Wi-Fi settings")) {
                 when (it) {
                     0 -> openSystemSettings(Settings.ACTION_BLUETOOTH_SETTINGS)
                     1 -> chooseAudioOutput()
                     2 -> openSystemSettings(Settings.ACTION_WIFI_SETTINGS)
                 }
             }
-            9 -> shareCurrentTrack()
-            10 -> showPowerSavingDialog()
-            11 -> Phase1InspectorDialog.show(this)
+            MoreMenuContract.Action.SHARE -> shareCurrentTrack()
+            MoreMenuContract.Action.POWER -> showPowerSavingDialog()
+            MoreMenuContract.Action.INSPECT -> Phase1InspectorDialog.show(this)
+            MoreMenuContract.Action.STORY -> startActivity(Intent(this, StoryHubActivity::class.java))
+            null -> Unit
         }
     }
 
@@ -1264,6 +1269,30 @@ class MainActivity : Activity() {
             background = panelBackground()
         }
         root.addView(dock)
+        // Persistent bottom destinations. Keep the existing music player and mini-player intact.
+        val bottomNavigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            contentDescription = "Pulse Player bottom navigation"
+        }
+        fun addDestination(label: String, click: () -> Unit) {
+            bottomNavigation.addView(button(label, click).apply {
+                isFocusable = true
+                contentDescription = label
+                minHeight = dp(if (isTelevisionUi()) 56 else 48)
+            }, LinearLayout.LayoutParams(0, dp(if (isTelevisionUi()) 60 else 50), 1f).apply {
+                marginStart = dp(2)
+                marginEnd = dp(2)
+            })
+        }
+        addDestination("♫ Music") { switchPlaylist("DEVICE") }
+        addDestination("🎬 Movies") { startActivity(Intent(this, CinemaActivity::class.java)) }
+        addDestination("▣ ShortTV") { startActivity(Intent(this, StoryHubActivity::class.java)) }
+        addDestination("⇩ Files") { showPicker("Files", arrayOf("Import audio file", "Import audio folder")) { index ->
+            if (index == 0) openFilePicker() else openFolderPicker()
+        } }
+        addDestination("⚙ More") { showMoreMenu() }
+        root.addView(bottomNavigation)
         val titleInfo = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = label("Choose a track", 15f, Color.WHITE, true).apply {
             isSingleLine = true
@@ -1393,6 +1422,32 @@ class MainActivity : Activity() {
             })
         }
     }
+
+    private fun showCinemaCategories() {
+        val categories = PulseCatalogNavigation.visibleCategories()
+            .filterNot { it.sourceCode.equals("Nollywood", ignoreCase = true) }
+        val labels = categories.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Pulse Cinema · Categories")
+            .setItems(labels) { _, index ->
+                val chosen = categories[index]
+                if (chosen.sourceCode == "ShortTV_Discover" || chosen.sourceCode == "Novel") {
+                    startActivity(Intent(this, StoryHubActivity::class.java))
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle(chosen.label)
+                        .setMessage("Online catalog is not connected to an authorized provider yet. Your existing music and local stories remain available.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun isTelevisionUi(): Boolean =
+        (getSystemService(UI_MODE_SERVICE) as android.app.UiModeManager)
+            .currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 }

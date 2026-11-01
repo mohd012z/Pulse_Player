@@ -28,6 +28,15 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".StoryHubActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+        <activity android:name=".CinemaActivity" android:exported="false" />
+        <activity android:name=".LocalVideoActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+        <activity android:name=".ArchiveBrowserActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+        <activity android:name=".ProviderBrowserActivity" android:exported="false" />
+
         <service
             android:name=".PlaybackService"
             android:exported="true"

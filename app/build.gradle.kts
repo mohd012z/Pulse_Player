@@ -34,8 +34,10 @@ android {
 dependencies {
     val media3Version = "1.11.1"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("com.google.guava:guava:33.4.8-android")
     implementation("androidx.room:room-runtime:2.8.4")
