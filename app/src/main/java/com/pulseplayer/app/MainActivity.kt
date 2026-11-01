@@ -139,6 +139,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = DeviceFormFactor.preferredOrientation(this)
         window.statusBarColor = COLOR_BG
         window.navigationBarColor = COLOR_BG
         buildUi()
@@ -1053,16 +1054,97 @@ class MainActivity : Activity() {
 
     private fun showMoviesDialog() {
         val options = arrayOf(
-            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports",
+            "Mirror Cast", "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports",
             "Drama China (Pelakon Sebenar)", "Ceramah Agama", "Sidang Media Malaysia",
             "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Misteri Indonesia",
             "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat",
             "Netflix on YouTube", "Netflix Movies"
         )
         showPicker("Watch · Movies · Learn · Live", options) { index ->
-            if (options[index] == "Misteri Indonesia") showIndonesianMystery()
+            if (options[index] == "Mirror Cast") showMirrorCastHelp()
+            else if (options[index] == "Misteri Indonesia") showIndonesianMystery()
+            else if (options[index] in listOf("Movie Melayu", "Movie Indonesia")) showMovieFilters(options[index])
             else openProvider(options[index])
         }
+    }
+
+    private fun showMirrorCastHelp() {
+        val choices = arrayOf("Open Android Cast settings", "Choose audio output", "Connection help")
+        showPicker("Mirror Cast · Android system", choices) { index ->
+            when (index) {
+                0 -> runCatching { startActivity(Intent(Settings.ACTION_CAST_SETTINGS)) }
+                    .onFailure { status("Cast settings unavailable on this Android device") }
+                1 -> chooseAudioOutput()
+                2 -> AlertDialog.Builder(this)
+                    .setTitle("Mirror Cast help")
+                    .setMessage("Connect your phone and TV to the same Wi-Fi when required. Open Cast settings and choose a supported receiver. Some Android devices support Miracast or vendor-specific screen sharing instead. Audio output selection does not mirror video. DRM-protected content may not display. Pulse Player cannot force a connection or bypass provider restrictions.")
+                    .setPositiveButton("OK", null).show()
+            }
+        }
+    }
+
+    private val movieFilterPrefs by lazy { getSharedPreferences("movie_filter_preferences", MODE_PRIVATE) }
+
+    private fun showMovieFilters(provider: String) {
+        val genres = arrayOf("All genres", "Action", "Comedy", "Horror", "Romance", "Drama", "Family", "Documentary")
+        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val years = arrayOf("All years", "Latest ($currentYear)", "Previous year (${currentYear - 1})",
+            "2020–2024", "2010–2019", "Before 2010")
+        val sources = arrayOf("Official-source search (recommended)", "All search results")
+        val key = provider.replace(" ", "_")
+        val savedGenre = movieFilterPrefs.getInt("$key:genre", 0).coerceIn(genres.indices)
+        val savedYear = movieFilterPrefs.getInt("$key:year", 0).coerceIn(years.indices)
+        val savedSource = movieFilterPrefs.getInt("$key:source", 0).coerceIn(sources.indices)
+        showPicker("$provider · Saved filters", arrayOf(
+            "Search with saved filters (${genres[savedGenre]}, ${years[savedYear]})",
+            "Change filters",
+            "Recent searches",
+            "Official streaming platforms"
+        )) { action ->
+            when (action) {
+                0 -> openMovieSearch(provider, savedGenre, savedYear, savedSource, currentYear)
+                1 -> showPicker("$provider · Genre", genres) { genreIndex ->
+                    showPicker("$provider · Release year", years) { yearIndex ->
+                        showPicker("$provider · Source", sources) { sourceIndex ->
+                            movieFilterPrefs.edit()
+                                .putInt("$key:genre", genreIndex)
+                                .putInt("$key:year", yearIndex)
+                                .putInt("$key:source", sourceIndex).apply()
+                            openMovieSearch(provider, genreIndex, yearIndex, sourceIndex, currentYear)
+                        }
+                    }
+                }
+                2 -> {
+                    val history = movieFilterPrefs.getString("$key:recent", "").orEmpty()
+                        .split("\\n").filter { it.isNotBlank() }.take(12)
+                    if (history.isEmpty()) status("No recent movie searches")
+                    else showPicker("$provider · Recent searches", history.toTypedArray()) { index ->
+                        startActivity(Intent(this, OnlineMediaActivity::class.java)
+                            .putExtra("provider", provider)
+                            .putExtra("movie_search_query", history[index]))
+                    }
+                }
+                3 -> showPicker("$provider · Platforms", arrayOf(
+                    "YouTube official-source search",
+                    if (provider == "Movie Melayu") "RTM Klik" else "Vidio"
+                )) { index ->
+                    if (index == 0) openMovieSearch(provider, savedGenre, savedYear, 0, currentYear)
+                    else startActivity(Intent(this, OnlineMediaActivity::class.java)
+                        .putExtra("provider", if (provider == "Movie Melayu") "RTM Klik" else "Vidio"))
+                }
+            }
+        }
+    }
+
+    private fun openMovieSearch(provider: String, genre: Int, year: Int, source: Int, currentYear: Int) {
+        val query = MovieSearchPolicy.query(provider, genre, year, source == 0, currentYear)
+        val key = provider.replace(" ", "_")
+        val old = movieFilterPrefs.getString("$key:recent", "").orEmpty().split("\\n")
+        val recent = (listOf(query) + old.filter { it != query && it.isNotBlank() }).take(12)
+        movieFilterPrefs.edit().putString("$key:recent", recent.joinToString("\\n")).apply()
+        startActivity(Intent(this, OnlineMediaActivity::class.java)
+            .putExtra("provider", provider)
+            .putExtra("movie_search_query", query))
     }
 
     private fun showIndonesianMystery() {
@@ -1082,12 +1164,14 @@ class MainActivity : Activity() {
     private fun openProvider(destination: String) {
         val url = when (destination) {
             "YouTube" -> "https://www.youtube.com/"
+            "RTM Klik" -> "https://rtmklik.rtm.gov.my/"
+            "Vidio" -> "https://www.vidio.com/"
             "Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat", "Netflix on YouTube", "Netflix Movies" -> ""
             "YouTube Music" -> "https://music.youtube.com/"
             "YouTube Shorts" -> "https://www.youtube.com/shorts"
             "JOOX" -> "https://www.joox.com/"
             "Spotify" -> "https://open.spotify.com/"
-            "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports" -> "https://www.youtube.com/"
+            "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports" -> "https://www.youtube.com/"
             "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)" -> "https://www.youtube.com/"
             "RTM Radio Malaysia" -> "https://radio.rtm.gov.my/"
             "BFM 89.9" -> "https://www.bfm.my/"
@@ -1096,7 +1180,7 @@ class MainActivity : Activity() {
             else -> return
         }
         runCatching {
-            if (destination in listOf("YouTube", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
+            if (destination in listOf("YouTube", "RTM Klik", "Vidio", "YouTube Music", "YouTube Shorts", "JOOX", "Spotify", "YouTube Movies", "Movie Melayu", "Movie Indonesia", "Public Domain Movies", "Live TV", "Live Sports", "Ceramah Agama", "Sidang Media Malaysia", "Sejarah Malaysia", "5-Minute Crafts", "Live Streaming", "Drama China (Pelakon Sebenar)", "Radio Malaysia (RTM)")) {
                 startActivity(Intent(this, OnlineMediaActivity::class.java).putExtra("provider", destination))
             } else {
                 if (destination in listOf("Drama Melayu", "Drama Korea", "Al-Quran", "Nasyid", "Tarannum", "Selawat", "Netflix on YouTube", "Netflix Movies")) {
@@ -1233,8 +1317,30 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun showCrossfadeSettings() {
+        val durations = intArrayOf(0, 2, 4, 6, 8, 12)
+        val options = durations.map { seconds ->
+            if (seconds == 0) "Off" else "${seconds} seconds"
+        }.toTypedArray()
+        customCommand(PlaybackService.CMD_STATUS) { extras, ok ->
+            val selected = if (ok) extras.getInt(PlaybackService.ARG_CROSSFADE_SECONDS, 0) else 0
+            showPicker("Crossfade · ${if (selected == 0) "Off" else "${selected}s"}", options) { index ->
+                val seconds = durations[index]
+                customCommand(PlaybackService.CMD_SET_CROSSFADE, Bundle().apply {
+                    putInt(PlaybackService.ARG_CROSSFADE_SECONDS, seconds)
+                }) { _, success ->
+                    status(
+                        if (!success) "Could not save crossfade setting"
+                        else if (seconds == 0) "Crossfade disabled"
+                        else "Crossfade ${seconds}s saved; audio overlap pending"
+                    )
+                }
+            }
+        }
+    }
+
     private fun showPlaybackMenu() = showPicker("Playback options", arrayOf(
-        "Toggle shuffle", "Cycle repeat", "Change speed", "Sleep timer", "Seek back 10s", "Seek forward 10s"
+        "Toggle shuffle", "Cycle repeat", "Change speed", "Sleep timer", "Seek back 10s", "Seek forward 10s", "Crossfade settings"
     )) {
         val c = controller
         when (it) {
@@ -1266,6 +1372,7 @@ class MainActivity : Activity() {
             }
             4 -> seekRelative(-10_000L)
             5 -> seekRelative(10_000L)
+            6 -> showCrossfadeSettings()
         }
     }
 
