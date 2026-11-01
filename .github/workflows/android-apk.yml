@@ -37,11 +37,20 @@ jobs:
           set -euo pipefail
           unzip -t app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | head -n 15
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          "$BUILD_TOOLS/apksigner" verify --min-sdk-version 26 --verbose --print-certs "$APK" | tee /tmp/standard-apk-signature.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/standard-apk-signature.txt
+          grep -m1 "Signer #1 certificate SHA-256 digest:" /tmp/standard-apk-signature.txt > app/build/outputs/apk/debug/SIGNER_SHA256.txt
+          test -s app/build/outputs/apk/debug/SIGNER_SHA256.txt
+          (cd app/build/outputs/apk/debug && sha256sum app-debug.apk > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: pulseplayer-v4-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
+            app/build/outputs/apk/debug/SIGNER_SHA256.txt
           if-no-files-found: error
           retention-days: 14
