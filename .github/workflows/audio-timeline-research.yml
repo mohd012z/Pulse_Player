@@ -1,0 +1,18 @@
+name: Audio Timeline Research (manual offline)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Synthetic offline regressions
+        run: python -m unittest discover -s tests -p 'test_audio_timeline_v1.py' -v
+      - name: Syntax validation
+        run: python -m py_compile scripts/audio_timeline_v1.py tests/test_audio_timeline_v1.py
