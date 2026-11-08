@@ -1,5 +1,5 @@
 """Read-only offline transcript classification and SQLite job journal."""
-import argparse,hashlib,json,os,re,sqlite3
+import argparse,hashlib,json,os,re,sqlite3,uuid
 from pathlib import Path
 SCHEMA="pulse.audio-timeline.v1"
 RULES={"ad":r"\b(sponsored by|use promo code|this episode is brought to you by)\b","promo":r"\b(subscribe to our newsletter|visit our merch store)\b","intro":r"\b(welcome to the show|you are listening to)\b","outro":r"\b(thanks for listening|see you next episode)\b"}
@@ -24,10 +24,19 @@ def analyze(doc):
         ids.add(ident);prev=end
         findings.append({"id":ident,"start_ms":start,"end_ms":end,"classification":classify(txt),"action":"keep"})
     return {"schema":SCHEMA,"mode":"read-only","source_sha256":doc["source_sha256"],"transcript_sha256":hashlib.sha256(canonical(doc)).hexdigest(),"findings":findings,"media_accessed":False,"media_modified":False,"limitations":["User-provided transcript only","Heuristic matches do not prove advertising intent"]}
+def seal(report):
+    result=dict(report)
+    result["report_sha256"]=hashlib.sha256(canonical(report)).hexdigest()
+    return result
+def verify(report):
+    if not isinstance(report,dict) or "report_sha256" not in report:return False
+    body=dict(report);digest=body.pop("report_sha256")
+    return isinstance(digest,str) and hashlib.sha256(canonical(body)).hexdigest()==digest
 def publish(report,path):
     flags=os.O_CREAT|os.O_EXCL|os.O_WRONLY
     if hasattr(os,"O_NOFOLLOW"):flags|=os.O_NOFOLLOW
     fd=os.open(path,flags,0o600)
+    report=seal(report)
     try:
         with os.fdopen(fd,"wb") as f:
             f.write(canonical(report)+b"\n");f.flush();os.fsync(f.fileno())
@@ -36,19 +45,21 @@ def publish(report,path):
 class Journal:
     def __init__(self,path):
         self.path=str(path)
-        with self.connect() as db:db.execute("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,state TEXT NOT NULL,owner TEXT,lease_until INTEGER NOT NULL DEFAULT 0)")
+        with self.connect() as db:db.execute("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,state TEXT NOT NULL,owner TEXT,token TEXT,lease_until INTEGER NOT NULL DEFAULT 0)")
     def connect(self):return sqlite3.connect(self.path,timeout=5)
     def enqueue(self,ident):
         if not re.fullmatch("[A-Za-z0-9_-]{1,64}",ident):raise ValueError("invalid id")
         with self.connect() as db:db.execute("INSERT OR IGNORE INTO jobs(id,state) VALUES (?,?)",(ident,"queued"))
     def claim(self,ident,owner,now,lease=60):
         if not re.fullmatch("[A-Za-z0-9_-]{1,64}",owner) or type(now)!=int or not 1<=lease<=3600:raise ValueError("invalid claim")
+        token=uuid.uuid4().hex
         with self.connect() as db:
-            c=db.execute("UPDATE jobs SET state='running',owner=?,lease_until=? WHERE id=? AND (state='queued' OR (state='running' AND lease_until<=?))",(owner,now+lease,ident,now))
-            return c.rowcount==1
-    def finish(self,ident,owner,now):
+            c=db.execute("UPDATE jobs SET state='running',owner=?,token=?,lease_until=? WHERE id=? AND (state='queued' OR (state='running' AND lease_until<=?))",(owner,token,now+lease,ident,now))
+            return token if c.rowcount==1 else None
+    def finish(self,ident,token,now):
+        if not isinstance(token,str) or not re.fullmatch("[a-f0-9]{32}",token) or type(now)!=int:raise ValueError("invalid completion")
         with self.connect() as db:
-            c=db.execute("UPDATE jobs SET state='complete',lease_until=0 WHERE id=? AND state='running' AND owner=? AND lease_until>?",(ident,owner,now))
+            c=db.execute("UPDATE jobs SET state='complete',lease_until=0 WHERE id=? AND state='running' AND token=? AND lease_until>?",(ident,token,now))
             return c.rowcount==1
 def main():
     p=argparse.ArgumentParser();p.add_argument("transcript");p.add_argument("report");a=p.parse_args()
